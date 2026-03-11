@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Puzzle Suite v60.3</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Comic+Neue:wght@700&family=Lora:wght@500;600;700&family=Roboto:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="puzzle-suite.css">
+</head>
+
+<body>
+    <div id="drop-zone">
+        <div class="drop-content">
+            <i class="fas fa-file-import" style="font-size:3rem; margin-bottom:15px;"></i><br>
+            Drop text or config file to import
+        </div>
+    </div>
+
+    <div id="toast-container" role="status" aria-live="polite" aria-atomic="false"></div>
+    <div id="loading-overlay">
+        <i class="fas fa-circle-notch fa-spin loading-icon"></i>
+        <div id="loading-text" class="loading-label">Initializing...</div>
+        <div class="progress-container">
+            <div class="progress-bar" id="loading-progress"></div>
+        </div>
+    </div>
+
+    <div id="modal-overlay" role="presentation">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-heading">
+            <h3 class="modal-title" id="modal-heading">Bulk Import</h3>
+            <p class="modal-desc">Format: <code>WORD - Clue</code></p>
+            <textarea id="import-text"
+                placeholder="GALAXY - A system of millions of stars&#10;PLANET - Celestial body orbiting a star"></textarea>
+            <div class="modal-actions">
+                <button class="btn-sec btn-auto" onclick="closeModal()">Cancel</button>
+                <button class="btn-main btn-auto" onclick="processImport()">Import</button>
+            </div>
+        </div>
+    </div>
+    <input type="file" id="file-input" accept=".json,.txt,.csv" onchange="loadConfigFromFile(this)">
+    <button class="toggle-sidebar" onclick="toggleSidebar()" title="Toggle Sidebar" aria-label="Toggle sidebar"><i
+            class="fas fa-bars"></i></button>
+
+    <aside>
+        <div class="brand">
+            <h1><span class="brand-icon"><i class="fas fa-puzzle-piece"></i></span>Puzzle Suite <small
+                    class="version-tag">v60.3</small></h1>
+            <div class="brand-actions">
+                <button onclick="toggleDarkMode()" title="Toggle Dark Mode" id="btn-dark"
+                    aria-label="Toggle dark mode"><i class="fas fa-moon"></i></button>
+                <button onclick="downloadConfig()" title="Save config" aria-label="Save configuration"><i
+                        class="fas fa-save"></i></button>
+                <button onclick="document.getElementById('file-input').click()" title="Load config"
+                    aria-label="Load configuration"><i class="fas fa-folder-open"></i></button>
+                <button onclick="hardReset()" title="Reset all" aria-label="Reset all settings and words"><i
+                        class="fas fa-redo"></i></button>
+            </div>
+        </div>
+        <div class="nav-tabs" role="tablist" aria-label="Sidebar panels">
+            <div class="nav-tab active" onclick="switchTab('content')" data-tab="content" role="tab"
+                aria-selected="true" tabindex="0"><i class="fas fa-list"></i> Editor</div>
+            <div class="nav-tab" onclick="switchTab('design')" data-tab="design" role="tab" aria-selected="false"
+                tabindex="-1"><i class="fas fa-sliders-h"></i> Settings</div>
+            <div class="nav-tab" onclick="switchTab('export')" data-tab="export" role="tab" aria-selected="false"
+                tabindex="-1"><i class="fas fa-download"></i> Export</div>
+        </div>
+        <div class="scroll-area">
+
+            <!-- EDITOR TAB -->
+            <div id="panel-content" role="tabpanel" aria-labelledby="panel-content-tab">
+                <div id="status-dashboard" class="status-bar" aria-live="polite" aria-atomic="true">
+                    <div class="status-left">
+                        <div class="status-icon icon-success" id="status-icon"><i class="fas fa-check"></i></div>
+                        <div>
+                            <div class="status-val" id="placed-count">0/0</div>
+                            <div class="status-lbl">Words Placed</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="wm-container" id="wordList"></div>
+                <div class="button-row">
+                    <button id="btn-undo" onclick="undo()" class="btn-sec flex-1" disabled
+                        aria-label="Undo last word change" title="Undo (Ctrl+Z)"><i class="fas fa-undo"></i>
+                        Undo</button>
+                    <button id="btn-redo" onclick="redo()" class="btn-sec flex-1" disabled aria-label="Redo word change"
+                        title="Redo (Ctrl+Shift+Z)"><i class="fas fa-redo-alt"></i> Redo</button>
+                </div>
+                <div class="button-row">
+                    <button onclick="addWordRow()" class="btn-sec flex-1" aria-label="Add word row"><i
+                            class="fas fa-plus"></i> Add Row</button>
+                    <button onclick="openModal(this)" class="btn-sec flex-1" aria-label="Bulk import words"><i
+                            class="fas fa-file-import"></i> Import</button>
+                </div>
+                <button class="btn-sec btn-clear-list" onclick="clearList()" aria-label="Clear all words from list"><i
+                        class="fas fa-trash-alt"></i> Clear List</button>
+            </div>
+
+            <!-- SETTINGS TAB -->
+            <div id="panel-design" style="display:none" role="tabpanel">
+                <details class="setting-card" open>
+                    <summary>
+                        <div class="card-header-inner"><i class="fas fa-print"></i> Page Setup</div>
+                    </summary>
+                    <div class="card-content">
+                        <label class="field-label">Main Title</label>
+                        <input type="text" id="titleInput" value="Vocabulary Quiz" onkeyup="debouncedUpdateUI()">
+                        <label class="field-label">Subtitle</label>
+                        <input type="text" id="subInput" value="Unit Review" onkeyup="debouncedUpdateUI()">
+                        <label class="field-label" style="margin-top:6px;">Title &amp; Subtitle Scale</label>
+                        <div class="slider-row">
+                            <input type="range" id="titleScale" min="0.4" max="1.5" step="0.05" value="1" oninput="updateTitleScale()">
+                            <span id="titleScaleVal" class="slider-val">1.00x</span>
+                        </div>
+                        <hr class="form-divider">
+                        <label class="field-label">Paper Size</label>
+                        <select id="paperSize" onchange="updatePaperSize()">
+                            <option value="a4">A4 (210 × 297 mm)</option>
+                            <option value="letter">US Letter (8.5 × 11 in)</option>
+                        </select>
+                        <hr class="form-divider">
+                        <label class="field-label">Watermark Image</label>
+                        <div class="file-upload-wrapper">
+                            <input type="file" id="bgUpload" accept="image/*" onchange="handleImage(this)">
+                            <div class="file-upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
+                            <div class="file-upload-subtext">Click to upload (Max 2MB)</div>
+                        </div>
+                        <div class="slider-row" style="margin-top:8px;">
+                            <span class="slider-label">Watermark Opacity</span>
+                            <input type="range" min="0" max="1" step="0.05" value="0.15"
+                                oninput="updateOpacity(this.value)">
+                        </div>
+                        <button onclick="clearWatermark()" class="btn-remove-watermark"
+                            aria-label="Remove watermark image">Remove Watermark</button>
+                    </div>
+                </details>
+
+                <details class="setting-card">
+                    <summary>
+                        <div class="card-header-inner"><i class="fas fa-text-height"></i> Typography & Scaling</div>
+                    </summary>
+                    <div class="card-content">
+                        <label class="field-label">Font Family</label>
+                        <select id="fontSelect" onchange="saveState(); updateUI()">
+                            <option value="'Inter', sans-serif">Clean (Inter)</option>
+                            <option value="'Roboto', sans-serif">Modern (Roboto)</option>
+                            <option value="'Lora', serif">Classic (Lora)</option>
+                            <option value="'Comic Neue', cursive">Playful (Comic)</option>
+                        </select>
+                        <label class="field-label" style="margin-top:6px;">Global Font Scale</label>
+                        <div class="slider-row">
+                            <input type="range" id="globalFontScale" min="0.7" max="1.5" step="0.05" value="1"
+                                oninput="updateGlobalFontScale()">
+                            <span id="globalFontScaleVal" class="slider-val">1.00x</span>
+                        </div>
+
+                        <hr class="form-divider">
+
+                        <label class="field-label">Per-Page Font Scale</label>
+                        <div class="slider-row">
+                            <span class="slider-label">Notes List</span>
+                            <input type="range" id="scaleNotesFont" min="0.5" max="2.0" step="0.05" value="1"
+                                oninput="focusPage(1); updatePageScales()">
+                            <span id="scaleNotesFontVal" class="slider-val">1.00x</span>
+                        </div>
+                        <div class="slider-row">
+                            <span class="slider-label">Search Bank</span>
+                            <input type="range" id="scaleWSFont" min="0.5" max="2.0" step="0.05" value="1"
+                                oninput="focusPage(2); updatePageScales()">
+                            <span id="scaleWSFontVal" class="slider-val">1.00x</span>
+                        </div>
+                        <div class="slider-row">
+                            <span class="slider-label">Crossword Clues</span>
+                            <input type="range" id="scaleCWFont" min="0.5" max="2.0" step="0.05" value="1"
+                                oninput="focusPage(3); updatePageScales()">
+                            <span id="scaleCWFontVal" class="slider-val">1.00x</span>
+                        </div>
+                        <div class="slider-row">
+                            <span class="slider-label">Scramble Words</span>
+                            <input type="range" id="scaleScrFont" min="0.5" max="2.0" step="0.05" value="1"
+                                oninput="focusPage(4); updatePageScales()">
+                            <span id="scaleScrFontVal" class="slider-val">1.00x</span>
+                        </div>
+                        <div class="slider-row">
+                            <span class="slider-label">Answer Keys</span>
+                            <input type="range" id="scaleKeyFont" min="0.5" max="2.0" step="0.05" value="1"
+                                oninput="focusPage(5); updatePageScales()">
+                            <span id="scaleKeyFontVal" class="slider-val">1.00x</span>
+                        </div>
+                    </div>
+                </details>
+
+                <details class="setting-card">
+                    <summary>
+                        <div class="card-header-inner"><i class="fas fa-sticky-note"></i> Notes Page</div>
+                    </summary>
+                    <div class="card-content">
+                        <label class="field-label">Term Column Width</label>
+                        <div class="slider-row">
+                            <input type="range" id="notesTermWidth" min="10" max="50" value="20"
+                                oninput="focusPage(1); updateNotesStyles()">
+                            <span id="notesWidthVal" class="slider-val">20%</span>
+                        </div>
+                        <hr class="form-divider">
+                        <div class="toggle-row"><label>Shuffle for Matching</label><label class="switch"><input
+                                    type="checkbox" id="notesShuffle" onchange="focusPage(1); generateAll()"><span
+                                    class="slider-switch"></span></label></div>
+                        <div class="toggle-row"><label>Show Terms</label><label class="switch"><input type="checkbox"
+                                    id="notesShowTerm" checked onchange="focusPage(1); updateNotesStyles(); saveState();"><span
+                                    class="slider-switch"></span></label></div>
+                        <div class="toggle-row"><label>Show Definitions</label><label class="switch"><input
+                                    type="checkbox" id="notesShowDef" checked
+                                    onchange="focusPage(1); updateNotesStyles(); saveState();"><span
+                                    class="slider-switch"></span></label></div>
+                    </div>
+                </details>
+
+                <details class="setting-card">
+                    <summary>
+                        <div class="card-header-inner"><i class="fas fa-search"></i> Word Search</div>
+                    </summary>
+                    <div class="card-content">
+                        <div class="input-row">
+                            <label class="slider-label">Grid Size</label>
+                            <input type="number" id="wsGridSize" value="15" min="10" max="25" class="input-small-center"
+                                onchange="debouncedGenerate()">
+                        </div>
+                        <div class="toggle-row"><label>Harder Fillers</label><label class="switch"><input
+                                    type="checkbox" id="wsHardFiller" onchange="generateAll()"><span
+                                    class="slider-switch"></span></label></div>
+
+                        <label class="field-label" style="margin-top:6px;">Custom Fillers (Optional)</label>
+                        <input type="text" id="wsCustomFillers" placeholder="e.g. ABC or 123"
+                            onchange="debouncedGenerate()" maxlength="50">
+
+                        <hr class="form-divider">
+                        <label class="field-label label-flex"><span>Grid Scale</span><span class="action-link"
+                                onclick="autoFit('search')">Auto-Fit</span></label>
+                        <input type="range" id="scaleSearch" min="15" max="60" value="32" oninput="focusPage(2); renderActivePage()">
+
+                        <div class="slider-row" style="margin-top:8px;">
+                            <span class="slider-label">Line Width</span>
+                            <input type="range" id="wsLineWidth" min="0.5" max="4" step="0.5" value="1"
+                                oninput="updateGridStyles()">
+                        </div>
+                        <div class="slider-row">
+                            <span class="slider-label">Background Opacity</span>
+                            <input type="range" id="wsOpacity" min="0" max="1" step="0.05" value="1"
+                                oninput="updateGridStyles()">
+                        </div>
+
+                        <hr class="form-divider">
+                        <div class="toggle-row"><label>Show Internal Grid</label><label class="switch"><input
+                                    type="checkbox" id="wsInternalGrid"
+                                    onchange="focusPage(2); renderActivePage(); saveState();"><span
+                                    class="slider-switch"></span></label></div>
+                        <div class="toggle-row"><label>Allow Diagonals</label><label class="switch"><input
+                                    type="checkbox" id="wsDiag" checked onchange="focusPage(2); debouncedGenerate()"><span
+                                    class="slider-switch"></span></label></div>
+                        <div class="toggle-row"><label>Allow Backwards</label><label class="switch"><input
+                                    type="checkbox" id="wsBack" checked onchange="focusPage(2); debouncedGenerate()"><span
+                                    class="slider-switch"></span></label></div>
+                        <div class="toggle-row"><label>Use Clues in Bank</label><label class="switch"><input
+                                    type="checkbox" id="wsUseClues" onchange="focusPage(2); renderActivePage(); saveState();"><span
+                                    class="slider-switch"></span></label></div>
+                    </div>
+                </details>
+
+                <details class="setting-card">
+                    <summary>
+                        <div class="card-header-inner"><i class="fas fa-border-all"></i> Crossword</div>
+                    </summary>
+                    <div class="card-content">
+                        <label class="field-label label-flex"><span>Grid Scale</span><span class="action-link"
+                                onclick="autoFit('crossword')">Auto-Fit</span></label>
+                        <input type="range" id="scaleCrossword" min="15" max="60" value="32"
+                            oninput="focusPage(3); renderActivePage()">
+
+                        <div class="slider-row" style="margin-top:8px;">
+                            <span class="slider-label">Line Width</span>
+                            <input type="range" id="cwLineWidth" min="0.5" max="4" step="0.5" value="1"
+                                oninput="updateGridStyles()">
+                        </div>
+                        <div class="slider-row">
+                            <span class="slider-label">Background Opacity</span>
+                            <input type="range" id="cwOpacity" min="0" max="1" step="0.05" value="1"
+                                oninput="updateGridStyles()">
+                        </div>
+                        <hr class="form-divider">
+                        <div class="toggle-row"><label>Show Word Bank</label><label class="switch"><input
+                                    type="checkbox" id="cwShowBank" onchange="focusPage(3); renderActivePage(); saveState();"><span
+                                    class="slider-switch"></span></label></div>
+                    </div>
+                </details>
+
+                <details class="setting-card">
+                    <summary>
+                        <div class="card-header-inner"><i class="fas fa-random"></i> Word Scramble</div>
+                    </summary>
+                    <div class="card-content">
+                        <div class="toggle-row"><label>Show First Letter Hint</label><label class="switch"><input
+                                    type="checkbox" id="scrShowHint" onchange="focusPage(4); renderActivePage(); saveState();"><span
+                                    class="slider-switch"></span></label></div>
+                    </div>
+                </details>
+            </div>
+
+            <!-- EXPORT TAB -->
+            <div id="panel-export" style="display:none" role="tabpanel">
+                <div class="export-card">
+                    <div class="input-row" style="margin-bottom: 20px;">
+                        <label class="input-inline field-label" style="margin:0;">Filename</label>
+                        <input type="text" id="exportFilename" value="MyPuzzle" class="flex-2">
+                    </div>
+                    <label class="field-label mb-8">Page Order (drag to reorder):</label>
+                    <div id="page-order-list" class="sortable-list">
+                        <div class="sortable-item" draggable="true" data-page="notes">
+                            <i class="fas fa-grip-vertical drag-handle"></i><input type="checkbox" id="sel-notes"
+                                checked onchange="saveState()"><span>Notes</span>
+                        </div>
+                        <div class="sortable-item" draggable="true" data-page="ws">
+                            <i class="fas fa-grip-vertical drag-handle"></i><input type="checkbox" id="sel-ws" checked
+                                onchange="saveState()"><span>Word Search</span>
+                        </div>
+                        <div class="sortable-item" draggable="true" data-page="cw">
+                            <i class="fas fa-grip-vertical drag-handle"></i><input type="checkbox" id="sel-cw" checked
+                                onchange="saveState()"><span>Crossword</span>
+                        </div>
+                        <div class="sortable-item" draggable="true" data-page="scr">
+                            <i class="fas fa-grip-vertical drag-handle"></i><input type="checkbox" id="sel-scr" checked
+                                onchange="saveState()"><span>Scramble</span>
+                        </div>
+                        <div class="sortable-item" draggable="true" data-page="key">
+                            <i class="fas fa-grip-vertical drag-handle"></i><input type="checkbox" id="sel-key" checked
+                                onchange="saveState()"><span>Answer Keys</span>
+                        </div>
+                    </div>
+                    <div class="bulk-export-row">
+                        <input type="number" id="bulkCount" value="1" min="1" max="50" class="input-large-center">
+                        <span class="text-bold-small">Unique Copies (Bulk)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="footer-actions">
+            <button class="btn-sec" onclick="generateAll()" style="flex:0 0 auto;" aria-label="Regenerate puzzles"><i
+                    class="fas fa-sync-alt"></i> Regenerate</button>
+            <button class="btn-main" id="export-btn-main" onclick="exportPDF()" aria-label="Export vector PDF"><i
+                    class="fas fa-file-pdf"></i> Export Vector PDF</button>
+        </div>
+        <div class="resize-handle" id="sidebar-resizer"></div>
+    </aside>
+
+    <main>
+        <div class="preview-toolbar">
+            <div class="page-tabs">
+                <button class="page-btn active" onclick="showPage(1)" id="tab-p1" aria-label="Notes page"><i
+                        class="fas fa-sticky-note"></i> Notes</button>
+                <button class="page-btn" onclick="showPage(2)" id="tab-p2" aria-label="Word Search page"><i
+                        class="fas fa-search"></i> Search</button>
+                <button class="page-btn" onclick="showPage(3)" id="tab-p3" aria-label="Crossword page"><i
+                        class="fas fa-border-all"></i> Crossword</button>
+                <button class="page-btn" onclick="showPage(4)" id="tab-p4" aria-label="Word Scramble page"><i
+                        class="fas fa-random"></i> Scramble</button>
+                <button class="page-btn" onclick="showPage(5)" id="tab-p5" aria-label="Answer Keys page"><i
+                        class="fas fa-key"></i> Keys</button>
+            </div>
+            <div class="zoom-controls">
+                <button class="zoom-btn" onclick="adjustZoom(-0.1)" aria-label="Zoom Out"><i
+                        class="fas fa-minus"></i></button>
+                <button class="zoom-btn" onclick="adjustZoom(0.1)" aria-label="Zoom In"><i
+                        class="fas fa-plus"></i></button>
+            </div>
+        </div>
+        <div class="viewport">
+
+            <div id="page1" class="page visible">
+                <div class="page-content">
+                    <div class="header">
+                        <div class="title-block">
+                            <h1 class="disp-title">Title</h1>
+                            <p class="disp-sub">Unit Review</p>
+                        </div>
+                        <div class="meta-block">
+                            <div class="line"><span>Name:</span></div>
+                            <div class="line"><span>Date:</span></div>
+                        </div>
+                    </div>
+                    <p class="disp-instruction" id="p1-instruction">📋 LIST OF TERMS AND DEFINITIONS.</p>
+                    <div class="puzzle-area" id="p1-notes"
+                        style="flex-direction: column; align-items: stretch; justify-content: flex-start; padding: 20px;">
+                    </div>
+                    <img class="watermark-img" src="" alt="">
+                </div>
+            </div>
+
+            <div id="page2" class="page">
+                <div class="page-content">
+                    <div class="header">
+                        <div class="title-block">
+                            <h1 class="disp-title">Title</h1>
+                            <p class="disp-sub">Sub</p>
+                        </div>
+                        <div class="meta-block">
+                            <div class="line"><span>Name:</span></div>
+                            <div class="line"><span>Date:</span></div>
+                        </div>
+                    </div>
+                    <p class="disp-instruction">🔍 WORD SEARCH - HIGHLIGHT THE WORDS LISTED IN THE GRID.</p>
+                    <div class="puzzle-area" id="p2-area"></div>
+                    <div class="footer-area" id="p2-footer"></div>
+                    <img class="watermark-img" src="" alt="">
+                </div>
+            </div>
+
+            <div id="page3" class="page">
+                <div class="page-content">
+                    <div class="header">
+                        <div class="title-block">
+                            <h1 class="disp-title">Title</h1>
+                            <p class="disp-sub">Sub</p>
+                        </div>
+                        <div class="meta-block">
+                            <div class="line"><span>Name:</span></div>
+                            <div class="line"><span>Date:</span></div>
+                        </div>
+                    </div>
+                    <p class="disp-instruction">✏️ CROSSWORD - USE THE CLUES PROVIDED TO FILL IN THE GRID.</p>
+                    <div class="puzzle-area" id="p3-area"></div>
+                    <div class="footer-area" id="p3-footer"></div>
+                    <img class="watermark-img" src="" alt="">
+                </div>
+            </div>
+
+            <div id="page4" class="page">
+                <div class="page-content">
+                    <div class="header">
+                        <div class="title-block">
+                            <h1 class="disp-title">Title</h1>
+                            <p class="disp-sub">Sub</p>
+                        </div>
+                        <div class="meta-block">
+                            <div class="line"><span>Name:</span></div>
+                            <div class="line"><span>Date:</span></div>
+                        </div>
+                    </div>
+                    <p class="disp-instruction">🔀 WORD SCRAMBLE - UNSCRAMBLE THE LETTERS TO FIND THE WORDS.</p>
+                    <div class="puzzle-area" id="p4-area"
+                        style="align-items: flex-start; justify-content: flex-start; padding-top: 30px;"></div>
+                    <img class="watermark-img" src="" alt="">
+                </div>
+            </div>
+
+            <div id="page5" class="page">
+                <div class="page-content">
+                    <div class="header">
+                        <div class="title-block">
+                            <h1 class="disp-title">Title</h1>
+                            <p>TEACHER ANSWER KEY</p>
+                        </div>
+                    </div>
+                    <div id="key-container" class="split-page"></div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script src="bundle.js?v=5"></script>
+</body>
+
+</html>
