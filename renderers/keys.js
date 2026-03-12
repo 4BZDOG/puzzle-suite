@@ -33,7 +33,8 @@ export function renderKeys(container, puzzleData, settings) {
         const zWS = Math.min(16, Math.floor(availW / ws.size));
 
         wsHTML += `<div style="flex:1; display:flex; justify-content:center; align-items:center;">
-            <div class="grid mode-search pdf-force-key" style="grid-template-columns: repeat(${ws.size},${zWS}px); grid-template-rows: repeat(${ws.size},${zWS}px);">`;
+            <div class="pdf-force-key">
+            <div class="grid mode-search" style="grid-template-columns: repeat(${ws.size},${zWS}px); grid-template-rows: repeat(${ws.size},${zWS}px);">`;
 
         for (let y = 0; y < ws.size; y++) {
             for (let x = 0; x < ws.size; x++) {
@@ -42,7 +43,7 @@ export function renderKeys(container, puzzleData, settings) {
             }
         }
 
-        wsHTML += '</div></div></div>';
+        wsHTML += '</div></div></div></div>';
         htmlStr += wsHTML;
     }
 
