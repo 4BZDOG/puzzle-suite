@@ -1823,7 +1823,15 @@ table.mode-cw td.cell.empty {
 
 .notes-clue {
     flex: 1;
-    word-break: break-word;
+    min-width: 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+.notes-clue .notes-editable {
+    flex: 1;
+    min-width: 0;
 }
 
 .notes-editable {
@@ -1834,8 +1842,8 @@ table.mode-cw td.cell.empty {
     padding: 4px;
     border-radius: 6px;
     cursor: text;
-    display: inline-block;
-    min-width: 50%;
+    display: block;
+    word-break: break-word;
 }
 
 .notes-editable:hover {
@@ -1852,8 +1860,10 @@ table.mode-cw td.cell.empty {
 .notes-clue-length {
     color: var(--text-muted);
     font-weight: 600;
-    margin-left: 4px;
     font-size: 0.9em;
+    flex-shrink: 0;
+    padding-top: 5px;
+    white-space: nowrap;
 }
 
 .hide-term .notes-word,

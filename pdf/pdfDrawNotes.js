@@ -23,16 +23,25 @@ export function drawNotes(ctx, notesList, startY, pScale) {
     // Determine if this is a matching exercise
     const isMatching = notesList.length > 0 && notesList[0].matchLetter !== undefined;
 
-    // Respect showTerm / showDef from settings (match original drawNotes behaviour)
+    // Respect showTerm / showDef from settings
     const showTerm = notesConfig ? notesConfig.showTerm !== false : true;
     const showDef = notesConfig ? notesConfig.showDef !== false : true;
 
+    // Column positions — proportional to the user's term-width setting, not scale-dependent
+    const numColW = isMatching ? 22 : 10;   // mm reserved for the # / "1. ____" column
+    const termFrac = (notesConfig?.termWidth || 20) / 100;
+    const termColW = Math.max(28, (availW - numColW) * termFrac);
+    const termX = MARGIN + numColW;
+    const defX = termX + termColW;
+    const defW = availW - numColW - termColW;
+
+    // Header row
     doc.setFont(pdfFont, 'bold');
     doc.setFontSize(10 * pScale);
     doc.setTextColor(100, 116, 139);
     doc.text('#', MARGIN, cy);
-    if (showTerm) doc.text('TERM', MARGIN + (isMatching ? 20 : 10) * scale, cy);
-    if (showDef) doc.text('DEFINITION', MARGIN + 60 * scale, cy);
+    if (showTerm) doc.text('TERM', termX, cy);
+    if (showDef) doc.text('DEFINITION', defX, cy);
 
     doc.setDrawColor(15, 23, 42);
     doc.setLineWidth(0.4);
@@ -42,15 +51,14 @@ export function drawNotes(ctx, notesList, startY, pScale) {
     doc.setTextColor(15, 23, 42);
     notesList.forEach((w, i) => {
         const numStr = isMatching ? `${i + 1}. ____` : `${i + 1}.`;
-        const termX = MARGIN + (isMatching ? 20 : 10) * scale;
         const clueStr = isMatching
             ? `${w.matchLetter}. ${w.clue} (${w.term.length})`
             : `${w.clue} (${w.term.length})`;
 
         doc.setFont(pdfFont, 'bold');
-        const tLines = showTerm ? doc.splitTextToSize(w.term, 45 * scale - (isMatching ? 10 * scale : 0)) : [];
+        const tLines = showTerm ? doc.splitTextToSize(w.term, termColW - 4) : [];
         doc.setFont(pdfFont, 'normal');
-        const dLines = showDef ? doc.splitTextToSize(clueStr, availW - 65 * scale) : [];
+        const dLines = showDef ? doc.splitTextToSize(clueStr, defW) : [];
         const maxLines = Math.max(tLines.length, dLines.length, 1);
 
         if (cy + (maxLines * 4.5 * pScale) > PAGE_HEIGHT - MARGIN) {
@@ -67,7 +75,7 @@ export function drawNotes(ctx, notesList, startY, pScale) {
         if (showTerm) doc.text(tLines, termX, cy);
 
         doc.setFont(pdfFont, 'normal');
-        if (showDef) doc.text(dLines, MARGIN + 60 * scale, cy);
+        if (showDef) doc.text(dLines, defX, cy);
 
         cy += (maxLines * 4.5 * pScale) + 2 * pScale;
         doc.setDrawColor(226, 232, 240);

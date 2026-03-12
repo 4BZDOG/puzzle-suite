@@ -33,15 +33,16 @@ export function renderNotes(container, puzzleData, words, settings, onUpdateWord
 
     targetData.forEach((w, i) => {
         htmlStr += '<div class="notes-row">';
+        htmlStr += isMatching
+            ? `<span class="notes-num" style="width:60px">${i + 1}. ____</span>`
+            : `<span class="notes-num">${i + 1}.</span>`;
         htmlStr += `<div class="notes-word"><div class="notes-editable" ${!isMatching ? 'contenteditable="true"' : ''} ${!isMatching ? `onblur="window._puzzleApp.updateWord(${i}, 'word', this.innerText)"` : ''}>${w.term}</div></div>`;
         htmlStr += '<div class="notes-clue">';
 
         if (isMatching) {
-            htmlStr += `<span class="notes-num" style="width:60px">${i + 1}. ____</span>`;
             htmlStr += `<div class="notes-editable">${w.matchLetter}. ${w.clue}</div>`;
             htmlStr += `<span class="notes-clue-length">(${w.term.length})</span>`;
         } else {
-            htmlStr += `<span class="notes-num">${i + 1}.</span>`;
             htmlStr += `<div class="notes-editable" contenteditable="true" onblur="window._puzzleApp.updateWord(${i}, 'clue', this.innerText)">${w.clue}</div>`;
             htmlStr += `<span class="notes-clue-length">(${w.term.length})</span>`;
         }

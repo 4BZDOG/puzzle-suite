@@ -79,9 +79,9 @@ export function drawWordSearch(ctx, wsData, layout, wordsList, showClues, isKey,
         });
 
         const numCols = showClues ? 2 : 3;
-        const colWidth = layout.w / numCols;
+        const colWidth = gridW / numCols;
         const itemsPerCol = Math.ceil(items.length / numCols);
-        let cx = layout.x, cy = bankY;
+        let cx = ox, cy = bankY;
         const sq = 2.5 * scale;
 
         items.forEach((text, i) => {
