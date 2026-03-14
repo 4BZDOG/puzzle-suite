@@ -498,6 +498,11 @@ window.addEventListener('load', async () => {
         if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey)) && !inText) {
             e.preventDefault(); redo(() => { saveState(); generateAll(); });
         }
+        // 1-5 keys: jump to page (when not in a text field)
+        if (!inText && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            const n = parseInt(e.key, 10);
+            if (n >= 1 && n <= 5) showPage(n);
+        }
     });
 
     setupSidebarResize();

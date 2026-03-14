@@ -53,7 +53,7 @@
     --cw-neg-margin: -1px;
 
     --notes-font-size: 14px;
-    --notes-term-width: 150px;
+    --notes-term-width: 20%;
 }
 
 /* Dark Mode Variables & Overrides */
@@ -1278,10 +1278,12 @@ table.mode-cw td.cell.empty {
     font-weight: 700;
     letter-spacing: 0.05em;
     margin-right: 15px;
-    width: 150px;
+    min-width: 80px;
+    max-width: 200px;
     text-align: left;
     font-family: monospace;
     flex-shrink: 0;
+    word-break: break-all;
 }
 
 .scramble-line {
@@ -1320,7 +1322,7 @@ table.mode-cw td.cell.empty {
     inset: 2px;
     border: 2px solid var(--danger);
     border-radius: 50%;
-    z-index: -1;
+    pointer-events: none;
 }
 
 .word-bank-styled {
@@ -1794,10 +1796,6 @@ table.mode-cw td.cell.empty {
     border-bottom: 1px solid #cbd5e1;
     padding: 8px 0;
     align-items: flex-start;
-}
-
-.notes-row:first-child {
-    border-top: 2px solid #000;
 }
 
 .notes-row:last-child {

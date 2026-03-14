@@ -54,6 +54,7 @@ export function loadRawState() {
 }
 
 export function hardReset() {
+    if (!confirm('Reset all words and settings? This cannot be undone.')) return;
     localStorage.removeItem(STORAGE_KEY);
     location.reload();
 }

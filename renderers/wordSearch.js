@@ -52,8 +52,9 @@ export function renderWordSearch(gridArea, footerArea, wsData, words, settings, 
         const items = wsData.placed.map(wStr => {
             if (showClues) {
                 const match = words.find(x => x.word === wStr);
-                return match
-                    ? `${match.clue} <span class="notes-clue-length">(${wStr.length})</span>`
+                const clue = match?.clue?.trim();
+                return clue
+                    ? `${clue} <span class="notes-clue-length">(${wStr.length})</span>`
                     : wStr;
             }
             return wStr;

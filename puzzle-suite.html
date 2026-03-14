@@ -32,9 +32,9 @@
     <div id="modal-overlay" role="presentation">
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-heading">
             <h3 class="modal-title" id="modal-heading">Bulk Import</h3>
-            <p class="modal-desc">Format: <code>WORD - Clue</code></p>
+            <p class="modal-desc">One word per line. Separate term and definition with <code>-</code>, <code>:</code>, <code>,</code> or a tab. Words are <strong>added</strong> to your existing list.</p>
             <textarea id="import-text"
-                placeholder="GALAXY - A system of millions of stars&#10;PLANET - Celestial body orbiting a star"></textarea>
+                placeholder="GALAXY - A system of millions of stars&#10;PLANET - Celestial body orbiting a star&#10;ORBIT - Curved path of a body around another"></textarea>
             <div class="modal-actions">
                 <button class="btn-sec btn-auto" onclick="closeModal()">Cancel</button>
                 <button class="btn-main btn-auto" onclick="processImport()">Import</button>
@@ -459,7 +459,10 @@
                     <div class="header">
                         <div class="title-block">
                             <h1 class="disp-title">Title</h1>
-                            <p>TEACHER ANSWER KEY</p>
+                            <p class="disp-sub">Unit Review</p>
+                        </div>
+                        <div class="meta-block" style="text-align:right; width:auto;">
+                            <span style="font-size:calc(0.75rem * var(--global-font-scale) * var(--page-scale)); font-weight:800; color:#dc143c; text-transform:uppercase; letter-spacing:0.06em;">Teacher Answer Key</span>
                         </div>
                     </div>
                     <div id="key-container" class="split-page"></div>
@@ -469,7 +472,7 @@
         </div>
     </main>
 
-    <script src="bundle.js?v=6"></script>
+    <script src="bundle.js?v=7"></script>
 </body>
 
 </html>
