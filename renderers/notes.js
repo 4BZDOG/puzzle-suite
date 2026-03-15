@@ -41,7 +41,7 @@ export function renderNotes(container, puzzleData, words, settings, onUpdateWord
 
         if (isMatching) {
             htmlStr += `<div class="notes-editable">${w.matchLetter}. ${w.clue}</div>`;
-            htmlStr += `<span class="notes-clue-length">(${w.term.length})</span>`;
+            htmlStr += `<span class="notes-clue-length">(${w.clueTermLength ?? w.term.length})</span>`;
         } else {
             htmlStr += `<div class="notes-editable" contenteditable="true" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}" onblur="window._puzzleApp.updateWord(${i}, 'clue', this.innerText)">${w.clue}</div>`;
             htmlStr += `<span class="notes-clue-length">(${w.term.length})</span>`;

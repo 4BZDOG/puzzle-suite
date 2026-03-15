@@ -36,6 +36,7 @@ async function createPuzzleData() {
             correctLetter: getLetter(clues.findIndex(c => c.origIdx === item.origIdx)),
             origIdx: item.origIdx,
             clueOrigIdx: clues[i].origIdx,
+            clueTermLength: clues[i].term.length,
         }));
     }
     pData.notes = notesData;
