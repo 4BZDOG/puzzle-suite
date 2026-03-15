@@ -59,6 +59,10 @@ export const state = {
         opts: { ws: true, cw: true, scr: true, notes: true, key: true },
         pageOrder:      ['notes','ws','cw','scr','key'],
         sidebarWidth:   '420px',
+        aiConfig: {
+            provider: 'google',
+            model:    'gemini-2.0-flash',
+        },
     },
 };
 
@@ -154,6 +158,10 @@ export function syncSettingsFromDOM() {
     const pol = document.querySelectorAll('#page-order-list .sortable-item');
     if (pol.length) s.pageOrder = Array.from(pol).map(el => el.dataset.page);
     s.sidebarWidth = document.documentElement.style.getPropertyValue('--sidebar-width') || s.sidebarWidth;
+    s.aiConfig = {
+        provider: getVal('aiProvider', s.aiConfig.provider),
+        model:    getVal('aiModel',    s.aiConfig.model),
+    };
 }
 
 // ---- Apply serialised state back to DOM ----------------------
@@ -257,6 +265,12 @@ export function applyStateToDOM(s) {
 
     if (cfg.sidebarWidth) {
         document.documentElement.style.setProperty('--sidebar-width', cfg.sidebarWidth);
+    }
+
+    if (cfg.aiConfig) {
+        Object.assign(state.settings.aiConfig, cfg.aiConfig);
+        setVal('aiProvider', cfg.aiConfig.provider);
+        setVal('aiModel',    cfg.aiConfig.model);
     }
 
     if (s.zoom !== undefined || cfg.zoom !== undefined) {
