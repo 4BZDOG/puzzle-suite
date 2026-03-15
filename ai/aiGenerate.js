@@ -27,7 +27,8 @@ export const AI_PROVIDERS = [
         models: [
             { id: 'llama-3.1-8b-instant',    label: 'Llama 3.1 8B Instant (fastest)', default: true },
             { id: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B Versatile' },
-            { id: 'mixtral-8x7b-32768',      label: 'Mixtral 8×7B' },
+            { id: 'openai/gpt-oss-20b',      label: 'GPT OSS 20B (agentic)' },
+            { id: 'openai/gpt-oss-120b',     label: 'GPT OSS 120B (agentic, slower)' },
         ],
         keyPlaceholder: 'gsk_...',
         keyHint: 'Get a free key at console.groq.com',
