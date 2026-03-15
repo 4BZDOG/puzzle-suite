@@ -2008,7 +2008,7 @@ table.mode-cw td.cell.empty {
     border-bottom: 1px solid var(--border);
     position: sticky;
     top: 0;
-    background: var(--surface);
+    background: var(--bg-panel);
     z-index: 1;
     border-radius: var(--radius) var(--radius) 0 0;
 }
@@ -2055,9 +2055,12 @@ table.mode-cw td.cell.empty {
     border-color: var(--primary);
 }
 .ai-status.error {
-    background: rgba(239,68,68,0.08);
+    background: rgba(239,68,68,0.1);
     color: var(--danger);
     border-color: var(--danger);
+}
+[data-theme="dark"] .ai-status.error {
+    background: rgba(239,68,68,0.18);
 }
 
 /* Generated word results list */
@@ -2077,7 +2080,7 @@ table.mode-cw td.cell.empty {
     transition: background 0.1s;
 }
 .ai-result-item:last-child { border-bottom: none; }
-.ai-result-item:hover { background: var(--bg); }
+.ai-result-item:hover { background: var(--bg-app); }
 .ai-result-item input[type="checkbox"] { margin-top: 3px; flex-shrink: 0; accent-color: var(--primary); }
 .ai-result-word {
     font-weight: 700;

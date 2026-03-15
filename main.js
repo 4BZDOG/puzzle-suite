@@ -370,13 +370,13 @@ function openAIModal() {
     if (!overlay) return;
     overlay.style.display = 'flex';
 
-    // Populate provider dropdown models and restore saved keys
-    const providerEl = document.getElementById('aiProvider');
-    const saved = loadSavedKeys();
-    if (providerEl) {
-        const providerId = state.settings.aiConfig?.provider || 'google';
-        providerEl.value = providerId;
-    }
+    // Restore provider + model + saveKey preference from state
+    const providerEl  = document.getElementById('aiProvider');
+    const saveKeyEl   = document.getElementById('aiSaveKey');
+    const cfg = state.settings.aiConfig;
+    if (providerEl && cfg?.provider) providerEl.value = cfg.provider;
+    if (saveKeyEl  && cfg?.saveKey  !== undefined) saveKeyEl.checked = cfg.saveKey;
+
     _refreshAIModelList();
     _refreshAIKeyField();
 }
@@ -391,6 +391,7 @@ function closeAIModal() {
 function onAIProviderChange() {
     _refreshAIModelList();
     _refreshAIKeyField();
+    syncSettingsFromDOM();
     saveState();
 }
 
@@ -521,7 +522,8 @@ async function runAIGenerate() {
         syncSettingsFromDOM();
         saveState();
     } catch (err) {
-        _setAIStatus(`<strong>Error:</strong> ${err.message}`, 'error');
+        const safe = (err.message || 'Unknown error').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        _setAIStatus(`<strong>Error:</strong> ${safe}`, 'error');
     } finally {
         if (btn) btn.disabled = false;
     }
