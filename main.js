@@ -18,6 +18,7 @@ import { renderKeys } from './renderers/keys.js';
 import { exportPDF } from './pdf/pdfExport.js';
 
 import { showToast } from './ui/toast.js';
+import { AI_PROVIDERS, generateWords, loadSavedKeys, saveKey } from './ai/aiGenerate.js';
 import { openModal, closeModal } from './ui/modal.js';
 import { setupSidebarResize, toggleSidebar, switchTab } from './ui/sidebar.js';
 import { toggleDarkMode } from './ui/darkMode.js';
@@ -359,6 +360,200 @@ function clearWatermark() {
 }
 
 // =============================================================
+// AI Word Generation Modal
+// =============================================================
+
+let _aiResults = []; // last generated results
+
+function openAIModal() {
+    const overlay = document.getElementById('ai-modal-overlay');
+    if (!overlay) return;
+    overlay.style.display = 'flex';
+
+    // Populate provider dropdown models and restore saved keys
+    const providerEl = document.getElementById('aiProvider');
+    const saved = loadSavedKeys();
+    if (providerEl) {
+        const providerId = state.settings.aiConfig?.provider || 'google';
+        providerEl.value = providerId;
+    }
+    _refreshAIModelList();
+    _refreshAIKeyField();
+}
+
+function closeAIModal() {
+    const overlay = document.getElementById('ai-modal-overlay');
+    if (overlay) overlay.style.display = 'none';
+    _setAIStatus(null);
+    _clearAIResults();
+}
+
+function onAIProviderChange() {
+    _refreshAIModelList();
+    _refreshAIKeyField();
+    saveState();
+}
+
+function _getSelectedProvider() {
+    const id = document.getElementById('aiProvider')?.value || 'google';
+    return AI_PROVIDERS.find(p => p.id === id) || AI_PROVIDERS[0];
+}
+
+function _refreshAIModelList() {
+    const provider = _getSelectedProvider();
+    const modelEl = document.getElementById('aiModel');
+    if (!modelEl) return;
+    modelEl.innerHTML = provider.models.map(m =>
+        `<option value="${m.id}"${m.default ? ' selected' : ''}>${m.label}</option>`
+    ).join('');
+    // Restore saved model if applicable
+    const savedModel = state.settings.aiConfig?.model;
+    if (savedModel && provider.models.some(m => m.id === savedModel)) {
+        modelEl.value = savedModel;
+    }
+}
+
+function _refreshAIKeyField() {
+    const provider = _getSelectedProvider();
+    const keyInput = document.getElementById('aiKeyInput');
+    const keyHint  = document.getElementById('aiKeyHint');
+    const keyLink  = document.getElementById('aiKeyLink');
+    if (keyInput) keyInput.placeholder = provider.keyPlaceholder || '';
+    if (keyHint)  keyHint.textContent  = provider.keyHint || '';
+    if (keyLink)  keyLink.href = provider.keyLink || '#';
+    // Restore saved key for this provider
+    const saved = loadSavedKeys();
+    if (keyInput) keyInput.value = saved[provider.id] || '';
+}
+
+function toggleAIKeyVisibility() {
+    const input = document.getElementById('aiKeyInput');
+    const icon  = document.getElementById('aiKeyEyeIcon');
+    if (!input) return;
+    const isPass = input.type === 'password';
+    input.type = isPass ? 'text' : 'password';
+    if (icon) icon.className = isPass ? 'fas fa-eye-slash' : 'fas fa-eye';
+}
+
+function _setAIStatus(msg, type = 'loading') {
+    const el = document.getElementById('ai-status');
+    if (!el) return;
+    if (!msg) { el.style.display = 'none'; el.className = 'ai-status'; el.innerHTML = ''; return; }
+    el.style.display = 'block';
+    el.className = `ai-status ${type}`;
+    el.innerHTML = type === 'loading'
+        ? `<span class="ai-spinner"></span> ${msg}`
+        : msg;
+}
+
+function _clearAIResults() {
+    _aiResults = [];
+    const el = document.getElementById('ai-results');
+    if (el) el.style.display = 'none';
+}
+
+function _renderAIResults(words) {
+    _aiResults = words;
+    const container = document.getElementById('ai-results');
+    const list      = document.getElementById('ai-results-list');
+    const count     = document.getElementById('ai-results-count');
+    if (!container || !list) return;
+
+    if (count) count.textContent = `${words.length} word${words.length !== 1 ? 's' : ''} generated`;
+
+    list.innerHTML = words.map((w, i) => `
+        <label class="ai-result-item">
+            <input type="checkbox" class="ai-result-cb" data-index="${i}" checked>
+            <span class="ai-result-word">${w.word}</span>
+            <span class="ai-result-clue">${w.clue}</span>
+        </label>
+    `).join('');
+
+    container.style.display = 'block';
+}
+
+async function runAIGenerate() {
+    const provider  = _getSelectedProvider();
+    const modelEl   = document.getElementById('aiModel');
+    const keyInput  = document.getElementById('aiKeyInput');
+    const topicEl   = document.getElementById('aiTopic');
+    const gradeEl   = document.getElementById('aiGrade');
+    const subjectEl = document.getElementById('aiSubject');
+    const diffEl    = document.getElementById('aiDifficulty');
+    const countEl   = document.getElementById('aiCount');
+    const saveKeyEl = document.getElementById('aiSaveKey');
+    const btn       = document.getElementById('ai-generate-btn');
+
+    const apiKey = keyInput?.value?.trim();
+    const topic  = topicEl?.value?.trim();
+
+    if (!apiKey) { _setAIStatus('Please enter your API key.', 'error'); return; }
+    if (!topic)  { _setAIStatus('Please enter a topic or context.', 'error'); return; }
+
+    // Optionally save key
+    if (saveKeyEl?.checked) saveKey(provider.id, apiKey);
+    else saveKey(provider.id, ''); // clear if unchecked
+
+    _clearAIResults();
+    _setAIStatus('Generating words — this usually takes a few seconds…', 'loading');
+    if (btn) btn.disabled = true;
+
+    try {
+        const words = await generateWords({
+            providerId:  provider.id,
+            modelId:     modelEl?.value,
+            apiKey,
+            topic,
+            gradeLevel:  gradeEl?.value  || '3rd-5th grade',
+            subject:     subjectEl?.value || 'General',
+            difficulty:  diffEl?.value   || 'medium',
+            count:       parseInt(countEl?.value || '10', 10),
+        });
+
+        if (words.length === 0) {
+            _setAIStatus('The AI returned no valid words. Try a different topic or model.', 'error');
+        } else {
+            _setAIStatus(null);
+            _renderAIResults(words);
+        }
+
+        // Persist chosen provider + model
+        syncSettingsFromDOM();
+        saveState();
+    } catch (err) {
+        _setAIStatus(`<strong>Error:</strong> ${err.message}`, 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+function aiSelectAll() {
+    document.querySelectorAll('.ai-result-cb').forEach(cb => { cb.checked = true; });
+}
+
+function aiSelectNone() {
+    document.querySelectorAll('.ai-result-cb').forEach(cb => { cb.checked = false; });
+}
+
+function aiImportSelected() {
+    const checked = Array.from(document.querySelectorAll('.ai-result-cb:checked'));
+    if (checked.length === 0) { showToast('No words selected.', 'warning'); return; }
+
+    const toAdd = checked.map(cb => {
+        const i = parseInt(cb.dataset.index, 10);
+        return _aiResults[i];
+    }).filter(Boolean);
+
+    const newWords = [...state.words, ...toAdd.map(w => ({ word: w.word, clue: w.clue }))];
+    pushHistory(state.words);
+    setWords(newWords);
+    saveState();
+    generateAll();
+    closeAIModal();
+    showToast(`Added ${toAdd.length} word${toAdd.length !== 1 ? 's' : ''} to your list.`, 'success');
+}
+
+// =============================================================
 // Expose public API on window (called by HTML onclick attributes)
 // =============================================================
 // The HTML has inline onclick="..." handlers that were written before
@@ -403,6 +598,15 @@ window._puzzleApp = {
     hardReset: () => hardReset(),
     undo: () => undo(() => { saveState(); generateAll(); }),
     redo: () => redo(() => { saveState(); generateAll(); }),
+    // AI generation
+    openAIModal,
+    closeAIModal,
+    onAIProviderChange,
+    toggleAIKeyVisibility,
+    runAIGenerate,
+    aiSelectAll,
+    aiSelectNone,
+    aiImportSelected,
 };
 
 // Also expose functions that are called directly without namespace
@@ -440,6 +644,15 @@ Object.assign(window, {
     undo: () => undo(() => { saveState(); generateAll(); }),
     redo: () => redo(() => { saveState(); generateAll(); }),
     loadConfigFromFile: (inp) => window._puzzleApp.loadConfigFromFile(inp),
+    // AI generation
+    openAIModal,
+    closeAIModal,
+    onAIProviderChange,
+    toggleAIKeyVisibility,
+    runAIGenerate,
+    aiSelectAll,
+    aiSelectNone,
+    aiImportSelected,
     // Called directly from HTML oninput/onchange attributes:
     debouncedGenerate,
     renderActivePage,
@@ -489,6 +702,8 @@ window.addEventListener('load', async () => {
         if (e.key === 'Escape') {
             const modal = document.getElementById('modal-overlay');
             if (modal && modal.style.display === 'flex') closeModal();
+            const aiModal = document.getElementById('ai-modal-overlay');
+            if (aiModal && aiModal.style.display === 'flex') closeAIModal();
         }
         const tag = document.activeElement?.tagName;
         const inText = tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable;

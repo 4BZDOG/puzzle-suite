@@ -41,6 +41,129 @@
             </div>
         </div>
     </div>
+    <!-- AI Word Generation Modal -->
+    <div id="ai-modal-overlay" role="presentation" style="display:none;">
+        <div class="modal ai-modal" role="dialog" aria-modal="true" aria-labelledby="ai-modal-heading">
+            <div class="ai-modal-header">
+                <h3 class="modal-title" id="ai-modal-heading"><i class="fas fa-robot"></i> Generate Words with AI</h3>
+                <button class="ai-modal-close" onclick="closeAIModal()" aria-label="Close AI modal"><i class="fas fa-times"></i></button>
+            </div>
+
+            <!-- Provider & Key Setup -->
+            <details class="ai-section" open>
+                <summary class="ai-section-title"><i class="fas fa-key"></i> API Setup</summary>
+                <div class="ai-section-body">
+                    <div class="ai-row">
+                        <label class="ai-label">Provider</label>
+                        <select id="aiProvider" onchange="onAIProviderChange()" class="ai-select">
+                            <option value="google">Google Gemini — Free tier</option>
+                            <option value="groq">Groq — Free tier</option>
+                            <option value="openai">OpenAI — Paid</option>
+                            <option value="anthropic">Anthropic Claude — Paid</option>
+                            <option value="openrouter">OpenRouter — Free + Paid</option>
+                        </select>
+                    </div>
+                    <div class="ai-row">
+                        <label class="ai-label">Model</label>
+                        <select id="aiModel" class="ai-select"></select>
+                    </div>
+                    <div class="ai-row">
+                        <label class="ai-label">API Key <a id="aiKeyLink" href="#" target="_blank" rel="noopener noreferrer" class="ai-key-link">Get free key ↗</a></label>
+                        <div class="ai-key-row">
+                            <input type="password" id="aiKeyInput" class="ai-key-input" placeholder="Paste your API key here" autocomplete="off" spellcheck="false">
+                            <button class="ai-key-toggle" onclick="toggleAIKeyVisibility()" title="Show/hide key" aria-label="Toggle key visibility"><i class="fas fa-eye" id="aiKeyEyeIcon"></i></button>
+                        </div>
+                        <p id="aiKeyHint" class="ai-key-hint"></p>
+                    </div>
+                    <label class="ai-checkbox-row">
+                        <input type="checkbox" id="aiSaveKey" checked>
+                        <span>Remember key on this device (stored locally, never sent to our servers)</span>
+                    </label>
+                </div>
+            </details>
+
+            <!-- Generation Options -->
+            <details class="ai-section" open>
+                <summary class="ai-section-title"><i class="fas fa-sliders-h"></i> Generation Options</summary>
+                <div class="ai-section-body">
+                    <div class="ai-row">
+                        <label class="ai-label">Topic / Context <span class="ai-required">*</span></label>
+                        <input type="text" id="aiTopic" class="ai-text-input" placeholder="e.g. The Solar System, World War II, Cell Biology…" maxlength="200">
+                    </div>
+                    <div class="ai-row-cols">
+                        <div class="ai-col">
+                            <label class="ai-label">Subject</label>
+                            <select id="aiSubject" class="ai-select">
+                                <option value="General">General</option>
+                                <option value="Science">Science</option>
+                                <option value="History">History</option>
+                                <option value="Geography">Geography</option>
+                                <option value="Math">Math</option>
+                                <option value="English / ELA">English / ELA</option>
+                                <option value="Foreign Language">Foreign Language</option>
+                                <option value="Art &amp; Music">Art &amp; Music</option>
+                                <option value="Health">Health</option>
+                            </select>
+                        </div>
+                        <div class="ai-col">
+                            <label class="ai-label">Grade Level</label>
+                            <select id="aiGrade" class="ai-select">
+                                <option value="K-2nd grade">K–2 (Ages 5-8)</option>
+                                <option value="3rd-5th grade" selected>3–5 (Ages 8-11)</option>
+                                <option value="6th-8th grade">6–8 (Ages 11-14)</option>
+                                <option value="9th-12th grade">9–12 (Ages 14-18)</option>
+                                <option value="College / Adult">College / Adult</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="ai-row-cols">
+                        <div class="ai-col">
+                            <label class="ai-label">Difficulty</label>
+                            <select id="aiDifficulty" class="ai-select">
+                                <option value="easy">Easy</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="hard">Hard</option>
+                            </select>
+                        </div>
+                        <div class="ai-col">
+                            <label class="ai-label">Word Count</label>
+                            <select id="aiCount" class="ai-select">
+                                <option value="5">5 words</option>
+                                <option value="10" selected>10 words</option>
+                                <option value="15">15 words</option>
+                                <option value="20">20 words</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </details>
+
+            <!-- Generate button -->
+            <button id="ai-generate-btn" class="btn-main ai-gen-btn" onclick="runAIGenerate()">
+                <i class="fas fa-magic"></i> Generate Words
+            </button>
+
+            <!-- Status / Error -->
+            <div id="ai-status" class="ai-status" style="display:none;"></div>
+
+            <!-- Results preview -->
+            <div id="ai-results" style="display:none;">
+                <div class="ai-results-header">
+                    <span id="ai-results-count" class="ai-results-count"></span>
+                    <div class="ai-results-actions">
+                        <button class="btn-sec btn-auto" onclick="aiSelectAll()">Select All</button>
+                        <button class="btn-sec btn-auto" onclick="aiSelectNone()">None</button>
+                    </div>
+                </div>
+                <div id="ai-results-list" class="ai-results-list"></div>
+                <div class="modal-actions" style="margin-top:12px;">
+                    <button class="btn-sec btn-auto" onclick="closeAIModal()">Cancel</button>
+                    <button class="btn-main btn-auto" onclick="aiImportSelected()"><i class="fas fa-plus"></i> Add Selected</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <input type="file" id="file-input" accept=".json,.txt,.csv" onchange="loadConfigFromFile(this)">
     <button class="toggle-sidebar" onclick="toggleSidebar()" title="Toggle Sidebar" aria-label="Toggle sidebar"><i
             class="fas fa-bars"></i></button>
@@ -95,6 +218,9 @@
                     <button onclick="openModal(this)" class="btn-sec flex-1" aria-label="Bulk import words"><i
                             class="fas fa-file-import"></i> Import</button>
                 </div>
+                <button onclick="openAIModal()" class="btn-ai-generate" aria-label="Generate words with AI">
+                    <i class="fas fa-robot"></i> Generate with AI <span class="ai-badge">BETA</span>
+                </button>
                 <button class="btn-sec btn-clear-list" onclick="clearList()" aria-label="Clear all words from list"><i
                         class="fas fa-trash-alt"></i> Clear List</button>
             </div>
@@ -472,7 +598,7 @@
         </div>
     </main>
 
-    <script src="bundle.js?v=7"></script>
+    <script src="bundle.js?v=8"></script>
 </body>
 
 </html>
