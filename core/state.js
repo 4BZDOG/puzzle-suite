@@ -62,6 +62,7 @@ export const state = {
         aiConfig: {
             provider: 'google',
             model:    'gemini-2.0-flash',
+            saveKey:  true,
         },
     },
 };
@@ -161,6 +162,7 @@ export function syncSettingsFromDOM() {
     s.aiConfig = {
         provider: getVal('aiProvider', s.aiConfig.provider),
         model:    getVal('aiModel',    s.aiConfig.model),
+        saveKey:  getChk('aiSaveKey',  s.aiConfig.saveKey),
     };
 }
 
@@ -271,6 +273,7 @@ export function applyStateToDOM(s) {
         Object.assign(state.settings.aiConfig, cfg.aiConfig);
         setVal('aiProvider', cfg.aiConfig.provider);
         setVal('aiModel',    cfg.aiConfig.model);
+        setChk('aiSaveKey',  cfg.aiConfig.saveKey);
     }
 
     if (s.zoom !== undefined || cfg.zoom !== undefined) {
