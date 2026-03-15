@@ -44,56 +44,59 @@
     <!-- AI Word Generation Modal -->
     <div id="ai-modal-overlay" role="presentation" style="display:none;">
         <div class="modal ai-modal" role="dialog" aria-modal="true" aria-labelledby="ai-modal-heading">
+
             <div class="ai-modal-header">
-                <h3 class="modal-title" id="ai-modal-heading"><i class="fas fa-robot"></i> Generate Words with AI</h3>
-                <button class="ai-modal-close" onclick="closeAIModal()" aria-label="Close AI modal"><i class="fas fa-times"></i></button>
+                <h3 class="modal-title" id="ai-modal-heading">
+                    <i class="fas fa-robot" style="color:var(--primary);"></i> Generate Words with AI
+                </h3>
+                <button class="btn-sec btn-auto ai-modal-close" onclick="closeAIModal()" aria-label="Close"><i class="fas fa-times"></i></button>
             </div>
 
             <!-- Provider & Key Setup -->
-            <details class="ai-section" open>
-                <summary class="ai-section-title"><i class="fas fa-key"></i> API Setup</summary>
-                <div class="ai-section-body">
-                    <div class="ai-row">
-                        <label class="ai-label">Provider</label>
-                        <select id="aiProvider" onchange="onAIProviderChange()" class="ai-select">
-                            <option value="google">Google Gemini — Free tier</option>
-                            <option value="groq">Groq — Free tier</option>
-                            <option value="openai">OpenAI — Paid</option>
-                            <option value="anthropic">Anthropic Claude — Paid</option>
-                            <option value="openrouter">OpenRouter — Free + Paid</option>
-                        </select>
-                    </div>
-                    <div class="ai-row">
-                        <label class="ai-label">Model</label>
-                        <select id="aiModel" class="ai-select"></select>
-                    </div>
-                    <div class="ai-row">
-                        <label class="ai-label">API Key <a id="aiKeyLink" href="#" target="_blank" rel="noopener noreferrer" class="ai-key-link">Get free key ↗</a></label>
-                        <div class="ai-key-row">
-                            <input type="password" id="aiKeyInput" class="ai-key-input" placeholder="Paste your API key here" autocomplete="off" spellcheck="false">
-                            <button class="ai-key-toggle" onclick="toggleAIKeyVisibility()" title="Show/hide key" aria-label="Toggle key visibility"><i class="fas fa-eye" id="aiKeyEyeIcon"></i></button>
-                        </div>
-                        <p id="aiKeyHint" class="ai-key-hint"></p>
-                    </div>
-                    <label class="ai-checkbox-row">
-                        <input type="checkbox" id="aiSaveKey" checked>
-                        <span>Remember key on this device (stored locally, never sent to our servers)</span>
+            <details class="setting-card" open>
+                <summary><div class="card-header-inner"><i class="fas fa-key"></i> API Setup</div></summary>
+                <div class="card-content">
+                    <label class="field-label">Provider</label>
+                    <select id="aiProvider" onchange="onAIProviderChange()">
+                        <option value="google">Google Gemini — Free tier</option>
+                        <option value="groq">Groq — Free tier</option>
+                        <option value="openai">OpenAI — Paid</option>
+                        <option value="anthropic">Anthropic Claude — Paid</option>
+                        <option value="openrouter">OpenRouter — Free + Paid</option>
+                    </select>
+
+                    <label class="field-label">Model</label>
+                    <select id="aiModel"></select>
+
+                    <label class="field-label">
+                        API Key
+                        <a id="aiKeyLink" href="#" target="_blank" rel="noopener noreferrer" class="ai-key-link">Get free key ↗</a>
                     </label>
+                    <div class="input-row" style="gap:8px;">
+                        <input type="password" id="aiKeyInput" placeholder="Paste your API key here" autocomplete="off" spellcheck="false" style="font-family:monospace; flex:1;">
+                        <button class="btn-sec btn-auto" onclick="toggleAIKeyVisibility()" title="Show/hide key" aria-label="Toggle key visibility" style="padding:0 12px;"><i class="fas fa-eye" id="aiKeyEyeIcon"></i></button>
+                    </div>
+                    <p id="aiKeyHint" class="ai-key-hint"></p>
+
+                    <div class="toggle-row">
+                        <label>Remember key on this device</label>
+                        <label class="switch"><input type="checkbox" id="aiSaveKey" checked><span class="slider-switch"></span></label>
+                    </div>
+                    <p style="font-size:0.75rem; color:var(--text-muted); margin-top:-6px;">Stored locally only — never sent to our servers.</p>
                 </div>
             </details>
 
             <!-- Generation Options -->
-            <details class="ai-section" open>
-                <summary class="ai-section-title"><i class="fas fa-sliders-h"></i> Generation Options</summary>
-                <div class="ai-section-body">
-                    <div class="ai-row">
-                        <label class="ai-label">Topic / Context <span class="ai-required">*</span></label>
-                        <input type="text" id="aiTopic" class="ai-text-input" placeholder="e.g. The Solar System, World War II, Cell Biology…" maxlength="200">
-                    </div>
-                    <div class="ai-row-cols">
-                        <div class="ai-col">
-                            <label class="ai-label">Subject</label>
-                            <select id="aiSubject" class="ai-select">
+            <details class="setting-card" open>
+                <summary><div class="card-header-inner"><i class="fas fa-sliders-h"></i> Generation Options</div></summary>
+                <div class="card-content">
+                    <label class="field-label">Topic / Context <span style="color:var(--danger);">*</span></label>
+                    <input type="text" id="aiTopic" placeholder="e.g. The Solar System, World War II, Cell Biology…" maxlength="200">
+
+                    <div class="input-row" style="align-items:flex-start; gap:12px;">
+                        <div style="flex:1;">
+                            <label class="field-label">Subject</label>
+                            <select id="aiSubject">
                                 <option value="General">General</option>
                                 <option value="Science">Science</option>
                                 <option value="History">History</option>
@@ -105,9 +108,9 @@
                                 <option value="Health">Health</option>
                             </select>
                         </div>
-                        <div class="ai-col">
-                            <label class="ai-label">Grade Level</label>
-                            <select id="aiGrade" class="ai-select">
+                        <div style="flex:1;">
+                            <label class="field-label">Grade Level</label>
+                            <select id="aiGrade">
                                 <option value="K-2nd grade">K–2 (Ages 5-8)</option>
                                 <option value="3rd-5th grade" selected>3–5 (Ages 8-11)</option>
                                 <option value="6th-8th grade">6–8 (Ages 11-14)</option>
@@ -116,18 +119,19 @@
                             </select>
                         </div>
                     </div>
-                    <div class="ai-row-cols">
-                        <div class="ai-col">
-                            <label class="ai-label">Difficulty</label>
-                            <select id="aiDifficulty" class="ai-select">
+
+                    <div class="input-row" style="align-items:flex-start; gap:12px;">
+                        <div style="flex:1;">
+                            <label class="field-label">Difficulty</label>
+                            <select id="aiDifficulty">
                                 <option value="easy">Easy</option>
                                 <option value="medium" selected>Medium</option>
                                 <option value="hard">Hard</option>
                             </select>
                         </div>
-                        <div class="ai-col">
-                            <label class="ai-label">Word Count</label>
-                            <select id="aiCount" class="ai-select">
+                        <div style="flex:1;">
+                            <label class="field-label">Word Count</label>
+                            <select id="aiCount">
                                 <option value="5">5 words</option>
                                 <option value="10" selected>10 words</option>
                                 <option value="15">15 words</option>
@@ -138,19 +142,19 @@
                 </div>
             </details>
 
-            <!-- Generate button -->
-            <button id="ai-generate-btn" class="btn-main ai-gen-btn" onclick="runAIGenerate()">
-                <i class="fas fa-magic"></i> Generate Words
-            </button>
-
-            <!-- Status / Error -->
-            <div id="ai-status" class="ai-status" style="display:none;"></div>
+            <!-- Generate button + status -->
+            <div style="padding:0 18px 18px;">
+                <button id="ai-generate-btn" class="btn-main" style="width:100%; justify-content:center; gap:8px;" onclick="runAIGenerate()">
+                    <i class="fas fa-magic"></i> Generate Words
+                </button>
+                <div id="ai-status" class="ai-status" style="display:none; margin-top:10px;"></div>
+            </div>
 
             <!-- Results preview -->
-            <div id="ai-results" style="display:none;">
-                <div class="ai-results-header">
-                    <span id="ai-results-count" class="ai-results-count"></span>
-                    <div class="ai-results-actions">
+            <div id="ai-results" style="display:none; padding:0 18px 18px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                    <span id="ai-results-count" style="font-size:0.78rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em;"></span>
+                    <div style="display:flex; gap:6px;">
                         <button class="btn-sec btn-auto" onclick="aiSelectAll()">Select All</button>
                         <button class="btn-sec btn-auto" onclick="aiSelectNone()">None</button>
                     </div>
@@ -161,6 +165,7 @@
                     <button class="btn-main btn-auto" onclick="aiImportSelected()"><i class="fas fa-plus"></i> Add Selected</button>
                 </div>
             </div>
+
         </div>
     </div>
 
@@ -598,7 +603,7 @@
         </div>
     </main>
 
-    <script src="bundle.js?v=8"></script>
+    <script src="bundle.js?v=9"></script>
 </body>
 
 </html>
