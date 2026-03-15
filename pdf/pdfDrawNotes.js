@@ -52,7 +52,7 @@ export function drawNotes(ctx, notesList, startY, pScale) {
     notesList.forEach((w, i) => {
         const numStr = isMatching ? `${i + 1}. ____` : `${i + 1}.`;
         const clueStr = isMatching
-            ? `${w.matchLetter}. ${w.clue} (${w.term.length})`
+            ? `${w.matchLetter}. ${w.clue} (${w.clueTermLength ?? w.term.length})`
             : `${w.clue} (${w.term.length})`;
 
         doc.setFont(pdfFont, 'bold');
