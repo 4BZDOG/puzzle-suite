@@ -62,8 +62,9 @@ export const AI_PROVIDERS = [
         name: 'OpenRouter',
         badge: 'Free + Paid',
         models: [
-            { id: 'google/gemini-flash-1.5-8b',                    label: 'Gemini Flash 1.5 8B (free)', default: true },
-            { id: 'meta-llama/llama-3.1-8b-instruct:free',         label: 'Llama 3.1 8B (free)' },
+            { id: 'meta-llama/llama-3.3-70b-instruct:free',        label: 'Llama 3.3 70B (free)', default: true },
+            { id: 'openai/gpt-oss-120b:free',                      label: 'GPT OSS 120B (free, slower)' },
+            { id: 'mistralai/mistral-small-3.1-24b-instruct:free', label: 'Mistral Small 3.1 24B (free, fast)' },
             { id: 'anthropic/claude-haiku-4-5',                    label: 'Claude Haiku (paid)' },
         ],
         keyPlaceholder: 'sk-or-...',
