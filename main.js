@@ -266,6 +266,12 @@ function updateWord(i, f, v) {
         debouncedGenerate();
     } else {
         state.words[i][f] = v;
+        // In matching mode, puzzleData.notes holds shuffled clue text. Patch it in-place
+        // so the preview updates immediately without a full re-generate.
+        if (f === 'clue' && state.puzzleData.notes?.length > 0 && 'clueOrigIdx' in state.puzzleData.notes[0]) {
+            const note = state.puzzleData.notes.find(n => n.clueOrigIdx === i);
+            if (note) note.clue = v;
+        }
         saveState();
         debouncedRenderActivePage();
     }
