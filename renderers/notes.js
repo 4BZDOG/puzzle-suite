@@ -13,13 +13,21 @@ export function renderNotes(container, puzzleData, words, settings, onUpdateWord
     if (!container) return;
     _updateNotesStyles(settings);
 
-    const targetData = puzzleData.notes || words.map(w => ({ term: w.word, clue: w.clue }));
+    // Use puzzleData.notes only in matching mode — it carries shuffle/matchLetter data.
+    // In standard mode always derive from live words so inline clue edits are reflected
+    // immediately without waiting for a full re-generate.
+    const hasMatchingData = settings.notesConfig.shuffle &&
+        puzzleData.notes?.length > 0 && 'matchLetter' in puzzleData.notes[0];
+    const targetData = hasMatchingData
+        ? puzzleData.notes
+        : words.map(w => ({ term: w.word, clue: w.clue }));
+
     if (targetData.length === 0) {
         container.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:40px;">No words added yet.</div>';
         return;
     }
 
-    const isMatching = settings.notesConfig.shuffle && targetData.length > 0 && 'matchLetter' in targetData[0];
+    const isMatching = hasMatchingData;
     let cls = 'notes-table';
     if (!settings.notesConfig.showTerm) cls += ' hide-term';
     if (!settings.notesConfig.showDef) cls += ' hide-def';
