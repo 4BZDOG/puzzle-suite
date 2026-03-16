@@ -19,7 +19,7 @@ export function renderNotes(container, puzzleData, words, settings, onUpdateWord
         return;
     }
 
-    const isMatching = settings.notesConfig.shuffle;
+    const isMatching = settings.notesConfig.shuffle && targetData.length > 0 && 'matchLetter' in targetData[0];
     let cls = 'notes-table';
     if (!settings.notesConfig.showTerm) cls += ' hide-term';
     if (!settings.notesConfig.showDef) cls += ' hide-def';
