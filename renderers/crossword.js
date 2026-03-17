@@ -23,6 +23,11 @@ export function renderCrossword(gridArea, footerArea, cwData, settings, preview 
         ? (() => { const el = document.getElementById('scaleCrossword'); return el ? parseInt(el.value, 10) : calcCWScale(cwData); })()
         : calcCWScale(cwData);
 
+    // Compute example word at function level so both grid and clue blocks can use it
+    const firstAcross = settings.showExample && cwData?.placed?.length
+        ? (cwData.placed.filter(w => w.dir === 'across').sort((a, b) => a.num - b.num)[0] || null)
+        : null;
+
     if (gridArea) {
         gridArea.innerHTML = '';
         if (!cwData || cwData.placed.length === 0) {
@@ -35,9 +40,6 @@ export function renderCrossword(gridArea, footerArea, cwData, settings, preview 
             return;
         }
 
-        const firstAcross = settings.showExample
-            ? (cwData.placed.filter(w => w.dir === 'across').sort((a, b) => a.num - b.num)[0] || null)
-            : null;
         const exCells = new Set();
         if (firstAcross) {
             for (let i = 0; i < firstAcross.word.length; i++) exCells.add(`${firstAcross.x + i},${firstAcross.y}`);

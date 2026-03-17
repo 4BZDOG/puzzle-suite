@@ -30,7 +30,7 @@ export function renderWordSearch(gridArea, footerArea, wsData, words, settings, 
 
         const showGrid = settings.wsInternalGrid;
         const exWordPos = settings.showExample && wsData.wordPositions?.length ? wsData.wordPositions[0] : null;
-        const exCells = new Set(exWordPos ? exWordPos.cells.map(c => `${c.x},${c.y}`) : []);
+        const exCells = new Set(exWordPos?.cells ? exWordPos.cells.map(c => `${c.x},${c.y}`) : []);
 
         let htmlStr = `<div class="grid mode-search ${showGrid ? 'with-internal-grid' : ''}" style="grid-template-columns: repeat(${wsData.size}, ${z}px); grid-template-rows: repeat(${wsData.size}, ${z}px);">`;
 

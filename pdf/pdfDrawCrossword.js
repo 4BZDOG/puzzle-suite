@@ -61,7 +61,7 @@ export function drawCrossword(ctx, cwData, layout, isKey, pScale) {
                 } else if (isEx) {
                     // Show example letters in blue
                     const letterIdx = x - firstAcross.x;
-                    doc.setFont('courier', 'bold');
+                    doc.setFont(pdfFont, 'bold');
                     doc.setFontSize(charFontSizePt);
                     doc.setTextColor(37, 99, 235);
                     doc.text(firstAcross.word[letterIdx], cx + cSize / 2, cy + cSize / 2 + cSize * 0.05, { align: 'center', baseline: 'middle' });

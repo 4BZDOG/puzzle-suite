@@ -98,10 +98,13 @@ export function drawNotes(ctx, notesList, startY, pScale) {
             doc.setTextColor(37, 99, 235);
             doc.text(`[EXAMPLE ANSWER: ${w.term}]`, defX, answerY);
             doc.setFont(pdfFont, 'normal');
+            doc.setFontSize(10 * pScale);
             doc.setTextColor(15, 23, 42);
         }
 
         cy += (maxLines * 4.5 * pScale) + 2 * pScale;
+        // Extra space when example answer text is appended below the definition
+        if (isExample && !isMatching && showDef) cy += 5 * pScale;
         doc.setDrawColor(226, 232, 240);
         doc.setLineWidth(0.15);
         doc.line(MARGIN, cy - 1.5 * pScale, PAGE_WIDTH - MARGIN, cy - 1.5 * pScale);

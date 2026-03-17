@@ -32,7 +32,7 @@ export function drawWordSearch(ctx, wsData, layout, wordsList, showClues, isKey,
     const showInternalGrid = ctx.wsInternalGrid || false;
     const showExample = ctx.showExample || false;
     const exWordPos = showExample && wsData.wordPositions?.length ? wsData.wordPositions[0] : null;
-    const exCells = new Set(exWordPos ? exWordPos.cells.map(c => `${c.x},${c.y}`) : []);
+    const exCells = new Set(exWordPos?.cells ? exWordPos.cells.map(c => `${c.x},${c.y}`) : []);
 
     for (let y = 0; y < wsData.size; y++) {
         for (let x = 0; x < wsData.size; x++) {
