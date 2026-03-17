@@ -30,7 +30,17 @@ export function drawNotes(ctx, notesList, startY, pScale) {
     // Column positions — proportional to the user's term-width setting, not scale-dependent
     const numColW = isMatching ? 22 : 10;   // mm reserved for the # / "1. ____" column
     const termFrac = (notesConfig?.termWidth || 20) / 100;
-    const termColW = Math.max(28, (availW - numColW) * termFrac);
+    let termColW = Math.max(28, (availW - numColW) * termFrac);
+
+    // Ensure term column is wide enough that no term needs to wrap.
+    if (notesList.length > 0) {
+        doc.setFont(pdfFont, 'bold');
+        doc.setFontSize(10 * pScale);
+        const maxTermW = notesList.reduce((m, w) => Math.max(m, doc.getTextWidth(w.term)), 0);
+        const minTermColW = Math.min(maxTermW + 4, (availW - numColW) * 0.70);
+        if (minTermColW > termColW) termColW = minTermColW;
+    }
+
     const termX = MARGIN + numColW;
     const defX = termX + termColW;
     const defW = availW - numColW - termColW;
@@ -86,12 +96,15 @@ export function drawNotes(ctx, notesList, startY, pScale) {
             doc.setFont(pdfFont, 'bold');
             doc.setFontSize(9 * pScale);
             doc.setTextColor(37, 99, 235);
-            doc.text(`\u2605 example answer: ${w.term}`, defX, answerY);
+            doc.text(`[EXAMPLE ANSWER: ${w.term}]`, defX, answerY);
             doc.setFont(pdfFont, 'normal');
+            doc.setFontSize(10 * pScale);
             doc.setTextColor(15, 23, 42);
         }
 
         cy += (maxLines * 4.5 * pScale) + 2 * pScale;
+        // Extra space when example answer text is appended below the definition
+        if (isExample && !isMatching && showDef) cy += 5 * pScale;
         doc.setDrawColor(226, 232, 240);
         doc.setLineWidth(0.15);
         doc.line(MARGIN, cy - 1.5 * pScale, PAGE_WIDTH - MARGIN, cy - 1.5 * pScale);

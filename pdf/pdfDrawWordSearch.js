@@ -32,7 +32,7 @@ export function drawWordSearch(ctx, wsData, layout, wordsList, showClues, isKey,
     const showInternalGrid = ctx.wsInternalGrid || false;
     const showExample = ctx.showExample || false;
     const exWordPos = showExample && wsData.wordPositions?.length ? wsData.wordPositions[0] : null;
-    const exCells = new Set(exWordPos ? exWordPos.cells.map(c => `${c.x},${c.y}`) : []);
+    const exCells = new Set(exWordPos?.cells ? exWordPos.cells.map(c => `${c.x},${c.y}`) : []);
 
     for (let y = 0; y < wsData.size; y++) {
         for (let x = 0; x < wsData.size; x++) {
@@ -105,11 +105,14 @@ export function drawWordSearch(ctx, wsData, layout, wordsList, showClues, isKey,
             }
 
             if (isEx) {
-                // Example: show ✓ in blue instead of checkbox
-                doc.setTextColor(37, 99, 235);
-                doc.setFont(pdfFont, 'bold');
-                doc.text('✓', cx + sq / 2, cy, { align: 'center' });
-                doc.setFont(pdfFont, 'normal');
+                // Draw a tick/checkmark in blue (avoids unicode rendering issues)
+                doc.setFillColor(219, 234, 254);
+                doc.rect(cx, cy - sq + 0.5 * scale, sq, sq, 'F');
+                doc.setDrawColor(37, 99, 235);
+                doc.setLineWidth(0.5);
+                const bx = cx, by = cy - sq + 0.5 * scale;
+                doc.line(bx + sq * 0.15, by + sq * 0.55, bx + sq * 0.42, by + sq * 0.80);
+                doc.line(bx + sq * 0.42, by + sq * 0.80, bx + sq * 0.85, by + sq * 0.20);
                 doc.setTextColor(37, 99, 235);
             } else {
                 doc.setDrawColor(100);

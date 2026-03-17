@@ -30,7 +30,7 @@ export function renderWordSearch(gridArea, footerArea, wsData, words, settings, 
 
         const showGrid = settings.wsInternalGrid;
         const exWordPos = settings.showExample && wsData.wordPositions?.length ? wsData.wordPositions[0] : null;
-        const exCells = new Set(exWordPos ? exWordPos.cells.map(c => `${c.x},${c.y}`) : []);
+        const exCells = new Set(exWordPos?.cells ? exWordPos.cells.map(c => `${c.x},${c.y}`) : []);
 
         let htmlStr = `<div class="grid mode-search ${showGrid ? 'with-internal-grid' : ''}" style="grid-template-columns: repeat(${wsData.size}, ${z}px); grid-template-rows: repeat(${wsData.size}, ${z}px);">`;
 
@@ -67,12 +67,12 @@ export function renderWordSearch(gridArea, footerArea, wsData, words, settings, 
         const exWord = settings.showExample && wsData.wordPositions?.length ? wsData.wordPositions[0].word : null;
         // Distribute items top-to-bottom per column using CSS Grid
         const itemsPerCol = Math.ceil(items.length / cols);
-        footerArea.innerHTML = `<div style="width:${gridPx}px; margin:0 auto;">
-            <div class="word-bank-styled" style="display:grid; grid-template-columns: repeat(${cols}, 1fr); grid-template-rows: repeat(${itemsPerCol}, auto); grid-auto-flow: column; column-gap:20px;">
+        footerArea.innerHTML = `<div style="width:${gridPx}px; margin:8px auto 0;">
+            <div class="word-bank-styled" style="display:grid; grid-template-columns: repeat(${cols}, 1fr); grid-template-rows: repeat(${itemsPerCol}, auto); grid-auto-flow: column; column-gap:28px; row-gap:0;">
                 ${wsData.placed.map((wStr, i) => {
                     const isEx = exWord === wStr;
                     const display = items[i];
-                    return `<div class="wb-item${isEx ? ' wb-item-example' : ''}" style="margin-bottom:6px;">${isEx ? '<span class="wb-check-done">✓</span>' : '<span class="wb-check"></span>'} <div${isEx ? ' style="text-decoration:line-through; color:var(--primary);"' : ''}>${display}</div></div>`;
+                    return `<div class="wb-item${isEx ? ' wb-item-example' : ''}">${isEx ? '<span class="wb-check-done" style="font-size:13px;line-height:1;color:var(--primary);flex-shrink:0;">&#10003;</span>' : '<span class="wb-check"></span>'}<div${isEx ? ' style="text-decoration:line-through; color:var(--primary); opacity:0.75;"' : ''}>${display}</div></div>`;
                 }).join('')}
             </div>
         </div>`;

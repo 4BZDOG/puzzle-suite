@@ -27,6 +27,26 @@ export function renderNotes(container, puzzleData, words, settings, onUpdateWord
         return;
     }
 
+    // Auto-widen term column so no term wraps to a second line.
+    // Measure terms with a temp canvas using the current resolved font.
+    if (container.offsetWidth > 0) {
+        const cs = getComputedStyle(document.documentElement);
+        const fsBase = parseFloat(cs.getPropertyValue('--notes-font-size') || '14');
+        const gScale = parseFloat(cs.getPropertyValue('--global-font-scale') || '1');
+        const pScale = parseFloat(cs.getPropertyValue('--page-scale') || '1');
+        const fontFamily = (cs.getPropertyValue('--user-font') || 'sans-serif').trim();
+        const fontSize = fsBase * gScale * pScale;
+        const canvas = document.createElement('canvas');
+        const ctx2d = canvas.getContext('2d');
+        ctx2d.font = `bold ${fontSize}px ${fontFamily}`;
+        const maxTermPx = Math.max(...targetData.map(w => ctx2d.measureText(w.term).width));
+        // +20px for padding-right; cap at 70% to preserve definition column space
+        const minPct = Math.min(70, Math.ceil(((maxTermPx + 20) / container.offsetWidth) * 100));
+        if (minPct > settings.notesConfig.termWidth) {
+            document.documentElement.style.setProperty('--notes-term-width', minPct + '%');
+        }
+    }
+
     const isMatching = hasMatchingData;
     let cls = 'notes-table';
     if (!settings.notesConfig.showTerm) cls += ' hide-term';
