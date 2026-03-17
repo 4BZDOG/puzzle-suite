@@ -14,3 +14,7 @@ node_modules/
 .idea/
 *.swp
 *.swo
+
+# Server — never commit secrets or database
+server/.env
+server/data/

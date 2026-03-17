@@ -29,6 +29,8 @@ import { setupDragAndDrop } from './ui/dropZone.js';
 import { processImport, handleDroppedFile } from './import-export/importWords.js';
 import { downloadConfig } from './import-export/exportConfig.js';
 
+import { licenseManager, TIERS } from './license/licenseManager.js';
+
 // =============================================================
 // Constants
 // =============================================================
@@ -278,6 +280,15 @@ function updateWord(i, f, v) {
 }
 
 function addWordRow() {
+    const wordLimit = licenseManager.getLimit('words');
+    if (state.words.length >= wordLimit) {
+        if (licenseManager.isPro) {
+            showToast(`Maximum ${wordLimit} words reached.`, 'warning');
+        } else {
+            showUpgradePrompt(`Free plan is limited to ${wordLimit} words. Upgrade to Pro for up to 50 words.`);
+        }
+        return;
+    }
     pushHistory();
     state.words.push({ word: '', clue: '' });
     _renderWordListAndStatus();
@@ -563,6 +574,176 @@ function aiImportSelected() {
 }
 
 // =============================================================
+// License / upgrade UI
+// =============================================================
+
+function _updateProBadge() {
+    const badge = document.getElementById('pro-badge-btn');
+    if (!badge) return;
+    const tier = licenseManager.tier;
+    if (tier === 'free') {
+        badge.textContent = 'Upgrade';
+        badge.classList.remove('pro-badge--active');
+    } else {
+        const label = (TIERS[tier] || TIERS.free).label;
+        badge.textContent = label;
+        badge.classList.add('pro-badge--active');
+    }
+}
+
+function _updateBulkLimit() {
+    const input = document.getElementById('bulkCount');
+    if (!input) return;
+    const max = licenseManager.getLimit('bulkSets');
+    if (parseInt(input.max, 10) !== max) {
+        input.max = max;
+        const hint = document.getElementById('bulk-limit-hint');
+        if (hint) hint.textContent = `Max ${max} on ${(TIERS[licenseManager.tier] || TIERS.free).label} plan`;
+    }
+    if (parseInt(input.value, 10) > max) {
+        input.value = max;
+        saveState();
+    }
+}
+
+function openLicenseModal() {
+    const modal = document.getElementById('license-modal-overlay');
+    if (!modal) return;
+    _refreshLicenseModal();
+    modal.style.display = 'flex';
+}
+
+function closeLicenseModal() {
+    const modal = document.getElementById('license-modal-overlay');
+    if (modal) modal.style.display = 'none';
+}
+
+function showUpgradePrompt(message) {
+    const el = document.getElementById('upgrade-prompt-msg');
+    if (el) {
+        el.textContent = message || 'Upgrade to Pro to unlock this feature.';
+        el.style.display = 'block';
+    }
+    openLicenseModal();
+    _switchLicTab('upgrade');
+}
+
+function _switchLicTab(tabName) {
+    document.querySelectorAll('.lic-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tabName));
+    document.querySelectorAll('.lic-panel').forEach(p => p.classList.toggle('active', p.dataset.panel === tabName));
+}
+
+function _refreshLicenseModal() {
+    const tier = licenseManager.tier;
+    const info = licenseManager.info;
+    const statusEl = document.getElementById('lic-status');
+    if (statusEl) {
+        if (tier === 'free') {
+            statusEl.innerHTML = '<span class="lic-tier lic-tier--free">Free Plan</span>';
+        } else {
+            const label = (TIERS[tier] || TIERS.free).label;
+            const expiry = info?.expiresAt ? ` · expires ${new Date(info.expiresAt).toLocaleDateString()}` : '';
+            const email = info?.email ? ` <span class="lic-email">${info.email}</span>` : '';
+            statusEl.innerHTML = `<span class="lic-tier lic-tier--pro">${label}</span>${email}${expiry}`;
+        }
+    }
+    // Populate plans
+    _loadPlansUI();
+}
+
+async function _loadPlansUI() {
+    const container = document.getElementById('lic-plans');
+    if (!container) return;
+    container.innerHTML = '<div class="lic-plans-loading">Loading plans…</div>';
+    const plans = await licenseManager.getPlans().catch(() => []);
+    if (!plans.length) {
+        container.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem">Could not load plan info. Make sure the server is running.</p>';
+        return;
+    }
+    container.innerHTML = plans.map(p => `
+        <div class="lic-plan-card${p.popular ? ' lic-plan-card--popular' : ''}">
+            ${p.popular ? '<div class="lic-popular-badge">Most Popular</div>' : ''}
+            <div class="lic-plan-name">${p.label}</div>
+            <div class="lic-plan-price">${p.price}</div>
+            ${p.priceNote ? `<div class="lic-plan-note">${p.priceNote}</div>` : ''}
+            <ul class="lic-plan-features">
+                ${p.features.map(f => `<li>${f}</li>`).join('')}
+            </ul>
+            <button class="btn-main lic-buy-btn" onclick="startCheckout('${p.id}')">
+                Get ${p.label}
+            </button>
+        </div>
+    `).join('');
+}
+
+async function activateLicenseKey() {
+    const input = document.getElementById('lic-key-input');
+    const statusEl = document.getElementById('lic-activate-status');
+    if (!input || !statusEl) return;
+
+    const key = input.value.trim();
+    if (!key) { statusEl.textContent = 'Please enter your license key.'; statusEl.className = 'lic-activate-status error'; return; }
+
+    const btn = document.getElementById('lic-activate-btn');
+    if (btn) btn.disabled = true;
+    statusEl.textContent = 'Validating…'; statusEl.className = 'lic-activate-status';
+
+    const result = await licenseManager.activateKey(key);
+    if (btn) btn.disabled = false;
+
+    if (result.ok) {
+        statusEl.textContent = `Activated! Plan: ${(TIERS[result.plan] || TIERS.free).label}`;
+        statusEl.className = 'lic-activate-status success';
+        input.value = '';
+        _updateProBadge();
+        _updateBulkLimit();
+        _refreshLicenseModal();
+        showToast(`${(TIERS[result.plan] || TIERS.free).label} activated!`, 'success');
+    } else {
+        statusEl.textContent = result.reason || 'Invalid key. Please check and try again.';
+        statusEl.className = 'lic-activate-status error';
+    }
+}
+
+function deactivateLicense() {
+    if (!confirm('Remove your license key from this device?')) return;
+    licenseManager.deactivate();
+    _updateProBadge();
+    _updateBulkLimit();
+    _refreshLicenseModal();
+    showToast('License removed from this device.', 'success');
+}
+
+async function startCheckout(planId) {
+    const emailEl = document.getElementById('lic-checkout-email');
+    const email = emailEl ? emailEl.value.trim() : '';
+    try {
+        await licenseManager.startCheckout(planId, email);
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
+}
+
+function _handleCheckoutReturn() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('checkout') === 'success') {
+        // Clean URL
+        history.replaceState({}, '', window.location.pathname);
+        // Show activation instructions
+        showToast('Payment successful! Check your email for your license key.', 'success');
+        setTimeout(() => {
+            openLicenseModal();
+            _switchLicTab('activate');
+            const msg = document.getElementById('checkout-success-msg');
+            if (msg) msg.style.display = 'block';
+        }, 500);
+    } else if (params.get('checkout') === 'cancel') {
+        history.replaceState({}, '', window.location.pathname);
+        showToast('Checkout cancelled.', 'warning');
+    }
+}
+
+// =============================================================
 // Expose public API on window (called by HTML onclick attributes)
 // =============================================================
 // The HTML has inline onclick="..." handlers that were written before
@@ -616,6 +797,14 @@ window._puzzleApp = {
     aiSelectAll,
     aiSelectNone,
     aiImportSelected,
+    // License / upgrade
+    openLicenseModal,
+    closeLicenseModal,
+    activateLicenseKey,
+    deactivateLicense,
+    startCheckout,
+    showUpgradePrompt,
+    _switchLicTab,
 };
 
 // Also expose functions that are called directly without namespace
@@ -662,6 +851,14 @@ Object.assign(window, {
     aiSelectAll,
     aiSelectNone,
     aiImportSelected,
+    // License / upgrade
+    openLicenseModal,
+    closeLicenseModal,
+    activateLicenseKey,
+    deactivateLicense,
+    startCheckout,
+    showUpgradePrompt,
+    _switchLicTab,
     // Called directly from HTML oninput/onchange attributes:
     debouncedGenerate,
     renderActivePage,
@@ -686,6 +883,14 @@ window.addEventListener('load', async () => {
         }
 
         pushHistory();
+        // Initialise license (non-blocking — falls back to free tier if server is down)
+        licenseManager.init().then(() => {
+            _updateProBadge();
+            _updateBulkLimit();
+        }).catch(() => {});
+        licenseManager.onChange(() => { _updateProBadge(); _updateBulkLimit(); });
+        _handleCheckoutReturn();
+
         await generateAll();
         updateGridStyles();
         updatePageScales();

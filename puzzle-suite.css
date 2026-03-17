@@ -2172,3 +2172,228 @@ table.mode-cw td.cell.empty {
 #ai-generate-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
 } /* end @layer components (AI) */
+
+/* ─── License / Upgrade UI ────────────────────────────────────────────────── */
+@layer components {
+
+/* Pro badge button in header */
+.pro-badge-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    background: linear-gradient(135deg, #6366f1, #4f46e5);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    white-space: nowrap;
+    box-shadow: 0 1px 4px rgba(79,70,229,.3);
+}
+.pro-badge-btn:hover { background: linear-gradient(135deg, #7c3aed, #4338ca); box-shadow: 0 2px 8px rgba(79,70,229,.4); }
+.pro-badge-btn.pro-badge--active { background: linear-gradient(135deg, #059669, #047857); box-shadow: 0 1px 4px rgba(5,150,105,.3); }
+.pro-badge-btn.pro-badge--active:hover { background: linear-gradient(135deg, #047857, #065f46); }
+
+/* Bulk limit hint */
+.bulk-limit-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-align: center;
+    margin-top: 4px;
+}
+.bulk-limit-hint a { color: var(--primary); text-decoration: none; }
+.bulk-limit-hint a:hover { text-decoration: underline; }
+
+/* License modal overlay */
+#license-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 1200;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+#license-modal-overlay[style*="flex"] { display: flex !important; }
+
+/* License modal container */
+.lic-modal {
+    background: var(--bg-panel, #fff);
+    border-radius: 14px;
+    width: 560px;
+    max-width: 100%;
+    max-height: 92vh;
+    overflow-y: auto;
+    box-shadow: 0 8px 40px rgba(0,0,0,.25);
+    padding: 0;
+}
+
+.lic-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px 0;
+    margin-bottom: 14px;
+}
+.lic-modal-header .modal-title { font-size: 1.1rem; font-weight: 700; }
+
+.lic-status-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px 12px;
+    border-bottom: 1px solid var(--border, #e2e8f0);
+    gap: 12px;
+}
+.lic-tier {
+    display: inline-block;
+    padding: 3px 12px;
+    border-radius: 12px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.lic-tier--free   { background: #f1f5f9; color: #64748b; }
+.lic-tier--pro    { background: #eef2ff; color: #4338ca; }
+.lic-email { color: var(--text-muted, #64748b); font-size: 0.8rem; font-weight: 400; margin-left: 8px; }
+
+/* Tabs */
+.lic-tabs {
+    display: flex;
+    gap: 0;
+    padding: 14px 24px 0;
+    border-bottom: 2px solid var(--border, #e2e8f0);
+}
+.lic-tab {
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    color: var(--text-muted, #64748b);
+    margin-bottom: -2px;
+    transition: all 0.15s;
+}
+.lic-tab.active { color: var(--primary, #4f46e5); border-bottom-color: var(--primary, #4f46e5); }
+.lic-tab:hover { color: var(--primary, #4f46e5); }
+
+/* Panels */
+.lic-panel { display: none; padding: 20px 24px; }
+.lic-panel.active { display: block; }
+
+/* Upgrade prompt message */
+.lic-upgrade-prompt {
+    margin: 0 24px 14px;
+    padding: 10px 14px;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    border-radius: 8px;
+    font-size: 0.83rem;
+    color: #92400e;
+}
+
+/* Plan cards grid */
+.lic-plans {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 12px;
+    margin-top: 4px;
+}
+.lic-plans-loading { color: var(--text-muted, #64748b); font-size: 0.85rem; padding: 12px 0; }
+
+.lic-plan-card {
+    border: 2px solid var(--border, #e2e8f0);
+    border-radius: 10px;
+    padding: 16px;
+    position: relative;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.lic-plan-card:hover { border-color: var(--primary, #4f46e5); box-shadow: 0 2px 12px rgba(79,70,229,.12); }
+.lic-plan-card--popular { border-color: var(--primary, #4f46e5); }
+
+.lic-popular-badge {
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--primary, #4f46e5);
+    color: #fff;
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 10px;
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.lic-plan-name { font-weight: 700; font-size: 0.9rem; margin-bottom: 4px; }
+.lic-plan-price { font-size: 1.25rem; font-weight: 800; color: var(--primary, #4f46e5); }
+.lic-plan-note { font-size: 0.72rem; color: var(--text-muted, #64748b); margin-bottom: 10px; }
+
+.lic-plan-features {
+    list-style: none;
+    padding: 0;
+    margin: 10px 0 14px;
+    font-size: 0.78rem;
+    color: var(--text-muted, #64748b);
+}
+.lic-plan-features li { padding: 2px 0; }
+.lic-plan-features li::before { content: "✓ "; color: #16a34a; font-weight: 700; }
+
+.lic-buy-btn {
+    width: 100%;
+    justify-content: center;
+    font-size: 0.83rem;
+}
+
+.lic-fine-print {
+    font-size: 0.72rem;
+    color: var(--text-muted, #64748b);
+    margin-top: 14px;
+    line-height: 1.5;
+}
+
+/* Activate panel status */
+.lic-activate-status {
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.83rem;
+    margin-top: 8px;
+}
+.lic-activate-status.error   { background: #fef2f2; color: #b91c1c; }
+.lic-activate-status.success { background: #f0fdf4; color: #15803d; }
+
+.lic-success-banner {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 0.85rem;
+    color: #15803d;
+    margin-bottom: 16px;
+}
+.lic-success-banner i { margin-right: 6px; }
+
+/* Dark mode adjustments */
+.dark .lic-modal { background: var(--bg-panel, #1e2030); }
+.dark .lic-tier--free  { background: #1e293b; color: #94a3b8; }
+.dark .lic-tier--pro   { background: #1e1b4b; color: #a5b4fc; }
+.dark .lic-plan-card   { border-color: #334155; }
+.dark .lic-plan-card:hover { border-color: var(--primary, #6366f1); }
+.dark .lic-upgrade-prompt { background: #431407; border-color: #92400e; color: #fed7aa; }
+.dark .lic-success-banner { background: #052e16; border-color: #166534; color: #86efac; }
+.dark .lic-activate-status.error   { background: #450a0a; color: #fca5a5; }
+.dark .lic-activate-status.success { background: #052e16; color: #86efac; }
+.dark .bulk-limit-hint { color: var(--text-muted, #94a3b8); }
+
+} /* end @layer components (license) */
