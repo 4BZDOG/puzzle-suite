@@ -177,11 +177,12 @@ export function drawMasterKeyPage(ctx, fullTitle, subText, currentPuzzleData, se
         let cx = layout.x, cy = layout.y + rowH;
         currentPuzzleData.notes.forEach((n, i) => {
             if (i > 0 && i % itemsPerCol === 0) { cx += colW; cy = layout.y + rowH; }
+            doc.setFont(pdfFont, 'normal');
             doc.setTextColor(15, 23, 42);
-            doc.text(`${i + 1}. `, cx + 2, cy);
+            doc.text(`${i + 1}. ${n.term}`, cx + 2, cy);
             doc.setFont(pdfFont, 'bold');
             doc.setTextColor(220, 20, 60);
-            doc.text(n.correctLetter, cx + 12 * scale, cy);
+            doc.text(n.correctLetter, cx + colW - 4, cy, { align: 'right' });
             doc.setFont(pdfFont, 'normal');
             cy += rowH;
         });
