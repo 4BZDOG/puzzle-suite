@@ -30,6 +30,7 @@ export function buildCtx(doc, pdfFont, wmImg, scale, { PAGE_WIDTH, PAGE_HEIGHT, 
         notesConfig: settings.notesConfig || { showTerm: true, showDef: true },
         wsInternalGrid: settings.wsInternalGrid || false,
         titleScale: settings.titleScale || 1,
+        showExample: settings.showExample || false,
     };
 }
 

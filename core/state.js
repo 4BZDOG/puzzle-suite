@@ -47,6 +47,7 @@ export const state = {
         cwLineWidth:    1,
         cwShowBank:     false,
         scrShowHint:    false,
+        showExample:    false,
         wmOpacity:      0.15,
         titleScale:     1,
         paperSize:      'a4',
@@ -137,6 +138,7 @@ export function syncSettingsFromDOM() {
     s.cwLineWidth    = parseFloat(getVal('cwLineWidth', s.cwLineWidth));
     s.cwShowBank     = getChk('cwShowBank', s.cwShowBank);
     s.scrShowHint    = getChk('scrShowHint', s.scrShowHint);
+    s.showExample    = getChk('showExample', s.showExample);
     s.titleScale     = parseFloat(getVal('titleScale', s.titleScale));
     s.paperSize      = getVal('paperSize', s.paperSize);
     s.wmOpacity      = parseFloat(
@@ -229,6 +231,7 @@ export function applyStateToDOM(s) {
     setVal('cwLineWidth',    cfg.cwLineWidth);
     setChk('cwShowBank',     cfg.cwShowBank);
     setChk('scrShowHint',    cfg.scrShowHint);
+    setChk('showExample',    cfg.showExample);
     setVal('titleScale',     cfg.titleScale);
     setVal('paperSize',      cfg.paperSize);
 

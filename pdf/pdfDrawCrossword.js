@@ -29,12 +29,22 @@ export function drawCrossword(ctx, cwData, layout, isKey, pScale) {
     const numFontSizePt  = Math.max(7.5, mmToPt(cSize) * 0.42);
     const charFontSizePt = mmToPt(cSize) * 0.65;
 
+    const showExample = ctx.showExample || false;
+    const firstAcross = showExample && !isKey
+        ? (cwData.placed.filter(w => w.dir === 'across').sort((a, b) => a.num - b.num)[0] || null)
+        : null;
+    const exCells = new Set();
+    if (firstAcross) {
+        for (let i = 0; i < firstAcross.word.length; i++) exCells.add(`${firstAcross.x + i},${firstAcross.y}`);
+    }
+
     for (let y = 0; y < cwData.rows; y++) {
         for (let x = 0; x < cwData.cols; x++) {
             const cell = cwData.grid[y][x];
             if (cell) {
                 const cx = ox + x * cSize, cy = oy + y * cSize;
-                doc.setFillColor(255, 255, 255);
+                const isEx = exCells.has(`${x},${y}`);
+                doc.setFillColor(isEx ? 219 : 255, isEx ? 234 : 255, isEx ? 254 : 255);
                 doc.rect(cx, cy, cSize, cSize, 'FD');
 
                 if (cell.num && !isKey) {
@@ -48,6 +58,13 @@ export function drawCrossword(ctx, cwData, layout, isKey, pScale) {
                     doc.setFontSize(charFontSizePt);
                     doc.setTextColor(220, 20, 60);
                     doc.text(cell.char, cx + cSize / 2, cy + cSize / 2 + cSize * 0.05, { align: 'center', baseline: 'middle' });
+                } else if (isEx) {
+                    // Show example letters in blue
+                    const letterIdx = x - firstAcross.x;
+                    doc.setFont('courier', 'bold');
+                    doc.setFontSize(charFontSizePt);
+                    doc.setTextColor(37, 99, 235);
+                    doc.text(firstAcross.word[letterIdx], cx + cSize / 2, cy + cSize / 2 + cSize * 0.05, { align: 'center', baseline: 'middle' });
                 }
             }
         }
@@ -102,8 +119,12 @@ export function drawCrossword(ctx, cwData, layout, isKey, pScale) {
             doc.setFontSize(fontPt);
             doc.setTextColor(15, 23, 42);
             list.forEach(w => {
-                const lines = doc.splitTextToSize(`${w.num}. ${w.clue} (${w.word.length})`, colW - 10 * scale);
+                const isEx = showExample && firstAcross && w.num === firstAcross.num && w.dir === 'across';
+                const prefix = isEx ? '\u2605 ' : '';
+                const lines = doc.splitTextToSize(`${prefix}${w.num}. ${w.clue} (${w.word.length})`, colW - 10 * scale);
+                if (isEx) doc.setTextColor(37, 99, 235);
                 lines.forEach(line => { doc.text(line, colX, y); y += lineH; });
+                if (isEx) doc.setTextColor(15, 23, 42);
                 y += spacingH;
             });
         };

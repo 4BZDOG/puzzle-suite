@@ -48,9 +48,13 @@ export function drawNotes(ctx, notesList, startY, pScale) {
     doc.line(MARGIN, cy + 2 * scale, PAGE_WIDTH - MARGIN, cy + 2 * scale);
     cy += 8 * pScale;
 
+    const showExample = ctx.showExample || false;
     doc.setTextColor(15, 23, 42);
     notesList.forEach((w, i) => {
-        const numStr = isMatching ? `${i + 1}. ____` : `${i + 1}.`;
+        const isExample = showExample && i === 0;
+        const numStr = isMatching
+            ? (isExample ? `${i + 1}. ${w.correctLetter}` : `${i + 1}. ____`)
+            : `${i + 1}.`;
         const clueStr = isMatching
             ? `${w.matchLetter}. ${w.clue} (${w.clueTermLength ?? w.term.length})`
             : `${w.clue} (${w.term.length})`;
@@ -68,7 +72,7 @@ export function drawNotes(ctx, notesList, startY, pScale) {
         }
 
         doc.setFont(pdfFont, 'bold');
-        doc.setTextColor(100, 116, 139);
+        doc.setTextColor(isExample ? 37 : 100, isExample ? 99 : 116, isExample ? 235 : 139);
         doc.text(numStr, MARGIN, cy);
 
         doc.setTextColor(15, 23, 42);
@@ -76,6 +80,16 @@ export function drawNotes(ctx, notesList, startY, pScale) {
 
         doc.setFont(pdfFont, 'normal');
         if (showDef) doc.text(dLines, defX, cy);
+        if (isExample && !isMatching && showDef) {
+            // Show answer after the clue lines in blue
+            const answerY = cy + (dLines.length * 4.5 * pScale);
+            doc.setFont(pdfFont, 'bold');
+            doc.setFontSize(9 * pScale);
+            doc.setTextColor(37, 99, 235);
+            doc.text(`\u2605 example answer: ${w.term}`, defX, answerY);
+            doc.setFont(pdfFont, 'normal');
+            doc.setTextColor(15, 23, 42);
+        }
 
         cy += (maxLines * 4.5 * pScale) + 2 * pScale;
         doc.setDrawColor(226, 232, 240);

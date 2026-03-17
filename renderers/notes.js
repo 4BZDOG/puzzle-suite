@@ -39,11 +39,17 @@ export function renderNotes(container, puzzleData, words, settings, onUpdateWord
             <span class="notes-clue-header">DEFINITION</span>
         </div>`;
 
+    const showExample = settings.showExample;
+
     targetData.forEach((w, i) => {
-        htmlStr += '<div class="notes-row">';
-        htmlStr += isMatching
-            ? `<span class="notes-num" style="width:60px">${i + 1}. ____</span>`
-            : `<span class="notes-num">${i + 1}.</span>`;
+        const isExample = showExample && i === 0;
+        htmlStr += `<div class="notes-row${isExample ? ' notes-row-example' : ''}">`;
+        if (isMatching) {
+            const numStr = isExample ? `${i + 1}. <b style="color:var(--primary)">${w.correctLetter}</b>` : `${i + 1}. ____`;
+            htmlStr += `<span class="notes-num" style="width:60px">${numStr}</span>`;
+        } else {
+            htmlStr += `<span class="notes-num">${i + 1}.</span>`;
+        }
         htmlStr += `<div class="notes-word"><div class="notes-editable" ${!isMatching ? 'contenteditable="true"' : ''} ${!isMatching ? `onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}" onblur="window._puzzleApp.updateWord(${i}, 'word', this.innerText)"` : ''}>${w.term}</div></div>`;
         htmlStr += '<div class="notes-clue">';
 
@@ -53,6 +59,7 @@ export function renderNotes(container, puzzleData, words, settings, onUpdateWord
         } else {
             htmlStr += `<div class="notes-editable" contenteditable="true" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}" onblur="window._puzzleApp.updateWord(${i}, 'clue', this.innerText)">${w.clue}</div>`;
             htmlStr += `<span class="notes-clue-length">(${w.term.length})</span>`;
+            if (isExample) htmlStr += `<span class="scramble-example-label" style="margin-left:6px;">★ example: <b>${w.term}</b></span>`;
         }
 
         htmlStr += '</div></div>';

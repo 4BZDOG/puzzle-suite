@@ -17,13 +17,16 @@ export function renderScramble(container, scrData, settings) {
 
     const items = scrData;
     const showHint = settings.scrShowHint;
+    const showExample = settings.showExample;
     let htmlStr = '<div class="scramble-container">';
 
-    items.forEach(item => {
-        htmlStr += `<div class="scramble-item">
+    items.forEach((item, i) => {
+        const isExample = showExample && i === 0;
+        htmlStr += `<div class="scramble-item${isExample ? ' scramble-example' : ''}">
             <div class="scramble-text">${item.scrambled}</div>
-            <div class="scramble-line"></div>
-            ${showHint ? `<div class="scramble-hint">(${item.original[0]}...)</div>` : ''}
+            ${isExample
+                ? `<div class="scramble-answer-filled">${item.original}</div><div class="scramble-example-label">★ example</div>`
+                : `<div class="scramble-line"></div>${showHint ? `<div class="scramble-hint">(${item.original[0]}...)</div>` : ''}`}
         </div>`;
     });
 
