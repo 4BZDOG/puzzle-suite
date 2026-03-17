@@ -23,24 +23,40 @@ export function drawScramble(ctx, scrData, layout, isKey, showHint, pScale) {
         const colW = layout.w / numCols;
         const rowH = Math.min(8 * scale, layout.h / itemsPerCol);
 
-        doc.setFontSize(Math.min(rowH * 2.5, Math.max(8, rowH * 1.5) * pScale));
+        // Start from a row-height-based size, then shrink so that the longest
+        // scrambled word + gap + answer word both fit inside colW.
+        // Courier is monospace so scrambled and original have equal pixel widths.
+        let fs = Math.max(6, rowH * 1.5 * pScale);
+        doc.setFont('courier', 'bold');
+        doc.setFontSize(fs);
+        const maxWordW = Math.max(...scrData.map(s => doc.getTextWidth(s.original)));
+        const needed = 2 * maxWordW + 6 * scale; // scrambled + gap + answer
+        if (needed > colW) {
+            fs = Math.max(5, fs * (colW - 6 * scale) / (2 * maxWordW));
+            doc.setFontSize(fs);
+        }
+
         let cx = layout.x, cy = layout.y + rowH;
 
         scrData.forEach((s, i) => {
             if (i > 0 && i % itemsPerCol === 0) { cx += colW; cy = layout.y + rowH; }
-            const splitX = cx + colW * 0.45;
 
             doc.setFont('courier', 'bold');
             doc.setTextColor(15, 23, 42);
-            doc.text(s.scrambled, cx + 5 * scale, cy, { align: 'left' });
+            doc.text(s.scrambled, cx + 2 * scale, cy);
 
-            doc.setDrawColor(100, 116, 139);
-            doc.setLineWidth(0.2);
-            doc.line(splitX, cy + 1, cx + colW - 2, cy + 1);
+            const scramW = doc.getTextWidth(s.scrambled);
+            const lineStart = cx + 2 * scale + scramW + 2 * scale;
+            const lineEnd = cx + colW - 2 * scale;
+            if (lineEnd > lineStart) {
+                doc.setDrawColor(100, 116, 139);
+                doc.setLineWidth(0.2);
+                doc.line(lineStart, cy + 1, lineEnd, cy + 1);
+            }
 
             doc.setFont(pdfFont, 'bold');
             doc.setTextColor(220, 20, 60);
-            doc.text(s.original, cx + colW - 2, cy, { align: 'right' });
+            doc.text(s.original, cx + colW - 2 * scale, cy, { align: 'right' });
 
             cy += rowH;
         });

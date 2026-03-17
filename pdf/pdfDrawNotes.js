@@ -172,7 +172,19 @@ export function drawMasterKeyPage(ctx, fullTitle, subText, currentPuzzleData, se
         const itemsPerCol = Math.ceil(currentPuzzleData.notes.length / numCols);
         const colW = layout.w / numCols;
         const rowH = Math.min(8 * scale, layout.h / itemsPerCol);
-        doc.setFontSize(Math.max(8, rowH * 1.5 * pScale));
+
+        // Compute font size from row height, then shrink if the longest "N. TERM"
+        // label overflows the column (leaves 6 mm for the bold correct-letter).
+        let fs = Math.max(8, rowH * 1.5 * pScale);
+        doc.setFont(pdfFont, 'normal');
+        doc.setFontSize(fs);
+        const maxLabelW = currentPuzzleData.notes.reduce(
+            (m, n, i) => Math.max(m, doc.getTextWidth(`${i + 1}. ${n.term}`)), 0);
+        const letterColW = 6 * scale;
+        if (maxLabelW > colW - letterColW) {
+            fs = Math.max(5, fs * (colW - letterColW) / maxLabelW);
+            doc.setFontSize(fs);
+        }
 
         let cx = layout.x, cy = layout.y + rowH;
         currentPuzzleData.notes.forEach((n, i) => {
