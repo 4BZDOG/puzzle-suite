@@ -61,12 +61,19 @@ export function drawScramble(ctx, scrData, layout, isKey, showHint, pScale) {
             cy += rowH;
         });
     } else {
+        const numCols = 2;
+        const itemsPerCol = Math.ceil(scrData.length / numCols);
+        const colW = layout.w / numCols;
+        const rowH = 12 * pScale;
+        const showExample = ctx.showExample || false;
+
         let cy = layout.y + 10 * scale;
         let cx = layout.x;
-        const colW = layout.w / 2;
 
-        scrData.forEach(s => {
-            if (cy > ctx.PAGE_HEIGHT - ctx.MARGIN - 10 * scale) { cy = layout.y + 10 * scale; cx += colW; }
+        scrData.forEach((s, i) => {
+            if (i > 0 && i % itemsPerCol === 0) { cx += colW; cy = layout.y + 10 * scale; }
+
+            const isEx = showExample && i === 0;
 
             doc.setFont('courier', 'bold');
             doc.setFontSize(14 * pScale);
@@ -75,20 +82,39 @@ export function drawScramble(ctx, scrData, layout, isKey, showHint, pScale) {
             const lineStartX = cx + colW * 0.40;
             doc.text(s.scrambled, cx + 10 * scale, cy, { align: 'left' });
 
-            doc.setDrawColor(15, 23, 42);
-            doc.setLineWidth(0.4);
+            if (isEx) {
+                // Show the answer filled in blue
+                doc.setFont(pdfFont, 'bold');
+                doc.setFontSize(14 * pScale);
+                doc.setTextColor(37, 99, 235);
+                doc.text(s.original, lineStartX + 2 * scale, cy);
+                doc.setDrawColor(37, 99, 235);
+                doc.setLineWidth(0.4);
+                const ansW = doc.getTextWidth(s.original);
+                const lineEndX = showHint ? cx + colW - 20 * scale : cx + colW - 10 * scale;
+                doc.line(lineStartX, cy + 2 * scale, Math.max(lineStartX + ansW + 4 * scale, lineEndX), cy + 2 * scale);
+                // "★ example" label
+                doc.setFont(pdfFont, 'italic');
+                doc.setFontSize(8 * pScale);
+                doc.setTextColor(37, 99, 235);
+                doc.text('\u2605 example', cx + colW - 2 * scale, cy, { align: 'right' });
+                doc.setTextColor(15, 23, 42);
+            } else {
+                doc.setDrawColor(15, 23, 42);
+                doc.setLineWidth(0.4);
 
-            const lineEndX = showHint ? cx + colW - 20 * scale : cx + colW - 10 * scale;
-            doc.line(lineStartX, cy + 2 * scale, lineEndX, cy + 2 * scale);
+                const lineEndX = showHint ? cx + colW - 20 * scale : cx + colW - 10 * scale;
+                doc.line(lineStartX, cy + 2 * scale, lineEndX, cy + 2 * scale);
 
-            if (showHint) {
-                doc.setFont(pdfFont, 'normal');
-                doc.setFontSize(10 * pScale);
-                doc.setTextColor(100, 116, 139);
-                doc.text(`(${s.original[0]}...)`, lineEndX + 3 * scale, cy, { align: 'left' });
+                if (showHint) {
+                    doc.setFont(pdfFont, 'normal');
+                    doc.setFontSize(10 * pScale);
+                    doc.setTextColor(100, 116, 139);
+                    doc.text(`(${s.original[0]}...)`, lineEndX + 3 * scale, cy, { align: 'left' });
+                }
             }
 
-            cy += 12 * pScale;
+            cy += rowH;
         });
     }
 }

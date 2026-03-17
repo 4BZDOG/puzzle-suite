@@ -22,6 +22,7 @@ function generateWS(sz, wordList, useDiag, useBack, useHard, customFillers) {
     if (useBack) dirs.push([-1, 0], [0, -1]);
     if (useDiag && useBack) dirs.push([-1, -1], [1, -1], [-1, 1]);
 
+    let wp = [];
     l.forEach(o => {
         let w = o.word, fit = false, t = 0;
         while (!fit && t < WS_MAX_ATTEMPTS) {
@@ -38,11 +39,14 @@ function generateWS(sz, wordList, useDiag, useBack, useHard, customFillers) {
                     if (cell !== '' && cell !== w[i]) ok = false;
                 }
                 if (ok) {
+                    const cells = [];
                     for (let i = 0; i < w.length; i++) {
                         g[y + i * d[1]][x + i * d[0]] = w[i];
                         solArray.push((x + i * d[0]) + ',' + (y + i * d[1]));
+                        cells.push({ x: x + i * d[0], y: y + i * d[1] });
                     }
                     p.push(w);
+                    wp.push({ word: w, cells });
                     fit = true;
                 }
             }
@@ -65,7 +69,7 @@ function generateWS(sz, wordList, useDiag, useBack, useHard, customFillers) {
             if (g[y][x] === '') g[y][x] = pool[Math.floor(Math.random() * pool.length)];
         }
     }
-    return { grid: g, size: sz, solutionArray: solArray, placed: p.sort() };
+    return { grid: g, size: sz, solutionArray: solArray, placed: p.sort(), wordPositions: wp };
 }
 
 // ---- Crossword -----------------------------------------------

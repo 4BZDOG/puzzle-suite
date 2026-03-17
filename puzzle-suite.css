@@ -1352,6 +1352,56 @@ table.mode-cw td.cell.empty {
     border-radius: 3px;
 }
 
+/* ---- Show Example styles ---- */
+.cell-example {
+    background-color: #dbeafe !important;
+}
+.cell-example .cell-example-letter {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: #2563eb;
+    font-size: 0.85em;
+    pointer-events: none;
+}
+.scramble-answer-filled {
+    font-weight: bold;
+    color: #2563eb;
+    font-family: var(--user-font);
+    font-size: calc(1rem * var(--global-font-scale) * var(--page-scale));
+    min-width: 60px;
+    border-bottom: 2px solid #2563eb;
+    padding: 0 4px;
+}
+.scramble-example-label {
+    font-size: calc(0.75rem * var(--global-font-scale) * var(--page-scale));
+    color: #2563eb;
+    white-space: nowrap;
+    margin-left: 6px;
+}
+.scramble-example {
+    background: #eff6ff;
+    border-radius: 4px;
+    padding: 2px 4px;
+}
+.clue-example {
+    background: #eff6ff;
+    border-radius: 3px;
+}
+.wb-check-done {
+    color: #2563eb;
+    font-weight: bold;
+    font-size: 1em;
+    line-height: 1;
+}
+.notes-row-example {
+    background: #eff6ff;
+    border-radius: 4px;
+}
+
 .clues-two-col {
     display: flex;
     gap: 32px;

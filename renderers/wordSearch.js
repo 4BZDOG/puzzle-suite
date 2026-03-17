@@ -29,12 +29,15 @@ export function renderWordSearch(gridArea, footerArea, wsData, words, settings, 
         if (!wsData) { gridArea.innerHTML = '<div style="color:var(--text-muted)">No Data</div>'; return; }
 
         const showGrid = settings.wsInternalGrid;
+        const exWordPos = settings.showExample && wsData.wordPositions?.length ? wsData.wordPositions[0] : null;
+        const exCells = new Set(exWordPos ? exWordPos.cells.map(c => `${c.x},${c.y}`) : []);
 
         let htmlStr = `<div class="grid mode-search ${showGrid ? 'with-internal-grid' : ''}" style="grid-template-columns: repeat(${wsData.size}, ${z}px); grid-template-rows: repeat(${wsData.size}, ${z}px);">`;
 
         for (let y = 0; y < wsData.size; y++) {
             for (let x = 0; x < wsData.size; x++) {
-                htmlStr += `<div class="cell" style="--cell-size: ${z}px;">${wsData.grid[y][x]}</div>`;
+                const isEx = exCells.has(`${x},${y}`);
+                htmlStr += `<div class="cell${isEx ? ' cell-example' : ''}" style="--cell-size: ${z}px;">${wsData.grid[y][x]}</div>`;
             }
         }
         htmlStr += `</div>`;
@@ -61,9 +64,16 @@ export function renderWordSearch(gridArea, footerArea, wsData, words, settings, 
         });
 
         const gridPx = wsData.size * z;
+        const exWord = settings.showExample && wsData.wordPositions?.length ? wsData.wordPositions[0].word : null;
+        // Distribute items top-to-bottom per column using CSS Grid
+        const itemsPerCol = Math.ceil(items.length / cols);
         footerArea.innerHTML = `<div style="width:${gridPx}px; margin:0 auto;">
-            <div class="word-bank-styled" style="column-count:${cols}; display:block; column-gap:20px;">
-                ${items.map(w => `<div class="wb-item" style="margin-bottom:6px; break-inside:avoid;"><span class="wb-check"></span> <div>${w}</div></div>`).join('')}
+            <div class="word-bank-styled" style="display:grid; grid-template-columns: repeat(${cols}, 1fr); grid-template-rows: repeat(${itemsPerCol}, auto); grid-auto-flow: column; column-gap:20px;">
+                ${wsData.placed.map((wStr, i) => {
+                    const isEx = exWord === wStr;
+                    const display = items[i];
+                    return `<div class="wb-item${isEx ? ' wb-item-example' : ''}" style="margin-bottom:6px;">${isEx ? '<span class="wb-check-done">✓</span>' : '<span class="wb-check"></span>'} <div${isEx ? ' style="text-decoration:line-through; color:var(--primary);"' : ''}>${display}</div></div>`;
+                }).join('')}
             </div>
         </div>`;
     }

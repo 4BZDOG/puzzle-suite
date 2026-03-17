@@ -35,6 +35,14 @@ export function renderCrossword(gridArea, footerArea, cwData, settings, preview 
             return;
         }
 
+        const firstAcross = settings.showExample
+            ? (cwData.placed.filter(w => w.dir === 'across').sort((a, b) => a.num - b.num)[0] || null)
+            : null;
+        const exCells = new Set();
+        if (firstAcross) {
+            for (let i = 0; i < firstAcross.word.length; i++) exCells.add(`${firstAcross.x + i},${firstAcross.y}`);
+        }
+
         let htmlStr = `<table class="mode-cw" style="--cell-size: ${z}px;">`;
 
         for (let y = 0; y < cwData.rows; y++) {
@@ -42,7 +50,12 @@ export function renderCrossword(gridArea, footerArea, cwData, settings, preview 
             for (let x = 0; x < cwData.cols; x++) {
                 const v = cwData.grid[y][x];
                 if (v) {
-                    htmlStr += `<td class="cell" style="width: ${z}px; height: ${z}px;"><span class="cell-num">${v.num || ''}</span></td>`;
+                    const isEx = exCells.has(`${x},${y}`);
+                    const letterIdx = firstAcross ? x - firstAcross.x : -1;
+                    const letter = isEx ? firstAcross.word[letterIdx] : '';
+                    htmlStr += `<td class="cell${isEx ? ' cell-example' : ''}" style="width: ${z}px; height: ${z}px;">
+                        <span class="cell-num">${v.num || ''}</span>${isEx ? `<span class="cell-example-letter">${letter}</span>` : ''}
+                    </td>`;
                 } else {
                     htmlStr += `<td class="cell empty" style="width: ${z}px; height: ${z}px;"></td>`;
                 }
@@ -57,8 +70,12 @@ export function renderCrossword(gridArea, footerArea, cwData, settings, preview 
         const ac = cwData.placed.filter(w => w.dir === 'across').sort((a, b) => a.num - b.num);
         const dn = cwData.placed.filter(w => w.dir === 'down').sort((a, b) => a.num - b.num);
 
+        const exampleNum = firstAcross ? firstAcross.num : -1;
         const makeClueRows = (list) =>
-            list.map(w => `<div class="clue-row"><span class="clue-num-bold">${w.num}.</span><span>${w.clue} <span class="notes-clue-length">(${w.word.length})</span></span></div>`).join('');
+            list.map(w => {
+                const isEx = settings.showExample && w.num === exampleNum && w.dir === 'across';
+                return `<div class="clue-row${isEx ? ' clue-example' : ''}"><span class="clue-num-bold">${isEx ? '★ ' : ''}${w.num}.</span><span>${w.clue} <span class="notes-clue-length">(${w.word.length})</span>${isEx ? ` <span class="scramble-example-label">example</span>` : ''}</span></div>`;
+            }).join('');
 
         let html = '<div class="clues-two-col">';
         if (ac.length) html += `<div class="clue-col"><div class="clue-group-title first">ACROSS</div>${makeClueRows(ac)}</div>`;

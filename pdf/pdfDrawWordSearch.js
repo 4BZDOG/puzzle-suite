@@ -30,6 +30,9 @@ export function drawWordSearch(ctx, wsData, layout, wordsList, showClues, isKey,
 
     // Read wsInternalGrid from ctx (passed via buildCtx settings) — never touch the DOM here
     const showInternalGrid = ctx.wsInternalGrid || false;
+    const showExample = ctx.showExample || false;
+    const exWordPos = showExample && wsData.wordPositions?.length ? wsData.wordPositions[0] : null;
+    const exCells = new Set(exWordPos ? exWordPos.cells.map(c => `${c.x},${c.y}`) : []);
 
     for (let y = 0; y < wsData.size; y++) {
         for (let x = 0; x < wsData.size; x++) {
@@ -53,6 +56,11 @@ export function drawWordSearch(ctx, wsData, layout, wordsList, showClues, isKey,
                     doc.setFont('courier', 'normal');
                 }
             } else {
+                // Highlight example word cells with a light blue fill
+                if (!isKey && exCells.has(`${x},${y}`)) {
+                    doc.setFillColor(219, 234, 254);
+                    doc.rect(cx, cy, cSize, cSize, 'F');
+                }
                 doc.setTextColor(15, 23, 42);
             }
 
@@ -84,8 +92,10 @@ export function drawWordSearch(ctx, wsData, layout, wordsList, showClues, isKey,
         let cx = ox, cy = bankY;
         const sq = 2.5 * scale;
 
+        const exWord = exWordPos ? exWordPos.word : null;
         items.forEach((text, i) => {
             if (i > 0 && i % itemsPerCol === 0) { cx += colWidth; cy = bankY; }
+            const isEx = exWord && wsData.placed[i] === exWord;
             const lines = doc.splitTextToSize(text, colWidth - 8 * scale);
 
             if (cy + (lines.length * 4 * pScale) > PAGE_HEIGHT - MARGIN) {
@@ -94,13 +104,24 @@ export function drawWordSearch(ctx, wsData, layout, wordsList, showClues, isKey,
                 cy = MARGIN + 10 * scale;
             }
 
-            doc.setDrawColor(100);
-            doc.setLineWidth(0.3);
-            doc.rect(cx, cy - sq + 0.5 * scale, sq, sq, 'S');
+            if (isEx) {
+                // Example: show ✓ in blue instead of checkbox
+                doc.setTextColor(37, 99, 235);
+                doc.setFont(pdfFont, 'bold');
+                doc.text('✓', cx + sq / 2, cy, { align: 'center' });
+                doc.setFont(pdfFont, 'normal');
+                doc.setTextColor(37, 99, 235);
+            } else {
+                doc.setDrawColor(100);
+                doc.setLineWidth(0.3);
+                doc.rect(cx, cy - sq + 0.5 * scale, sq, sq, 'S');
+                doc.setTextColor(15, 23, 42);
+            }
             lines.forEach((line, idx) => {
                 doc.text(line, cx + 5 * scale, cy);
                 if (idx < lines.length - 1) cy += 4 * pScale;
             });
+            if (isEx) doc.setTextColor(15, 23, 42);
             cy += 6 * pScale;
         });
     }
