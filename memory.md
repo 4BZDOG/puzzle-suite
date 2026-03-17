@@ -6,7 +6,9 @@ This file tracks key decisions, reasoning, and hard-won lessons across sessions.
 
 ## Project Purpose
 
-Puzzle Suite is a client-side-only teacher tool for generating printable vocabulary worksheets: notes/matching page, word search, crossword, word scramble, and answer key. No server. Everything runs in the browser. PDF export via jsPDF.
+Puzzle Suite is a teacher tool for generating printable vocabulary worksheets: notes/matching page, word search, crossword, word scramble, and answer key. PDF export via jsPDF.
+
+The frontend is fully client-side and works without any server (Free tier). An optional Node.js/Express server (`server/`) handles Stripe payments, license key issuance and validation, and an admin dashboard. The frontend degrades gracefully if the server is unreachable — all features work on Free tier.
 
 ---
 
@@ -80,10 +82,18 @@ History is `state.words` snapshots only. Settings changes are not undoable. `pus
 
 ## Storage
 
+### Browser (localStorage)
 - Main state key: `puzzleSuiteV60` (bump version when schema changes incompatibly)
 - Legacy fallback: `puzzleSuiteV59`
 - AI keys stored separately: `puzzleSuiteAIKeys` (never included in main payload)
+- License key: `puzzleSuiteLicense` (raw key string, uppercased)
+- License validation cache: `puzzleSuiteLicenseCache` (JSON `{ key, data, ts }`, 24-hour TTL)
 - Watermark src stored at top level of payload (can be large — main quota risk)
+
+### Server (SQLite via better-sqlite3)
+- Database file: `server/data/licenses.db` (created automatically; excluded from git)
+- `licenses` table: `key, email, plan, billing_interval, active, stripe_session_id, stripe_subscription_id, created_at, activated_at, expires_at`
+- `events` table: `id, license_key, event, note, created_at` — audit log for all state changes
 
 ---
 
@@ -123,6 +133,47 @@ This keeps the matching preview live without triggering a full puzzle regenerate
 - **Settings-driven isMatching in renderers** — tried first, caused "undefined." artifacts before first generate. Abandoned in favour of data-driven.
 - **Patching `puzzleData.notes` for word (term) edits** — not needed; word edits already call `debouncedGenerate()` which rebuilds everything.
 - **Triggering full regenerate on clue edits** — considered but rejected; too expensive and unnecessary. Clue text changes don't affect puzzle layout. In-place patch is sufficient.
+
+---
+
+## Payment System Design Decisions (2026-03-17)
+
+### License-key auth over user accounts
+User accounts (email/password, sessions, forgot-password, etc.) add significant complexity for a tool that is fundamentally stateless. License keys let users pay once, receive a key, and enter it — no registration, no cookie management, no password resets. The server stores only the key, email, plan, and timestamps.
+
+**Decision rationale**: Teachers are the primary audience. They distrust yet-another-account and want a tool that "just works." A key they paste in once provides Pro access forever (Lifetime) or until their subscription lapses. Simpler server, simpler UI, fewer support requests.
+
+### `onChange` listener pattern (not Promise.then)
+`licenseManager.init()` is fire-and-forget (`.catch(() => {})`). UI update functions (`_updateProBadge`, `_updateBulkLimit`) are registered via `licenseManager.onChange()` BEFORE `init()` is called, not in a `.then()`. This means:
+- They fire when init completes (even asynchronously)
+- They fire again whenever the user activates or deactivates a key
+- No duplication — one registration handles all state transitions
+
+**Lesson**: Using `.then()` to update UI after `init()` AND `onChange()` for key activation caused double updates. `onChange` fires on init completion via `_notify()`, so `.then()` is redundant and should be removed.
+
+### `_cachedPlans` prevents repeated network requests
+Plan data (prices, features, plan IDs) from the server is cached in a module-level `let _cachedPlans = null`. `_loadPlansUI()` returns the cached array on subsequent calls. This prevents a fetch request every time the user opens the Upgrade modal.
+
+### XSS discipline: all server data through `escapeHTML`
+All server-supplied strings rendered via `innerHTML` — `p.label`, `p.price`, `p.features[n]`, `p.id`, `info.email`, `info.plan` — must be wrapped in `escapeHTML()`. The existing `escapeHTML` utility in `main.js` handles this. Raw strings from fetch responses are never safe to inject directly.
+
+**Lesson**: XSS in the plans renderer was caught in review. `_renderPlans()` was extracted as a dedicated helper that enforces this discipline in one place.
+
+### Stripe webhook raw body requirement
+Express's `express.json()` middleware consumes and parses `req.body`, destroying the raw buffer that Stripe needs for signature verification. The webhook route (`POST /api/webhook`) uses `express.raw({ type: 'application/json' })` and must be registered BEFORE `app.use(express.json())` in `server/index.js`.
+
+**Lesson**: If the webhook route is registered after `express.json()`, Stripe's `constructEvent()` throws "No signatures found matching the expected signature for payload" — even with a correct `STRIPE_WEBHOOK_SECRET`.
+
+### Idempotent webhook processing
+Stripe may deliver the same webhook event more than once (retries on network error or non-2xx response). The `checkout.session.completed` handler calls `db.getLicenseBySession(session.id)` before creating a new license. If a license with that Stripe session ID already exists, it logs and returns 200 without creating a duplicate.
+
+### `datetime('now')` — single quotes required in SQLite
+SQLite identifiers use double quotes; string literals use single quotes. `datetime("now")` throws `SqliteError: no such column: now` because SQLite interprets `"now"` as a column reference. All SQLite date expressions must use `datetime('now')`, `date('now')`, etc.
+
+### localStorage keys for license state
+- `puzzleSuiteLicense` — the raw license key string (trimmed, uppercased)
+- `puzzleSuiteLicenseCache` — JSON `{ key, data, ts }` — 24-hour validation cache
+These are separate from the main `puzzleSuiteV60` state key so they survive state resets.
 
 ---
 

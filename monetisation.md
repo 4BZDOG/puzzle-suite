@@ -1,15 +1,31 @@
 # Puzzle Suite — Monetisation Strategy
 
-_Last updated: 2026-03-15_
+_Last updated: 2026-03-17_
 
 ---
 
 ## Current State
 
-Puzzle Suite is a fully client-side, free tool with no server costs and no user accounts.
-Revenue is currently zero. All features — including AI word generation — are available without restriction.
+Puzzle Suite has a working payment system (Stripe Checkout + license keys) and a Node.js/Express server in `server/`. The payment flow is live:
 
-The AI feature uses a **Bring Your Own Key (BYOK)** model: users supply an API key from Google, Groq, OpenAI, Anthropic, or OpenRouter. This is zero-cost to us but creates friction (obtaining, managing, and paying for API keys is a barrier for non-technical users, especially teachers).
+1. User clicks **Upgrade** in the app → selects a plan → Stripe Checkout → receives license key by email → enters key in app → unlocked Pro/School/Lifetime tier immediately.
+
+The free tier remains fully functional without any server. The server is only required to accept payments, issue license keys, and validate Pro/School/Lifetime licenses.
+
+**Implemented tiers** (actively billing via Stripe):
+- **Free** — 30 words, 3 bulk sets, BYOK AI (no server required)
+- **Pro Monthly** — $5/month
+- **Pro Annual** — $45/year (save 25%)
+- **School Monthly** — $49/month (pooled team use)
+- **Lifetime Pro** — $99 one-time
+
+**Not yet implemented** (planned):
+- Managed AI credits (Pro tier currently still requires BYOK)
+- Cloud save / cross-device sync
+- Roster import (CSV → differentiated student sets)
+- Marketplace
+
+The AI feature uses a **Bring Your Own Key (BYOK)** model: users supply an API key from Google, Groq, OpenAI, Anthropic, or OpenRouter. This is zero-cost to us but creates friction for non-technical users — managed AI is the primary remaining upgrade trigger to build.
 
 ---
 
@@ -33,23 +49,23 @@ Everything currently available:
 - Local save/load (.json config files)
 - All fonts, paper sizes, watermark
 
-### Pro — *~$5/month or $45/year*
-Targets individual teachers and tutors who want AI without the hassle:
-- **Managed AI credits** — ~500 AI generations/month (≈ 10,000 words), no API key needed
-- **Choice of AI quality tier** — Fast (Gemini Flash / Llama 3.1) or Premium (GPT-4o / Claude Sonnet)
-- Bulk export up to **25 unique sets** (vs. 3 on Free)
-- Up to **50 words** per set (vs. 30)
-- **Cloud save** — puzzles sync across devices, shareable links
+### Pro — *$5/month or $45/year* ✅ billing live
+Targets individual teachers and tutors:
+- Bulk export up to **25 unique sets** (vs. 3 on Free) ✅
+- Up to **50 words** per set (vs. 30) ✅
+- **Managed AI credits** — ~500 AI generations/month, no API key needed *(planned)*
+- **Choice of AI quality tier** — Fast or Premium *(planned)*
+- **Cloud save** — puzzles sync across devices *(planned)*
 - Priority support
 
-### School — *~$49/month per school (unlimited teachers)*
+### School — *$49/month per school (unlimited teachers)* ✅ billing live
 Targets department heads and school IT purchasers:
-- Everything in Pro
-- **2,500 AI generations/month** pooled across all teachers
-- **Admin dashboard** — usage per teacher, billing in one place
-- **Custom branding** — school logo as watermark default, custom title templates
-- **Roster import** — CSV upload to auto-generate differentiated sets per student name
-- LMS export helpers (Google Classroom, Canvas-ready PDF naming)
+- Everything in Pro ✅
+- **2,500 AI generations/month** pooled across all teachers *(planned)*
+- **Admin dashboard** — usage per teacher, billing in one place *(planned; server admin panel is internal-only today)*
+- **Custom branding** — school logo as watermark default, custom title templates *(planned)*
+- **Roster import** — CSV upload to auto-generate differentiated sets per student name *(planned)*
+- LMS export helpers (Google Classroom, Canvas-ready PDF naming) *(planned)*
 - Dedicated support SLA
 
 ---
@@ -116,16 +132,17 @@ Key conversion bets:
 
 ## What to Build First
 
-Ranked by effort-to-revenue ratio:
+Ranked by effort-to-revenue ratio (✅ = done):
 
-1. **Auth layer** (accounts, sessions) — prerequisite for everything else; use a managed provider (Clerk, Supabase Auth) to ship fast
-2. **Managed AI proxy** (Cloudflare Worker + credit accounting in D1/KV) — directly unlocks Pro tier
-3. **Stripe integration** — subscription billing, Pro/School plans, top-up packs
-4. **Usage dashboard in UI** — credit counter, upgrade prompts, account page
-5. **Cloud save** (Supabase or R2 + signed URLs) — Pro differentiator, high retention value
-6. **School admin dashboard** — unlocks the higher-value School tier
+1. ✅ ~~**Auth layer**~~ — **License key system** (no accounts needed; user pays → key emailed → entered in app)
+2. ✅ ~~**Stripe integration**~~ — Checkout sessions, all four plan types, webhook processing, license CRUD
+3. ✅ ~~**Admin dashboard**~~ — `server/admin.html` with stats, license management, resend email, plan changes
+4. **Managed AI proxy** (Cloudflare Worker + credit accounting) — directly unlocks the main Pro differentiator; BYOK still required until this is built
+5. **Usage dashboard in UI** — credit counter, upgrade prompts, account/billing page
+6. **Cloud save** (Supabase or R2 + signed URLs) — Pro differentiator, high retention value
+7. **School-specific features** — roster import, LMS export, custom branding
 
-Items 1–4 alone fully enable the Free → Pro conversion funnel.
+Items 1–3 fully enable the Free → Pro/School/Lifetime conversion funnel. Item 4 is the highest-value remaining work.
 
 ---
 

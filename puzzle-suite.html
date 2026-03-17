@@ -178,6 +178,8 @@
             <h1><span class="brand-icon"><i class="fas fa-puzzle-piece"></i></span>Puzzle Suite <small
                     class="version-tag">v60.3</small></h1>
             <div class="brand-actions">
+                <button id="pro-badge-btn" class="pro-badge-btn" onclick="openLicenseModal()"
+                    title="Upgrade to Pro" aria-label="License & Upgrade">Upgrade</button>
                 <button onclick="toggleDarkMode()" title="Toggle Dark Mode" id="btn-dark"
                     aria-label="Toggle dark mode"><i class="fas fa-moon"></i></button>
                 <button onclick="downloadConfig()" title="Save config" aria-label="Save configuration"><i
@@ -480,9 +482,10 @@
                         </div>
                     </div>
                     <div class="bulk-export-row">
-                        <input type="number" id="bulkCount" value="1" min="1" max="50" class="input-large-center">
+                        <input type="number" id="bulkCount" value="1" min="1" max="3" class="input-large-center">
                         <span class="text-bold-small">Unique Copies (Bulk)</span>
                     </div>
+                    <div id="bulk-limit-hint" class="bulk-limit-hint">Max 3 on Free plan — <a href="#" onclick="openLicenseModal(); return false;">Upgrade for 25</a></div>
                 </div>
             </div>
         </div>
@@ -613,7 +616,72 @@
         </div>
     </main>
 
-    <script src="bundle.js?v=13"></script>
+    <!-- License / Upgrade Modal -->
+    <div id="license-modal-overlay" role="presentation" style="display:none;">
+        <div class="modal lic-modal" role="dialog" aria-modal="true" aria-labelledby="lic-modal-heading">
+
+            <div class="lic-modal-header">
+                <h3 class="modal-title" id="lic-modal-heading">
+                    <i class="fas fa-star" style="color:var(--primary);"></i> Puzzle Suite License
+                </h3>
+                <button class="btn-sec btn-auto lic-modal-close" onclick="closeLicenseModal()" aria-label="Close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <!-- Current plan status -->
+            <div class="lic-status-row">
+                <div id="lic-status"><span class="lic-tier lic-tier--free">Free Plan</span></div>
+                <button class="btn-sec btn-auto" onclick="deactivateLicense()" id="lic-deactivate-btn"
+                    title="Remove license from this device" style="font-size:0.75rem;">Remove key</button>
+            </div>
+
+            <!-- Prompt message (shown when opened via upgrade prompt) -->
+            <div id="upgrade-prompt-msg" class="lic-upgrade-prompt" style="display:none;"></div>
+
+            <!-- Tabs -->
+            <div class="lic-tabs">
+                <button class="lic-tab active" data-tab="upgrade" onclick="_switchLicTab('upgrade')">Upgrade</button>
+                <button class="lic-tab" data-tab="activate" onclick="_switchLicTab('activate')">I have a key</button>
+            </div>
+
+            <!-- Upgrade panel -->
+            <div class="lic-panel active" data-panel="upgrade">
+                <div class="form-row" style="margin-bottom:12px;">
+                    <label class="field-label">Your email (pre-fills checkout)</label>
+                    <input type="email" id="lic-checkout-email" class="full" placeholder="teacher@school.edu"
+                        autocomplete="email">
+                </div>
+                <div id="lic-plans" class="lic-plans">
+                    <div class="lic-plans-loading">Loading plans…</div>
+                </div>
+                <p class="lic-fine-print">After payment you'll receive a license key by email. Subscriptions can be cancelled any time via Stripe.</p>
+            </div>
+
+            <!-- Activate panel -->
+            <div class="lic-panel" data-panel="activate">
+                <!-- Post-checkout success message -->
+                <div id="checkout-success-msg" class="lic-success-banner" style="display:none;">
+                    <i class="fas fa-check-circle"></i> Payment successful! Check your email for your license key, then paste it below.
+                </div>
+                <div class="form-row">
+                    <label class="field-label">License Key</label>
+                    <input type="text" id="lic-key-input" class="full" placeholder="PSP-XXXXX-XXXXX-XXXXX-XXXXX"
+                        autocomplete="off" spellcheck="false" style="font-family:monospace;letter-spacing:1px;">
+                </div>
+                <div id="lic-activate-status" class="lic-activate-status"></div>
+                <div class="modal-actions" style="margin-top:16px;">
+                    <button class="btn-sec btn-auto" onclick="closeLicenseModal()">Cancel</button>
+                    <button class="btn-main btn-auto" id="lic-activate-btn" onclick="activateLicenseKey()">
+                        <i class="fas fa-key"></i> Activate
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="bundle.js?v=15"></script>
 </body>
 
 </html>

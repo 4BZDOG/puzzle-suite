@@ -29,6 +29,8 @@ import { setupDragAndDrop } from './ui/dropZone.js';
 import { processImport, handleDroppedFile } from './import-export/importWords.js';
 import { downloadConfig } from './import-export/exportConfig.js';
 
+import { licenseManager, TIERS } from './license/licenseManager.js';
+
 // =============================================================
 // Constants
 // =============================================================
@@ -278,6 +280,15 @@ function updateWord(i, f, v) {
 }
 
 function addWordRow() {
+    const wordLimit = licenseManager.getLimit('words');
+    if (state.words.length >= wordLimit) {
+        if (licenseManager.isPro) {
+            showToast(`Maximum ${wordLimit} words reached.`, 'warning');
+        } else {
+            showUpgradePrompt(`Free plan is limited to ${wordLimit} words. Upgrade to Pro for up to 50 words.`);
+        }
+        return;
+    }
     pushHistory();
     state.words.push({ word: '', clue: '' });
     _renderWordListAndStatus();
@@ -554,12 +565,193 @@ function aiImportSelected() {
     }).filter(Boolean);
 
     const newWords = [...state.words, ...toAdd.map(w => ({ word: w.word, clue: w.clue }))];
-    pushHistory(state.words);
+    pushHistory();
     setWords(newWords);
     saveState();
     generateAll();
     closeAIModal();
     showToast(`Added ${toAdd.length} word${toAdd.length !== 1 ? 's' : ''} to your list.`, 'success');
+}
+
+// =============================================================
+// License / upgrade UI
+// =============================================================
+
+function _updateProBadge() {
+    const badge = document.getElementById('pro-badge-btn');
+    if (!badge) return;
+    const tier = licenseManager.tier;
+    if (tier === 'free') {
+        badge.textContent = 'Upgrade';
+        badge.classList.remove('pro-badge--active');
+    } else {
+        const label = (TIERS[tier] || TIERS.free).label;
+        badge.textContent = label;
+        badge.classList.add('pro-badge--active');
+    }
+}
+
+function _updateBulkLimit() {
+    const input = document.getElementById('bulkCount');
+    if (!input) return;
+    const max = licenseManager.getLimit('bulkSets');
+    if (parseInt(input.max, 10) !== max) {
+        input.max = max;
+        const hint = document.getElementById('bulk-limit-hint');
+        if (hint) hint.textContent = `Max ${max} on ${(TIERS[licenseManager.tier] || TIERS.free).label} plan`;
+    }
+    if (parseInt(input.value, 10) > max) {
+        input.value = max;
+        saveState();
+    }
+}
+
+function openLicenseModal() {
+    const modal = document.getElementById('license-modal-overlay');
+    if (!modal) return;
+    _refreshLicenseModal();
+    modal.style.display = 'flex';
+}
+
+function closeLicenseModal() {
+    const modal = document.getElementById('license-modal-overlay');
+    if (modal) modal.style.display = 'none';
+}
+
+function showUpgradePrompt(message) {
+    const el = document.getElementById('upgrade-prompt-msg');
+    if (el) {
+        el.textContent = message || 'Upgrade to Pro to unlock this feature.';
+        el.style.display = 'block';
+    }
+    openLicenseModal();
+    _switchLicTab('upgrade');
+}
+
+function _switchLicTab(tabName) {
+    document.querySelectorAll('.lic-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tabName));
+    document.querySelectorAll('.lic-panel').forEach(p => p.classList.toggle('active', p.dataset.panel === tabName));
+}
+
+function _refreshLicenseModal() {
+    const tier = licenseManager.tier;
+    const info = licenseManager.info;
+    const statusEl = document.getElementById('lic-status');
+    if (statusEl) {
+        if (tier === 'free') {
+            statusEl.innerHTML = '<span class="lic-tier lic-tier--free">Free Plan</span>';
+        } else {
+            const label = escapeHTML((TIERS[tier] || TIERS.free).label);
+            const expiry = info?.expiresAt ? ` · expires ${new Date(info.expiresAt).toLocaleDateString()}` : '';
+            const email = info?.email ? ` <span class="lic-email">${escapeHTML(info.email)}</span>` : '';
+            statusEl.innerHTML = `<span class="lic-tier lic-tier--pro">${label}</span>${email}${expiry}`;
+        }
+    }
+    // Populate plans (uses cache after first load)
+    _loadPlansUI();
+}
+
+let _cachedPlans = null;
+
+async function _loadPlansUI() {
+    const container = document.getElementById('lic-plans');
+    if (!container) return;
+    // Use cached plans to avoid a network hit every time the modal opens
+    if (_cachedPlans) { _renderPlans(container, _cachedPlans); return; }
+    container.innerHTML = '<div class="lic-plans-loading">Loading plans…</div>';
+    const plans = await licenseManager.getPlans().catch(() => []);
+    if (!plans.length) {
+        container.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem">Could not load plan info. Make sure the server is running.</p>';
+        return;
+    }
+    _cachedPlans = plans;
+    _renderPlans(container, plans);
+}
+
+function _renderPlans(container, plans) {
+    container.innerHTML = plans.map(p => {
+        const id    = escapeHTML(p.id);
+        const label = escapeHTML(p.label);
+        const price = escapeHTML(p.price);
+        const note  = p.priceNote ? `<div class="lic-plan-note">${escapeHTML(p.priceNote)}</div>` : '';
+        const feats = (p.features || []).map(f => `<li>${escapeHTML(f)}</li>`).join('');
+        return `
+        <div class="lic-plan-card${p.popular ? ' lic-plan-card--popular' : ''}">
+            ${p.popular ? '<div class="lic-popular-badge">Most Popular</div>' : ''}
+            <div class="lic-plan-name">${label}</div>
+            <div class="lic-plan-price">${price}</div>
+            ${note}
+            <ul class="lic-plan-features">${feats}</ul>
+            <button class="btn-main lic-buy-btn" onclick="startCheckout('${id}')">
+                Get ${label}
+            </button>
+        </div>`;
+    }).join('');
+}
+
+async function activateLicenseKey() {
+    const input = document.getElementById('lic-key-input');
+    const statusEl = document.getElementById('lic-activate-status');
+    if (!input || !statusEl) return;
+
+    const key = input.value.trim();
+    if (!key) { statusEl.textContent = 'Please enter your license key.'; statusEl.className = 'lic-activate-status error'; return; }
+
+    const btn = document.getElementById('lic-activate-btn');
+    if (btn) btn.disabled = true;
+    statusEl.textContent = 'Validating…'; statusEl.className = 'lic-activate-status';
+
+    const result = await licenseManager.activateKey(key);
+    if (btn) btn.disabled = false;
+
+    if (result.ok) {
+        statusEl.textContent = `Activated! Plan: ${(TIERS[result.plan] || TIERS.free).label}`;
+        statusEl.className = 'lic-activate-status success';
+        input.value = '';
+        // onChange already handles _updateProBadge + _updateBulkLimit
+        _refreshLicenseModal();
+        showToast(`${(TIERS[result.plan] || TIERS.free).label} activated!`, 'success');
+    } else {
+        statusEl.textContent = result.reason || 'Invalid key. Please check and try again.';
+        statusEl.className = 'lic-activate-status error';
+    }
+}
+
+function deactivateLicense() {
+    if (!confirm('Remove your license key from this device?')) return;
+    licenseManager.deactivate();
+    // onChange already handles _updateProBadge + _updateBulkLimit
+    _refreshLicenseModal();
+    showToast('License removed from this device.', 'success');
+}
+
+async function startCheckout(planId) {
+    const emailEl = document.getElementById('lic-checkout-email');
+    const email = emailEl ? emailEl.value.trim() : '';
+    try {
+        await licenseManager.startCheckout(planId, email);
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
+}
+
+function _handleCheckoutReturn() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('checkout') === 'success') {
+        // Clean URL
+        history.replaceState({}, '', window.location.pathname);
+        // Show activation instructions
+        showToast('Payment successful! Check your email for your license key.', 'success');
+        setTimeout(() => {
+            openLicenseModal();
+            _switchLicTab('activate');
+            const msg = document.getElementById('checkout-success-msg');
+            if (msg) msg.style.display = 'block';
+        }, 500);
+    } else if (params.get('checkout') === 'cancel') {
+        history.replaceState({}, '', window.location.pathname);
+        showToast('Checkout cancelled.', 'warning');
+    }
 }
 
 // =============================================================
@@ -616,6 +808,14 @@ window._puzzleApp = {
     aiSelectAll,
     aiSelectNone,
     aiImportSelected,
+    // License / upgrade
+    openLicenseModal,
+    closeLicenseModal,
+    activateLicenseKey,
+    deactivateLicense,
+    startCheckout,
+    showUpgradePrompt,
+    _switchLicTab,
 };
 
 // Also expose functions that are called directly without namespace
@@ -662,6 +862,14 @@ Object.assign(window, {
     aiSelectAll,
     aiSelectNone,
     aiImportSelected,
+    // License / upgrade
+    openLicenseModal,
+    closeLicenseModal,
+    activateLicenseKey,
+    deactivateLicense,
+    startCheckout,
+    showUpgradePrompt,
+    _switchLicTab,
     // Called directly from HTML oninput/onchange attributes:
     debouncedGenerate,
     renderActivePage,
@@ -686,6 +894,12 @@ window.addEventListener('load', async () => {
         }
 
         pushHistory();
+        // Initialise license (non-blocking — falls back to free tier if server is down).
+        // onChange fires when init completes (via _notify), so no separate .then() needed.
+        licenseManager.onChange(() => { _updateProBadge(); _updateBulkLimit(); });
+        licenseManager.init().catch(() => {});
+        _handleCheckoutReturn();
+
         await generateAll();
         updateGridStyles();
         updatePageScales();
@@ -728,6 +942,9 @@ window.addEventListener('load', async () => {
             if (n >= 1 && n <= 5) showPage(n);
         }
     });
+
+    // Flush pending saves immediately before the page unloads (bypasses 500ms debounce)
+    window.addEventListener('beforeunload', saveStateNow);
 
     setupSidebarResize();
     setupSortableList();
