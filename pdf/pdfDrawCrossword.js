@@ -120,7 +120,7 @@ export function drawCrossword(ctx, cwData, layout, isKey, pScale) {
             doc.setTextColor(15, 23, 42);
             list.forEach(w => {
                 const isEx = showExample && firstAcross && w.num === firstAcross.num && w.dir === 'across';
-                const prefix = isEx ? '\u2605 ' : '';
+                const prefix = isEx ? '[EX] ' : '';
                 const lines = doc.splitTextToSize(`${prefix}${w.num}. ${w.clue} (${w.word.length})`, colW - 10 * scale);
                 if (isEx) doc.setTextColor(37, 99, 235);
                 lines.forEach(line => { doc.text(line, colX, y); y += lineH; });

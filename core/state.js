@@ -47,7 +47,7 @@ export const state = {
         cwLineWidth:    1,
         cwShowBank:     false,
         scrShowHint:    false,
-        showExample:    false,
+        showExample:    true,
         wmOpacity:      0.15,
         titleScale:     1,
         paperSize:      'a4',

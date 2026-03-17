@@ -97,7 +97,7 @@ export function drawScramble(ctx, scrData, layout, isKey, showHint, pScale) {
                 doc.setFont(pdfFont, 'italic');
                 doc.setFontSize(8 * pScale);
                 doc.setTextColor(37, 99, 235);
-                doc.text('\u2605 example', cx + colW - 2 * scale, cy, { align: 'right' });
+                doc.text('[EXAMPLE]', cx + colW - 2 * scale, cy, { align: 'right' });
                 doc.setTextColor(15, 23, 42);
             } else {
                 doc.setDrawColor(15, 23, 42);
