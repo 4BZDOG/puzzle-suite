@@ -565,7 +565,7 @@ function aiImportSelected() {
     }).filter(Boolean);
 
     const newWords = [...state.words, ...toAdd.map(w => ({ word: w.word, clue: w.clue }))];
-    pushHistory(state.words);
+    pushHistory();
     setWords(newWords);
     saveState();
     generateAll();
@@ -942,6 +942,9 @@ window.addEventListener('load', async () => {
             if (n >= 1 && n <= 5) showPage(n);
         }
     });
+
+    // Flush pending saves immediately before the page unloads (bypasses 500ms debounce)
+    window.addEventListener('beforeunload', saveStateNow);
 
     setupSidebarResize();
     setupSortableList();

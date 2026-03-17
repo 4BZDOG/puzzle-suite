@@ -84,7 +84,12 @@ async function handleCheckoutCompleted(stripe, session) {
     return;
   }
 
-  const plan = session.metadata?.plan || 'pro';
+  const VALID_PLANS = ['pro', 'school', 'lifetime'];
+  const plan = session.metadata?.plan;
+  if (!VALID_PLANS.includes(plan)) {
+    console.error(`[webhook] Invalid or missing plan in session metadata: "${plan}" (session=${session.id})`);
+    return;
+  }
   const billingInterval = session.metadata?.billing_interval || null;
 
   // For subscriptions, get the subscription ID
@@ -150,9 +155,9 @@ async function handlePaymentSucceeded(invoice) {
     db.reactivateKey(lic.key, 'payment_succeeded');
     console.log(`[webhook] Reactivated ${lic.key} after successful payment`);
   }
-  // Clear any expiry that was set on failed payment
+  // Clear any expiry that was set on a prior failed payment
   if (lic && lic.expires_at) {
-    db.db.prepare('UPDATE licenses SET expires_at = NULL WHERE key = ?').run(lic.key);
+    db.clearExpiry(lic.key);
   }
 }
 

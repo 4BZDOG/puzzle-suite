@@ -184,6 +184,13 @@ function setExpiry(key, expiresAt) {
 }
 
 /**
+ * Clear expires_at on a license (e.g. after successful payment renewal).
+ */
+function clearExpiry(key) {
+  db.prepare('UPDATE licenses SET expires_at = NULL WHERE key = ?').run(key);
+}
+
+/**
  * Paginated list of all licenses, newest first.
  */
 function listLicenses({ limit = 50, offset = 0, search = '' } = {}) {
@@ -225,6 +232,7 @@ module.exports = {
   getLicenseBySubscription,
   getLicenseBySession,
   setExpiry,
+  clearExpiry,
   listLicenses,
   getEvents,
   logEvent,

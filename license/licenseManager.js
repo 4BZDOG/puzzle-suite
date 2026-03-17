@@ -125,7 +125,10 @@ class LicenseManager {
     // Hit server
     try {
       const url = `${SERVER_URL}/api/license/validate?key=${encodeURIComponent(key)}`;
-      const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      const ac = new AbortController();
+      const tid = setTimeout(() => ac.abort(), 8000);
+      let r;
+      try { r = await fetch(url, { signal: ac.signal }); } finally { clearTimeout(tid); }
       const data = await r.json();
       if (data.valid) {
         this._saveCache(key, data);
