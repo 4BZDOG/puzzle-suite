@@ -10,12 +10,13 @@ const express = require('express');
 const router = express.Router();
 
 // Stripe is initialized in index.js and attached to req.stripe via middleware
-const PLAN_PRICE_IDS = () => ({
+// Read once at module load — env vars are immutable at runtime
+const PLAN_PRICE_IDS = {
   pro_monthly:     process.env.STRIPE_PRICE_PRO_MONTHLY,
   pro_annual:      process.env.STRIPE_PRICE_PRO_ANNUAL,
   school_monthly:  process.env.STRIPE_PRICE_SCHOOL_MONTHLY,
   lifetime:        process.env.STRIPE_PRICE_LIFETIME,
-});
+};
 
 const PLAN_MODES = {
   pro_monthly:    'subscription',
@@ -41,11 +42,11 @@ router.post('/session', async (req, res) => {
   try {
     const { plan, email } = req.body;
 
-    if (!plan || !PLAN_PRICE_IDS()[plan]) {
+    if (!plan || !PLAN_PRICE_IDS[plan]) {
       return res.status(400).json({ error: `Invalid plan "${plan}". Valid plans: ${Object.keys(PLAN_META).join(', ')}` });
     }
 
-    const priceId = PLAN_PRICE_IDS()[plan];
+    const priceId = PLAN_PRICE_IDS[plan];
     if (!priceId || priceId.startsWith('price_REPLACE')) {
       return res.status(503).json({ error: 'Stripe price not configured. Set STRIPE_PRICE_* env vars.' });
     }

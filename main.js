@@ -641,39 +641,52 @@ function _refreshLicenseModal() {
         if (tier === 'free') {
             statusEl.innerHTML = '<span class="lic-tier lic-tier--free">Free Plan</span>';
         } else {
-            const label = (TIERS[tier] || TIERS.free).label;
+            const label = escapeHTML((TIERS[tier] || TIERS.free).label);
             const expiry = info?.expiresAt ? ` · expires ${new Date(info.expiresAt).toLocaleDateString()}` : '';
-            const email = info?.email ? ` <span class="lic-email">${info.email}</span>` : '';
+            const email = info?.email ? ` <span class="lic-email">${escapeHTML(info.email)}</span>` : '';
             statusEl.innerHTML = `<span class="lic-tier lic-tier--pro">${label}</span>${email}${expiry}`;
         }
     }
-    // Populate plans
+    // Populate plans (uses cache after first load)
     _loadPlansUI();
 }
+
+let _cachedPlans = null;
 
 async function _loadPlansUI() {
     const container = document.getElementById('lic-plans');
     if (!container) return;
+    // Use cached plans to avoid a network hit every time the modal opens
+    if (_cachedPlans) { _renderPlans(container, _cachedPlans); return; }
     container.innerHTML = '<div class="lic-plans-loading">Loading plans…</div>';
     const plans = await licenseManager.getPlans().catch(() => []);
     if (!plans.length) {
         container.innerHTML = '<p style="color:var(--text-muted);font-size:0.85rem">Could not load plan info. Make sure the server is running.</p>';
         return;
     }
-    container.innerHTML = plans.map(p => `
+    _cachedPlans = plans;
+    _renderPlans(container, plans);
+}
+
+function _renderPlans(container, plans) {
+    container.innerHTML = plans.map(p => {
+        const id    = escapeHTML(p.id);
+        const label = escapeHTML(p.label);
+        const price = escapeHTML(p.price);
+        const note  = p.priceNote ? `<div class="lic-plan-note">${escapeHTML(p.priceNote)}</div>` : '';
+        const feats = (p.features || []).map(f => `<li>${escapeHTML(f)}</li>`).join('');
+        return `
         <div class="lic-plan-card${p.popular ? ' lic-plan-card--popular' : ''}">
             ${p.popular ? '<div class="lic-popular-badge">Most Popular</div>' : ''}
-            <div class="lic-plan-name">${p.label}</div>
-            <div class="lic-plan-price">${p.price}</div>
-            ${p.priceNote ? `<div class="lic-plan-note">${p.priceNote}</div>` : ''}
-            <ul class="lic-plan-features">
-                ${p.features.map(f => `<li>${f}</li>`).join('')}
-            </ul>
-            <button class="btn-main lic-buy-btn" onclick="startCheckout('${p.id}')">
-                Get ${p.label}
+            <div class="lic-plan-name">${label}</div>
+            <div class="lic-plan-price">${price}</div>
+            ${note}
+            <ul class="lic-plan-features">${feats}</ul>
+            <button class="btn-main lic-buy-btn" onclick="startCheckout('${id}')">
+                Get ${label}
             </button>
-        </div>
-    `).join('');
+        </div>`;
+    }).join('');
 }
 
 async function activateLicenseKey() {
@@ -695,8 +708,7 @@ async function activateLicenseKey() {
         statusEl.textContent = `Activated! Plan: ${(TIERS[result.plan] || TIERS.free).label}`;
         statusEl.className = 'lic-activate-status success';
         input.value = '';
-        _updateProBadge();
-        _updateBulkLimit();
+        // onChange already handles _updateProBadge + _updateBulkLimit
         _refreshLicenseModal();
         showToast(`${(TIERS[result.plan] || TIERS.free).label} activated!`, 'success');
     } else {
@@ -708,8 +720,7 @@ async function activateLicenseKey() {
 function deactivateLicense() {
     if (!confirm('Remove your license key from this device?')) return;
     licenseManager.deactivate();
-    _updateProBadge();
-    _updateBulkLimit();
+    // onChange already handles _updateProBadge + _updateBulkLimit
     _refreshLicenseModal();
     showToast('License removed from this device.', 'success');
 }
@@ -883,12 +894,10 @@ window.addEventListener('load', async () => {
         }
 
         pushHistory();
-        // Initialise license (non-blocking — falls back to free tier if server is down)
-        licenseManager.init().then(() => {
-            _updateProBadge();
-            _updateBulkLimit();
-        }).catch(() => {});
+        // Initialise license (non-blocking — falls back to free tier if server is down).
+        // onChange fires when init completes (via _notify), so no separate .then() needed.
         licenseManager.onChange(() => { _updateProBadge(); _updateBulkLimit(); });
+        licenseManager.init().catch(() => {});
         _handleCheckoutReturn();
 
         await generateAll();

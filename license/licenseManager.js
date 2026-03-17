@@ -116,12 +116,10 @@ class LicenseManager {
 
   async _validate(key, forceRefresh = false) {
     // Check cache first (unless forcing refresh)
-    if (!forceRefresh) {
-      const cached = this._loadCache(key);
-      if (cached) {
-        this._applyValidation(cached);
-        return cached;
-      }
+    const cachedBeforeFetch = forceRefresh ? null : this._loadCache(key);
+    if (cachedBeforeFetch) {
+      this._applyValidation(cachedBeforeFetch);
+      return cachedBeforeFetch;
     }
 
     // Hit server
@@ -137,13 +135,11 @@ class LicenseManager {
       this._applyValidation(data);
       return data;
     } catch (_err) {
-      // Server unreachable — honour cached result if any, else stay free
-      const cached = this._loadCache(key);
-      if (cached) {
-        this._applyValidation(cached);
-        return cached;
+      // Server unreachable — honour cache from before the fetch attempt, else stay free
+      if (cachedBeforeFetch) {
+        this._applyValidation(cachedBeforeFetch);
+        return cachedBeforeFetch;
       }
-      // Stay on free tier silently
       return { valid: false, reason: 'Server unreachable' };
     }
   }

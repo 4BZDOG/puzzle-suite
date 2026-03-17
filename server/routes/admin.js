@@ -146,8 +146,10 @@ router.put('/licenses/:key/plan', (req, res) => {
 router.delete('/licenses/:key', (req, res) => {
   const lic = db.getLicense(req.params.key);
   if (!lic) return res.status(404).json({ error: 'License not found' });
-  db.db.prepare('DELETE FROM licenses WHERE key = ?').run(req.params.key);
-  db.db.prepare('DELETE FROM events WHERE license_key = ?').run(req.params.key);
+  db.db.transaction(() => {
+    db.db.prepare('DELETE FROM licenses WHERE key = ?').run(req.params.key);
+    db.db.prepare('DELETE FROM events WHERE license_key = ?').run(req.params.key);
+  })();
   res.json({ ok: true });
 });
 
