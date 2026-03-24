@@ -269,7 +269,7 @@ function updateWord(i, f, v) {
         saveState();
         debouncedGenerate();
     } else {
-        state.words[i][f] = v;
+        state.words[i][f] = typeof v === 'string' ? v.trim() : v;
         // In matching mode, puzzleData.notes holds shuffled clue text. Patch it in-place
         // so the preview updates immediately without a full re-generate.
         if (f === 'clue' && state.puzzleData.notes?.length > 0 && 'clueOrigIdx' in state.puzzleData.notes[0]) {

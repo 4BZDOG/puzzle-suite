@@ -57,6 +57,7 @@ export function processImport(onComplete) {
  */
 export function handleDroppedFile(file, onApplyJSON, onTextImport) {
     const r = new FileReader();
+    r.onerror = () => showToast('Failed to read file.', 'error');
     r.onload = e => {
         const text = e.target.result;
         if (file.name.endsWith('.json')) {
