@@ -272,7 +272,7 @@ export function applyStateToDOM(s) {
         document.documentElement.style.setProperty('--sidebar-width', cfg.sidebarWidth);
     }
 
-    if (cfg.aiConfig) {
+    if (cfg.aiConfig && typeof cfg.aiConfig === 'object') {
         Object.assign(state.settings.aiConfig, cfg.aiConfig);
         setVal('aiProvider', cfg.aiConfig.provider);
         setVal('aiModel',    cfg.aiConfig.model);

@@ -78,7 +78,7 @@ export function renderKeys(container, puzzleData, settings) {
     if (hasScr) {
         let scrHTML = '<div class="split-half"><div class="split-title">WORD SCRAMBLE</div><div class="scramble-solution">';
         puzzleData.scr.forEach(s => {
-            scrHTML += `<div class="scr-sol-row"><span>${s.scrambled}</span><b>${s.original}</b></div>`;
+            scrHTML += `<div class="scr-sol-row"><span>${escapeHTML(s.scrambled)}</span><b>${escapeHTML(s.original)}</b></div>`;
         });
         scrHTML += '</div></div>';
         htmlStr += scrHTML;

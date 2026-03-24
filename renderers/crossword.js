@@ -1,6 +1,7 @@
 // =============================================================
 // renderers/crossword.js — Page 3: Crossword preview
 // =============================================================
+import { escapeHTML } from '../core/utils.js';
 
 const CELL_SIZE_MIN = 15, CELL_SIZE_MAX = 60;
 
@@ -76,7 +77,7 @@ export function renderCrossword(gridArea, footerArea, cwData, settings, preview 
         const makeClueRows = (list) =>
             list.map(w => {
                 const isEx = settings.showExample && w.num === exampleNum && w.dir === 'across';
-                return `<div class="clue-row${isEx ? ' clue-example' : ''}"><span class="clue-num-bold">${isEx ? '★ ' : ''}${w.num}.</span><span>${w.clue} <span class="notes-clue-length">(${w.word.length})</span>${isEx ? ` <span class="scramble-example-label">example</span>` : ''}</span></div>`;
+                return `<div class="clue-row${isEx ? ' clue-example' : ''}"><span class="clue-num-bold">${isEx ? '★ ' : ''}${w.num}.</span><span>${escapeHTML(w.clue)} <span class="notes-clue-length">(${w.word.length})</span>${isEx ? ` <span class="scramble-example-label">example</span>` : ''}</span></div>`;
             }).join('');
 
         let html = '<div class="clues-two-col">';

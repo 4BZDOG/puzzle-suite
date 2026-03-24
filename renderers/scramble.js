@@ -1,6 +1,7 @@
 // =============================================================
 // renderers/scramble.js — Page 4: Word Scramble preview
 // =============================================================
+import { escapeHTML } from '../core/utils.js';
 
 /**
  * @param {HTMLElement} container
@@ -23,10 +24,10 @@ export function renderScramble(container, scrData, settings) {
     items.forEach((item, i) => {
         const isExample = showExample && i === 0;
         htmlStr += `<div class="scramble-item${isExample ? ' scramble-example' : ''}">
-            <div class="scramble-text">${item.scrambled}</div>
+            <div class="scramble-text">${escapeHTML(item.scrambled)}</div>
             ${isExample
-                ? `<div class="scramble-answer-filled">${item.original}</div><div class="scramble-example-label">★ example</div>`
-                : `<div class="scramble-line"></div>${showHint ? `<div class="scramble-hint">(${item.original[0]}...)</div>` : ''}`}
+                ? `<div class="scramble-answer-filled">${escapeHTML(item.original)}</div><div class="scramble-example-label">★ example</div>`
+                : `<div class="scramble-line"></div>${showHint ? `<div class="scramble-hint">(${escapeHTML(item.original[0])}...)</div>` : ''}`}
         </div>`;
     });
 

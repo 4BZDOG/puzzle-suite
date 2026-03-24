@@ -138,7 +138,9 @@ async function fetchGoogle(apiKey, modelId, prompt) {
         throw new Error(err?.error?.message || `HTTP ${res.status}`);
     }
     const data = await res.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) throw new Error('Google API returned an empty or unexpected response. Check your API key and quota.');
+    return text;
 }
 
 async function fetchGroq(apiKey, modelId, prompt) {
@@ -160,7 +162,9 @@ async function fetchGroq(apiKey, modelId, prompt) {
         throw new Error(err?.error?.message || `HTTP ${res.status}`);
     }
     const data = await res.json();
-    return data.choices?.[0]?.message?.content || '';
+    const text = data.choices?.[0]?.message?.content;
+    if (!text) throw new Error('Groq API returned an empty or unexpected response. Check your API key and quota.');
+    return text;
 }
 
 async function fetchOpenAI(apiKey, modelId, prompt) {
@@ -182,7 +186,9 @@ async function fetchOpenAI(apiKey, modelId, prompt) {
         throw new Error(err?.error?.message || `HTTP ${res.status}`);
     }
     const data = await res.json();
-    return data.choices?.[0]?.message?.content || '';
+    const text = data.choices?.[0]?.message?.content;
+    if (!text) throw new Error('OpenAI API returned an empty or unexpected response. Check your API key and quota.');
+    return text;
 }
 
 async function fetchAnthropic(apiKey, modelId, prompt) {
@@ -205,7 +211,9 @@ async function fetchAnthropic(apiKey, modelId, prompt) {
         throw new Error(err?.error?.message || `HTTP ${res.status}`);
     }
     const data = await res.json();
-    return data.content?.[0]?.text || '';
+    const text = data.content?.[0]?.text;
+    if (!text) throw new Error('Anthropic API returned an empty or unexpected response. Check your API key and quota.');
+    return text;
 }
 
 async function fetchOpenRouter(apiKey, modelId, prompt) {
@@ -232,7 +240,9 @@ async function fetchOpenRouter(apiKey, modelId, prompt) {
         throw new Error(meta ? `${msg} — ${meta}` : msg);
     }
     const data = await res.json();
-    return data.choices?.[0]?.message?.content || '';
+    const text = data.choices?.[0]?.message?.content;
+    if (!text) throw new Error('OpenRouter API returned an empty or unexpected response. Check your API key and quota.');
+    return text;
 }
 
 // ---- Response parser -----------------------------------------
@@ -247,8 +257,9 @@ function parseResponse(text) {
     if (start === -1 || end === -1) throw new Error('No JSON array found in response.');
     clean = clean.slice(start, end + 1);
 
-    const arr = JSON.parse(clean);
-    if (!Array.isArray(arr)) throw new Error('Response is not an array.');
+    let arr;
+    try { arr = JSON.parse(clean); } catch (_) { throw new Error('AI response contained invalid JSON — try again or switch models.'); }
+    if (!Array.isArray(arr)) throw new Error('AI response is not a JSON array.');
 
     return arr
         .filter(item => item && typeof item.word === 'string' && typeof item.clue === 'string')
