@@ -500,16 +500,16 @@
 
     <main>
         <div class="preview-toolbar">
-            <div class="page-tabs">
-                <button class="page-btn active" onclick="showPage(1)" id="tab-p1" aria-label="Notes page"><i
+            <div class="page-tabs" role="tablist" aria-label="Puzzle pages">
+                <button class="page-btn active" onclick="showPage(1)" id="tab-p1" role="tab" aria-selected="true" aria-label="Notes page"><i
                         class="fas fa-sticky-note"></i> Notes</button>
-                <button class="page-btn" onclick="showPage(2)" id="tab-p2" aria-label="Word Search page"><i
+                <button class="page-btn" onclick="showPage(2)" id="tab-p2" role="tab" aria-selected="false" aria-label="Word Search page"><i
                         class="fas fa-search"></i> Search</button>
-                <button class="page-btn" onclick="showPage(3)" id="tab-p3" aria-label="Crossword page"><i
+                <button class="page-btn" onclick="showPage(3)" id="tab-p3" role="tab" aria-selected="false" aria-label="Crossword page"><i
                         class="fas fa-border-all"></i> Crossword</button>
-                <button class="page-btn" onclick="showPage(4)" id="tab-p4" aria-label="Word Scramble page"><i
+                <button class="page-btn" onclick="showPage(4)" id="tab-p4" role="tab" aria-selected="false" aria-label="Word Scramble page"><i
                         class="fas fa-random"></i> Scramble</button>
-                <button class="page-btn" onclick="showPage(5)" id="tab-p5" aria-label="Answer Keys page"><i
+                <button class="page-btn" onclick="showPage(5)" id="tab-p5" role="tab" aria-selected="false" aria-label="Answer Keys page"><i
                         class="fas fa-key"></i> Keys</button>
             </div>
             <div class="zoom-controls">
@@ -681,7 +681,7 @@
         </div>
     </div>
 
-    <script src="bundle.js?v=23"></script>
+    <script src="bundle.js?v=24"></script>
 </body>
 
 </html>

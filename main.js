@@ -246,7 +246,11 @@ function showPage(n) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('visible'));
     const pEl = document.getElementById('page' + n);
     if (pEl) pEl.classList.add('visible');
-    document.querySelectorAll('.page-btn').forEach((b, i) => b.classList.toggle('active', i + 1 === n));
+    document.querySelectorAll('.page-btn').forEach((b, i) => {
+        const isActive = i + 1 === n;
+        b.classList.toggle('active', isActive);
+        b.setAttribute('aria-selected', isActive);
+    });
     renderActivePage();
     _renderWordListAndStatus();  // refresh word-list status dots to reflect the new active page
 }
@@ -619,6 +623,10 @@ function openLicenseModal() {
     if (!modal) return;
     _refreshLicenseModal();
     modal.style.display = 'flex';
+    // Move focus into modal for keyboard/screen-reader users
+    setTimeout(() => {
+        modal.querySelector('button, [tabindex]:not([tabindex="-1"])')?.focus();
+    }, 50);
 }
 
 function closeLicenseModal() {
@@ -941,6 +949,8 @@ window.addEventListener('load', async () => {
             if (modal && modal.style.display === 'flex') closeModal();
             const aiModal = document.getElementById('ai-modal-overlay');
             if (aiModal && aiModal.style.display === 'flex') closeAIModal();
+            const licModal = document.getElementById('license-modal-overlay');
+            if (licModal && licModal.style.display === 'flex') closeLicenseModal();
         }
         const tag = document.activeElement?.tagName;
         const inText = tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement?.isContentEditable;

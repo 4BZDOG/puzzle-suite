@@ -784,6 +784,13 @@ main.generating::after {
     border: none;
     background: var(--input-bg);
     border-radius: 4px;
+    outline: none;
+}
+
+.wm-input:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: -2px;
+    border-radius: 4px;
 }
 
 .wm-word {
