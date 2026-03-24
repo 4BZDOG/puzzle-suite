@@ -2,6 +2,8 @@
 // renderers/notes.js — Page 1: Notes/vocabulary page preview
 // =============================================================
 
+const escapeHTML = str => String(str).replace(/[&<>'"]/g, t => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[t]));
+
 /**
  * @param {HTMLElement} container
  * @param {Object}      puzzleData  - state.puzzleData (notes may be null before gen)
@@ -74,10 +76,10 @@ export function renderNotes(container, puzzleData, words, settings, onUpdateWord
         htmlStr += '<div class="notes-clue">';
 
         if (isMatching) {
-            htmlStr += `<div class="notes-editable">${w.matchLetter}. ${w.clue}</div>`;
+            htmlStr += `<div class="notes-editable">${w.matchLetter}. ${escapeHTML(w.clue)}</div>`;
             htmlStr += `<span class="notes-clue-length">(${w.clueTermLength ?? w.term.length})</span>`;
         } else {
-            htmlStr += `<div class="notes-editable" contenteditable="true" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}" onblur="window._puzzleApp.updateWord(${i}, 'clue', this.innerText)">${w.clue}</div>`;
+            htmlStr += `<div class="notes-editable" contenteditable="true" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}" onblur="window._puzzleApp.updateWord(${i}, 'clue', this.innerText)">${escapeHTML(w.clue)}</div>`;
             htmlStr += `<span class="notes-clue-length">(${w.term.length})</span>`;
             if (isExample) htmlStr += `<span class="scramble-example-label" style="margin-left:6px;">★ example: <b>${w.term}</b></span>`;
         }

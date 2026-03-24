@@ -250,9 +250,11 @@ function showPage(n) {
 // Word list mutations
 // =============================================================
 function updateWord(i, f, v) {
+    if (i < 0 || i >= state.words.length) return;
     if (f === 'word') {
         pushHistory();
         const val = v.toUpperCase().replace(/[^A-Z]/g, '');
+        if (!val) return;  // reject all-non-alpha input silently
         state.words[i][f] = val;
         const szEl = document.getElementById('wsGridSize');
         if (szEl) {

@@ -107,9 +107,9 @@ function _autoScaleCluesToFit(footerEl) {
     const container = footerEl.querySelector('.clues-two-col');
     if (!container) return;
     container.style.fontSize = '';
-    const minH = parseFloat(getComputedStyle(pageEl).minHeight);
+    const minH = parseFloat(getComputedStyle(pageEl).minHeight) || 0;
     if (pageEl.scrollHeight <= minH + 2) return;
-    const curFontPx = parseFloat(getComputedStyle(container).fontSize);
+    const curFontPx = parseFloat(getComputedStyle(container).fontSize) || 14;
     const MIN_PT = 5.5;
     let pt = curFontPx * 0.75;
     while (pageEl.scrollHeight > minH + 2 && pt > MIN_PT) {

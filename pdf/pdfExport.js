@@ -133,8 +133,11 @@ export async function exportPDF() {
             if (B) B.style.width = Math.round((i / count) * 100) + '%';
             await new Promise(r => setTimeout(r, 10));
 
-            const cpd = await createPuzzleData();
-            if (!cpd) { i--; continue; }
+            // Try up to 3 times to generate a valid puzzle set; abort the whole export if
+            // generation keeps failing (prevents an infinite retry loop on degenerate input).
+            let cpd = null;
+            for (let attempt = 0; attempt < 3 && !cpd; attempt++) cpd = await createPuzzleData();
+            if (!cpd) { showToast('Could not generate a puzzle set — skipping.', 'error'); continue; }
 
             const setIndicator = count > 1 ? `SET ${i + 1}` : '';
 

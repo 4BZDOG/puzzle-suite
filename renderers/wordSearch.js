@@ -2,6 +2,8 @@
 // renderers/wordSearch.js — Page 2: Word Search preview
 // =============================================================
 
+const escapeHTML = str => String(str).replace(/[&<>'"]/g, t => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[t]));
+
 const CELL_SIZE_MIN = 15, CELL_SIZE_MAX = 60;
 
 export function calcWSScale(wsData, isPrint = false) {
@@ -21,7 +23,7 @@ export function calcWSScale(wsData, isPrint = false) {
  */
 export function renderWordSearch(gridArea, footerArea, wsData, words, settings, preview = true) {
     const z = preview
-        ? (() => { const el = document.getElementById('scaleSearch'); return el ? parseInt(el.value, 10) : calcWSScale(wsData); })()
+        ? (() => { const el = document.getElementById('scaleSearch'); const v = el ? parseInt(el.value, 10) : NaN; return isNaN(v) ? calcWSScale(wsData) : v; })()
         : calcWSScale(wsData);
 
     if (gridArea) {
@@ -52,15 +54,17 @@ export function renderWordSearch(gridArea, footerArea, wsData, words, settings, 
         else if (maxLen > 12) cols = 2;
         else if (maxLen <= 8) cols = 4;
 
+        // Build lookup Map once (O(n)) instead of calling .find() per placed word (O(n²))
+        const wordClueMap = new Map(words.map(w => [w.word, w.clue]));
+
         const items = wsData.placed.map(wStr => {
             if (showClues) {
-                const match = words.find(x => x.word === wStr);
-                const clue = match?.clue?.trim();
+                const clue = wordClueMap.get(wStr)?.trim();
                 return clue
-                    ? `${clue} <span class="notes-clue-length">(${wStr.length})</span>`
-                    : wStr;
+                    ? `${escapeHTML(clue)} <span class="notes-clue-length">(${wStr.length})</span>`
+                    : escapeHTML(wStr);
             }
-            return wStr;
+            return escapeHTML(wStr);
         });
 
         const gridPx = wsData.size * z;
