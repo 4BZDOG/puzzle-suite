@@ -78,13 +78,20 @@ async function createPuzzleData() {
 // =============================================================
 let generationSequenceId = 0;
 
+const _mainEl = document.querySelector('main');
+
 async function generateAll() {
     syncSettingsFromDOM();   // ensure state reflects current DOM before generation
     const seqId = ++generationSequenceId;
     renderStatusGenerating();
+    _mainEl?.classList.add('generating');
 
     const pData = await createPuzzleData();
-    if (seqId !== generationSequenceId || !pData) return;
+
+    // Only the latest request gets to update the UI
+    if (seqId !== generationSequenceId) return;
+    _mainEl?.classList.remove('generating');
+    if (!pData) return;
 
     setPuzzleData(pData);
     autoFit('search', true);

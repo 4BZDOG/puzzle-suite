@@ -706,6 +706,27 @@ input:focus-visible+.slider-switch {
     color: var(--primary);
 }
 
+/* Generating progress bar — slides across the top of the preview area */
+@keyframes gen-progress {
+    0%   { transform: translateX(-100%); }
+    60%  { transform: translateX(20%); }
+    100% { transform: translateX(110%); }
+}
+
+main.generating::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 60%;
+    height: 3px;
+    background: var(--primary);
+    border-radius: 0 2px 2px 0;
+    animation: gen-progress 1.4s ease-in-out infinite;
+    z-index: 200;
+    pointer-events: none;
+}
+
 .wm-container {
     border: 1px solid var(--border);
     border-radius: var(--radius);

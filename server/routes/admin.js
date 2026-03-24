@@ -60,9 +60,8 @@ router.post('/licenses', async (req, res) => {
   if (!email || !plan) {
     return res.status(400).json({ error: 'email and plan are required' });
   }
-  const validPlans = VALID_PLANS;
-  if (!validPlans.includes(plan)) {
-    return res.status(400).json({ error: `Invalid plan. Use: ${validPlans.join(', ')}` });
+  if (!VALID_PLANS.includes(plan)) {
+    return res.status(400).json({ error: `Invalid plan. Use: ${VALID_PLANS.join(', ')}` });
   }
 
   const key = db.createLicense({ email, plan, billingInterval, expiresAt });
@@ -133,9 +132,8 @@ router.put('/licenses/:key/plan', (req, res) => {
   const lic = db.getLicense(req.params.key);
   if (!lic) return res.status(404).json({ error: 'License not found' });
   const { plan, billingInterval = null } = req.body;
-  const validPlans = VALID_PLANS;
-  if (!validPlans.includes(plan)) {
-    return res.status(400).json({ error: `Invalid plan. Use: ${validPlans.join(', ')}` });
+  if (!VALID_PLANS.includes(plan)) {
+    return res.status(400).json({ error: `Invalid plan. Use: ${VALID_PLANS.join(', ')}` });
   }
   db.updateLicensePlan(req.params.key, plan, billingInterval);
   res.json({ ok: true });
