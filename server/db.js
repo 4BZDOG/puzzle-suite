@@ -219,8 +219,12 @@ function logEvent(key, eventType, note = '') {
     .run(key, eventType, note);
 }
 
+// Canonical list of valid plan names — import this in any route that validates plans.
+const VALID_PLANS = ['pro', 'school', 'lifetime'];
+
 module.exports = {
   db,
+  VALID_PLANS,
   generateKey,
   createLicense,
   getLicense,

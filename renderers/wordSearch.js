@@ -1,8 +1,7 @@
 // =============================================================
 // renderers/wordSearch.js — Page 2: Word Search preview
 // =============================================================
-
-const escapeHTML = str => String(str).replace(/[&<>'"]/g, t => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[t]));
+import { escapeHTML } from '../core/utils.js';
 
 const CELL_SIZE_MIN = 15, CELL_SIZE_MAX = 60;
 

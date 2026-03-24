@@ -16,6 +16,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { VALID_PLANS } = db;
 const { sendLicenseEmail } = require('../email');
 
 /**
@@ -84,7 +85,6 @@ async function handleCheckoutCompleted(stripe, session) {
     return;
   }
 
-  const VALID_PLANS = ['pro', 'school', 'lifetime'];
   const plan = session.metadata?.plan;
   if (!VALID_PLANS.includes(plan)) {
     console.error(`[webhook] Invalid or missing plan in session metadata: "${plan}" (session=${session.id})`);

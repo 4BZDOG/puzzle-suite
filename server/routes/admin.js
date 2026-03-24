@@ -16,6 +16,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { VALID_PLANS } = db;
 const { sendLicenseEmail, sendKeyReminder } = require('../email');
 
 // ── Auth middleware ────────────────────────────────────────────────────────────
@@ -59,7 +60,7 @@ router.post('/licenses', async (req, res) => {
   if (!email || !plan) {
     return res.status(400).json({ error: 'email and plan are required' });
   }
-  const validPlans = ['pro', 'school', 'lifetime'];
+  const validPlans = VALID_PLANS;
   if (!validPlans.includes(plan)) {
     return res.status(400).json({ error: `Invalid plan. Use: ${validPlans.join(', ')}` });
   }
@@ -132,7 +133,7 @@ router.put('/licenses/:key/plan', (req, res) => {
   const lic = db.getLicense(req.params.key);
   if (!lic) return res.status(404).json({ error: 'License not found' });
   const { plan, billingInterval = null } = req.body;
-  const validPlans = ['pro', 'school', 'lifetime'];
+  const validPlans = VALID_PLANS;
   if (!validPlans.includes(plan)) {
     return res.status(400).json({ error: `Invalid plan. Use: ${validPlans.join(', ')}` });
   }

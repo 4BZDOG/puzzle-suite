@@ -115,6 +115,8 @@ const AI_TIMEOUT_MS = 30000;
 function fetchWithTimeout(url, opts) {
     const ac = new AbortController();
     const tid = setTimeout(() => ac.abort(), AI_TIMEOUT_MS);
+    // Forward any caller-supplied signal so both the timeout and the caller can abort.
+    if (opts?.signal) opts.signal.addEventListener('abort', () => ac.abort(), { once: true });
     return fetch(url, { ...opts, signal: ac.signal })
         .finally(() => clearTimeout(tid));
 }

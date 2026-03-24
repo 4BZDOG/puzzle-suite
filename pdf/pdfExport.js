@@ -136,7 +136,7 @@ export async function exportPDF() {
             // Try up to 3 times to generate a valid puzzle set; abort the whole export if
             // generation keeps failing (prevents an infinite retry loop on degenerate input).
             let cpd = null;
-            for (let attempt = 0; attempt < 3 && !cpd; attempt++) cpd = await createPuzzleData();
+            for (let attempt = 0; attempt < 2 && !cpd; attempt++) cpd = await createPuzzleData();
             if (!cpd) { showToast('Could not generate a puzzle set — skipping.', 'error'); continue; }
 
             const setIndicator = count > 1 ? `SET ${i + 1}` : '';

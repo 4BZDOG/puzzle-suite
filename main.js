@@ -5,6 +5,7 @@
 import { state, setWords, setPuzzleData, updateSetting, applyStateToDOM, syncSettingsFromDOM } from './core/state.js';
 import { pushHistory, undo, redo } from './core/history.js';
 import { saveState, saveStateNow, loadRawState, hardReset } from './core/storage.js';
+import { escapeHTML } from './core/utils.js';
 
 import { generateAllAsync } from './workers/workerBridge.js';
 
@@ -37,9 +38,6 @@ import { licenseManager, TIERS } from './license/licenseManager.js';
 const CELL_SIZE_MIN = 15, CELL_SIZE_MAX = 60;
 const WATERMARK_MAX_BYTES = 2e6;
 
-const escapeHTML = str => str.replace(/[&<>'"]/g, tag => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
-}[tag]));
 
 // Debounce helper
 const debounceFn = (func, wait) => {
