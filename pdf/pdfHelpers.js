@@ -58,6 +58,7 @@ function textToImgPDF(text, { fontSizePt, bold = false, italic = false, color = 
     canvas.width = 3000;
     canvas.height = lineH;
     const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas 2D context unavailable — cannot render emoji text for PDF.');
 
     const weight = bold ? 'bold' : 'normal';
     const style  = italic ? 'italic' : 'normal';
@@ -72,7 +73,9 @@ function textToImgPDF(text, { fontSizePt, bold = false, italic = false, color = 
     const crop = document.createElement('canvas');
     crop.width = w;
     crop.height = lineH;
-    crop.getContext('2d').drawImage(canvas, 0, 0);
+    const cropCtx = crop.getContext('2d');
+    if (!cropCtx) throw new Error('Canvas 2D context unavailable — cannot render emoji text for PDF.');
+    cropCtx.drawImage(canvas, 0, 0);
 
     const mmPerPx = 25.4 / (96 * SCALE);
     return {

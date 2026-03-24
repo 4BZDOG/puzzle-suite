@@ -15,13 +15,14 @@ import { drawScramble } from './pdfDrawScramble.js';
  * @param {number} pScale
  */
 export function drawNotes(ctx, notesList, startY, pScale) {
+    if (!notesList || !notesList.length) return;
     const { doc, PAGE_WIDTH, PAGE_HEIGHT, MARGIN, scale, pdfFont, drawWatermark, notesConfig } = ctx;
     pScale = pScale || scale;
     let cy = startY;
     const availW = PAGE_WIDTH - MARGIN * 2;
 
     // Determine if this is a matching exercise
-    const isMatching = notesList.length > 0 && notesList[0].matchLetter !== undefined;
+    const isMatching = notesList[0].matchLetter !== undefined;
 
     // Respect showTerm / showDef from settings
     const showTerm = notesConfig ? notesConfig.showTerm !== false : true;
