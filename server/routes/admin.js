@@ -60,6 +60,9 @@ router.post('/licenses', async (req, res) => {
   if (!email || !plan) {
     return res.status(400).json({ error: 'email and plan are required' });
   }
+  if (typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'Invalid email format' });
+  }
   if (!VALID_PLANS.includes(plan)) {
     return res.status(400).json({ error: `Invalid plan. Use: ${VALID_PLANS.join(', ')}` });
   }

@@ -256,6 +256,7 @@ function showPage(n) {
 // =============================================================
 function updateWord(i, f, v) {
     if (i < 0 || i >= state.words.length) return;
+    if (!['word', 'clue'].includes(f)) return;
     if (f === 'word') {
         pushHistory();
         const val = v.toUpperCase().replace(/[^A-Z]/g, '');
@@ -689,7 +690,7 @@ function _renderPlans(container, plans) {
             <div class="lic-plan-price">${price}</div>
             ${note}
             <ul class="lic-plan-features">${feats}</ul>
-            <button class="btn-main lic-buy-btn" onclick="startCheckout('${id}')">
+            <button class="btn-main lic-buy-btn" data-plan-id="${id}">
                 Get ${label}
             </button>
         </div>`;
@@ -906,6 +907,12 @@ window.addEventListener('load', async () => {
         licenseManager.onChange(() => { _updateProBadge(); _updateBulkLimit(); });
         licenseManager.init().catch(() => {});
         _handleCheckoutReturn();
+
+        // Delegate plan-buy button clicks (avoids inline onclick with server-supplied plan IDs)
+        document.getElementById('license-modal-overlay')?.addEventListener('click', e => {
+            const btn = e.target.closest('[data-plan-id]');
+            if (btn) startCheckout(btn.dataset.planId);
+        });
 
         await generateAll();
         updateGridStyles();

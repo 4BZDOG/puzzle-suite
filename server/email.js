@@ -35,6 +35,18 @@ const PLAN_LIMITS = {
   lifetime: { words: 50, bulkSets: 25 },
 };
 
+/** Returns a safe, validated app URL for use in email href attributes. */
+function _safeAppUrl() {
+  const raw = (process.env.SUCCESS_URL || '').replace('?checkout=success', '').trim();
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error();
+    return u.href;
+  } catch (_) {
+    return 'https://puzzle-suite.app';
+  }
+}
+
 /**
  * Send the license key delivery email after a successful purchase.
  */
@@ -89,7 +101,7 @@ async function sendLicenseEmail({ to, key, plan, billingInterval }) {
   <div class="steps">
     <h3>How to activate</h3>
     <ol>
-      <li>Open <a href="${process.env.SUCCESS_URL?.replace('?checkout=success', '') || 'Puzzle Suite'}">Puzzle Suite</a></li>
+      <li>Open <a href="${_safeAppUrl()}">Puzzle Suite</a></li>
       <li>Click the <strong>Pro</strong> badge in the top-right corner</li>
       <li>Paste your license key and click <strong>Activate</strong></li>
     </ol>

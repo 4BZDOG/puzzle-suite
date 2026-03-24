@@ -68,8 +68,8 @@ router.post('/session', async (req, res) => {
       // automatic_tax: { enabled: true },
     };
 
-    // Pre-fill email if provided
-    if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    // Pre-fill email if provided (type guard prevents calling .toLowerCase on non-strings)
+    if (typeof email === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       sessionParams.customer_email = email.toLowerCase().trim();
     }
 
