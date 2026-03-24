@@ -128,8 +128,9 @@ async function handleSubscriptionDeleted(subscription) {
   }
 
   // Grace period: set expiry to end of current period rather than deactivating immediately
-  const periodEnd = subscription.current_period_end
-    ? new Date(subscription.current_period_end * 1000).toISOString()
+  const ts = Number(subscription.current_period_end);
+  const periodEnd = (Number.isFinite(ts) && ts > 0)
+    ? new Date(ts * 1000).toISOString()
     : new Date().toISOString();
 
   db.setExpiry(lic.key, periodEnd);

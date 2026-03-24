@@ -82,6 +82,7 @@ export async function exportPDF() {
     try {
         if (T) T.innerText = 'Loading PDF Engine...';
         const jspdfModule = await loadJSPDF();
+        if (!jspdfModule?.jsPDF) throw new Error('PDF engine failed to load');
         const { jsPDF } = jspdfModule;
 
         const paperSize = cfg.paperSize || 'a4';

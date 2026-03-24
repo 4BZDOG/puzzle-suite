@@ -9,6 +9,7 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
+const { randomInt } = require('crypto');
 
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'data', 'licenses.db');
 
@@ -68,7 +69,7 @@ function generateKey() {
   for (let g = 0; g < GROUPS; g++) {
     key += '-';
     for (let c = 0; c < GROUP_LEN; c++) {
-      key += ALPHABET[Math.floor(Math.random() * ALPHABET.length)];
+      key += ALPHABET[randomInt(ALPHABET.length)];
     }
   }
   return key;

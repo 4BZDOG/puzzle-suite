@@ -1,6 +1,7 @@
 // =============================================================
 // renderers/keys.js — Page 5: Answer keys preview
 // =============================================================
+import { escapeHTML } from '../core/utils.js';
 
 /**
  * @param {HTMLElement} container
@@ -87,7 +88,7 @@ export function renderKeys(container, puzzleData, settings) {
     if (isMatching && puzzleData.notes) {
         let notesHTML = '<div class="split-half"><div class="split-title">MATCHING KEY</div><div class="scramble-solution">';
         puzzleData.notes.forEach((n, i) => {
-            notesHTML += `<div class="scr-sol-row"><span>${i + 1}. ${n.term}</span><b style="color:var(--danger)">${n.correctLetter}</b></div>`;
+            notesHTML += `<div class="scr-sol-row"><span>${i + 1}. ${escapeHTML(n.term)}</span><b style="color:var(--danger)">${n.correctLetter}</b></div>`;
         });
         notesHTML += '</div></div>';
         htmlStr += notesHTML;
