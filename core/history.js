@@ -16,9 +16,9 @@ export function pushHistory() {
 }
 
 export function undo(onComplete) {
-    if (historyIndex <= 0) return;
-    historyIndex--;
+    if (historyIndex < 0) return;
     setWords(JSON.parse(JSON.stringify(wordHistory[historyIndex])));
+    historyIndex--;
     _updateButtons();
     if (onComplete) onComplete();
 }
@@ -31,7 +31,7 @@ export function redo(onComplete) {
     if (onComplete) onComplete();
 }
 
-export function canUndo() { return historyIndex > 0; }
+export function canUndo() { return historyIndex >= 0; }
 export function canRedo() { return historyIndex < wordHistory.length - 1; }
 
 function _updateButtons() {

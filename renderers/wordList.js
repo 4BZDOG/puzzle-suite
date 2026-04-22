@@ -60,7 +60,7 @@ export function renderWordList(container, words, puzzleData, activePage, onUpdat
             </div>
             <div style="flex:2">
                 <input class="wm-input wm-clue" value="${escapeHTML(w.clue)}"
-                    onkeyup="window._puzzleApp.updateWord(${i},'clue',this.value)"
+                    oninput="window._puzzleApp.updateWord(${i},'clue',this.value)"
                     placeholder="Clue" aria-label="Clue for word ${i + 1}">
             </div>
             <button class="wm-btn" onclick="window._puzzleApp.delWord(${i})"

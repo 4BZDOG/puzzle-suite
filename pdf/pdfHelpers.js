@@ -163,7 +163,7 @@ export function drawHeader(ctx, fullTitle, subText, instructions, isKey, setIndi
     // Divider line (now above the instructions)
     doc.setDrawColor(15, 23, 42);
     doc.setLineWidth(0.4);
-    doc.line(MARGIN, MARGIN + 22 * scale, PAGE_WIDTH - MARGIN, MARGIN + 22 * scale);
+    doc.line(MARGIN, MARGIN + 22 * pScale, PAGE_WIDTH - MARGIN, MARGIN + 22 * pScale);
 
     // Instructions — below the divider line (uses drawText so emoji prefix renders correctly)
     drawText(doc, instructions.toUpperCase(), MARGIN, MARGIN + 29 * pScale, {
@@ -174,5 +174,5 @@ export function drawHeader(ctx, fullTitle, subText, instructions, isKey, setIndi
         pdfFont,
     });
 
-    return MARGIN + 38 * scale;
+    return MARGIN + 38 * pScale;
 }

@@ -1991,10 +1991,13 @@ table.mode-cw td.cell.empty {
     outline-offset: 2px;
 }
 
+@page { margin: 0; }
+
 @media print {
     aside, .preview-toolbar, .page-tabs, #loading-overlay { display: none !important; }
     .viewport { padding: 0; }
     .page { box-shadow: none; margin: 0; }
+    .notes-row { break-inside: avoid; }
 }
 
 } /* end @layer utils */

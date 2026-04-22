@@ -540,7 +540,7 @@ async function runAIGenerate() {
         syncSettingsFromDOM();
         saveState();
     } catch (err) {
-        const safe = (err.message || 'Unknown error').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const safe = escapeHTML(err.message || 'Unknown error');
         _setAIStatus(`<strong>Error:</strong> ${safe}`, 'error');
     } finally {
         if (btn) btn.disabled = false;
