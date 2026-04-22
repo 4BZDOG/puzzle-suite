@@ -64,7 +64,8 @@ export function drawScramble(ctx, scrData, layout, isKey, showHint, pScale) {
         const numCols = 2;
         const itemsPerCol = Math.ceil(scrData.length / numCols);
         const colW = layout.w / numCols;
-        const rowH = 12 * pScale;
+        const maxRowH = 12 * pScale;
+        const rowH = Math.min(maxRowH, (layout.h - 10 * scale) / itemsPerCol);
         const showExample = ctx.showExample || false;
 
         let cy = layout.y + 10 * scale;

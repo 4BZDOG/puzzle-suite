@@ -79,7 +79,7 @@
                     <p id="aiKeyHint" class="ai-key-hint"></p>
 
                     <div class="toggle-row">
-                        <label>Remember key on this device</label>
+                        <label for="aiSaveKey">Remember key on this device</label>
                         <label class="switch"><input type="checkbox" id="aiSaveKey" checked><span class="slider-switch"></span></label>
                     </div>
                     <p style="font-size:0.75rem; color:var(--text-muted); margin-top:-6px;">Stored locally only — never sent to our servers.</p>
@@ -338,13 +338,13 @@
                             <span id="notesWidthVal" class="slider-val">20%</span>
                         </div>
                         <hr class="form-divider">
-                        <div class="toggle-row"><label>Shuffle for Matching</label><label class="switch"><input
+                        <div class="toggle-row"><label for="notesShuffle">Shuffle for Matching</label><label class="switch"><input
                                     type="checkbox" id="notesShuffle" onchange="focusPage(1); generateAll()"><span
                                     class="slider-switch"></span></label></div>
-                        <div class="toggle-row"><label>Show Terms</label><label class="switch"><input type="checkbox"
+                        <div class="toggle-row"><label for="notesShowTerm">Show Terms</label><label class="switch"><input type="checkbox"
                                     id="notesShowTerm" checked onchange="focusPage(1); updateNotesStyles(); saveState();"><span
                                     class="slider-switch"></span></label></div>
-                        <div class="toggle-row"><label>Show Definitions</label><label class="switch"><input
+                        <div class="toggle-row"><label for="notesShowDef">Show Definitions</label><label class="switch"><input
                                     type="checkbox" id="notesShowDef" checked
                                     onchange="focusPage(1); updateNotesStyles(); saveState();"><span
                                     class="slider-switch"></span></label></div>
@@ -361,7 +361,7 @@
                             <input type="number" id="wsGridSize" value="15" min="10" max="25" class="input-small-center"
                                 onchange="debouncedGenerate()">
                         </div>
-                        <div class="toggle-row"><label>Harder Fillers</label><label class="switch"><input
+                        <div class="toggle-row"><label for="wsHardFiller">Harder Fillers</label><label class="switch"><input
                                     type="checkbox" id="wsHardFiller" onchange="generateAll()"><span
                                     class="slider-switch"></span></label></div>
 
@@ -386,17 +386,17 @@
                         </div>
 
                         <hr class="form-divider">
-                        <div class="toggle-row"><label>Show Internal Grid</label><label class="switch"><input
+                        <div class="toggle-row"><label for="wsInternalGrid">Show Internal Grid</label><label class="switch"><input
                                     type="checkbox" id="wsInternalGrid"
                                     onchange="focusPage(2); renderActivePage(); saveState();"><span
                                     class="slider-switch"></span></label></div>
-                        <div class="toggle-row"><label>Allow Diagonals</label><label class="switch"><input
+                        <div class="toggle-row"><label for="wsDiag">Allow Diagonals</label><label class="switch"><input
                                     type="checkbox" id="wsDiag" checked onchange="focusPage(2); debouncedGenerate()"><span
                                     class="slider-switch"></span></label></div>
-                        <div class="toggle-row"><label>Allow Backwards</label><label class="switch"><input
+                        <div class="toggle-row"><label for="wsBack">Allow Backwards</label><label class="switch"><input
                                     type="checkbox" id="wsBack" checked onchange="focusPage(2); debouncedGenerate()"><span
                                     class="slider-switch"></span></label></div>
-                        <div class="toggle-row"><label>Use Clues in Bank</label><label class="switch"><input
+                        <div class="toggle-row"><label for="wsUseClues">Use Clues in Bank</label><label class="switch"><input
                                     type="checkbox" id="wsUseClues" onchange="focusPage(2); renderActivePage(); saveState();"><span
                                     class="slider-switch"></span></label></div>
                     </div>
@@ -423,7 +423,7 @@
                                 oninput="updateGridStyles()">
                         </div>
                         <hr class="form-divider">
-                        <div class="toggle-row"><label>Show Word Bank</label><label class="switch"><input
+                        <div class="toggle-row"><label for="cwShowBank">Show Word Bank</label><label class="switch"><input
                                     type="checkbox" id="cwShowBank" onchange="focusPage(3); renderActivePage(); saveState();"><span
                                     class="slider-switch"></span></label></div>
                     </div>
@@ -434,7 +434,7 @@
                         <div class="card-header-inner"><i class="fas fa-random"></i> Word Scramble</div>
                     </summary>
                     <div class="card-content">
-                        <div class="toggle-row"><label>Show First Letter Hint</label><label class="switch"><input
+                        <div class="toggle-row"><label for="scrShowHint">Show First Letter Hint</label><label class="switch"><input
                                     type="checkbox" id="scrShowHint" onchange="focusPage(4); renderActivePage(); saveState();"><span
                                     class="slider-switch"></span></label></div>
                     </div>
@@ -444,7 +444,7 @@
                         <div class="card-header-inner"><i class="fas fa-star"></i> Example Answer</div>
                     </summary>
                     <div class="card-content">
-                        <div class="toggle-row"><label>Show 1 Worked Example</label><label class="switch"><input
+                        <div class="toggle-row"><label for="showExample">Show 1 Worked Example</label><label class="switch"><input
                                     type="checkbox" id="showExample" onchange="renderActivePage(); saveState();"><span
                                     class="slider-switch"></span></label></div>
                     </div>
@@ -681,7 +681,7 @@
         </div>
     </div>
 
-    <script src="bundle.js?v=16"></script>
+    <script src="bundle.js?v=17"></script>
 </body>
 
 </html>

@@ -2388,15 +2388,15 @@ table.mode-cw td.cell.empty {
 .lic-success-banner i { margin-right: 6px; }
 
 /* Dark mode adjustments */
-.dark .lic-modal { background: var(--bg-panel, #1e2030); }
-.dark .lic-tier--free  { background: #1e293b; color: #94a3b8; }
-.dark .lic-tier--pro   { background: #1e1b4b; color: #a5b4fc; }
-.dark .lic-plan-card   { border-color: #334155; }
-.dark .lic-plan-card:hover { border-color: var(--primary, #6366f1); }
-.dark .lic-upgrade-prompt { background: #431407; border-color: #92400e; color: #fed7aa; }
-.dark .lic-success-banner { background: #052e16; border-color: #166534; color: #86efac; }
-.dark .lic-activate-status.error   { background: #450a0a; color: #fca5a5; }
-.dark .lic-activate-status.success { background: #052e16; color: #86efac; }
-.dark .bulk-limit-hint { color: var(--text-muted, #94a3b8); }
+[data-theme="dark"] .lic-modal { background: var(--bg-panel, #1e2030); }
+[data-theme="dark"] .lic-tier--free  { background: #1e293b; color: #94a3b8; }
+[data-theme="dark"] .lic-tier--pro   { background: #1e1b4b; color: #a5b4fc; }
+[data-theme="dark"] .lic-plan-card   { border-color: #334155; }
+[data-theme="dark"] .lic-plan-card:hover { border-color: var(--primary, #6366f1); }
+[data-theme="dark"] .lic-upgrade-prompt { background: #431407; border-color: #92400e; color: #fed7aa; }
+[data-theme="dark"] .lic-success-banner { background: #052e16; border-color: #166534; color: #86efac; }
+[data-theme="dark"] .lic-activate-status.error   { background: #450a0a; color: #fca5a5; }
+[data-theme="dark"] .lic-activate-status.success { background: #052e16; color: #86efac; }
+[data-theme="dark"] .bulk-limit-hint { color: var(--text-muted, #94a3b8); }
 
 } /* end @layer components (license) */
