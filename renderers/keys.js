@@ -8,12 +8,12 @@
  * @param {Object}      settings    - state.settings
  */
 export function renderKeys(container, puzzleData, settings) {
-    if (!container) return;
+    if (!container || !puzzleData) return;
 
-    const hasWS = puzzleData.ws && puzzleData.ws.placed.length > 0;
-    const hasCW = puzzleData.cw && puzzleData.cw.placed.length > 0;
-    const hasScr = puzzleData.scr && puzzleData.scr.length > 0;
-    const isMatching = !!(settings.notesConfig?.shuffle && puzzleData.notes?.length > 0 && 'matchLetter' in puzzleData.notes[0]);
+    const hasWS = puzzleData.ws?.placed?.length > 0;
+    const hasCW = puzzleData.cw?.placed?.length > 0;
+    const hasScr = puzzleData.scr?.length > 0;
+    const isMatching = !!(settings.notesConfig?.shuffle && puzzleData.notes?.length > 0 && puzzleData.notes[0]?.matchLetter !== undefined);
 
     const activeCount = (hasWS ? 1 : 0) + (hasCW ? 1 : 0) + (hasScr ? 1 : 0) + (isMatching ? 1 : 0);
 

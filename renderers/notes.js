@@ -2,6 +2,10 @@
 // renderers/notes.js — Page 1: Notes/vocabulary page preview
 // =============================================================
 
+const escapeHTML = str => str.replace(/[&<>'"]/g, tag => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
+}[tag]));
+
 /**
  * @param {HTMLElement} container
  * @param {Object}      puzzleData  - state.puzzleData (notes may be null before gen)
@@ -79,7 +83,7 @@ export function renderNotes(container, puzzleData, words, settings, onUpdateWord
         } else {
             htmlStr += `<div class="notes-editable" contenteditable="true" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}" onblur="window._puzzleApp.updateWord(${i}, 'clue', this.innerText)">${w.clue}</div>`;
             htmlStr += `<span class="notes-clue-length">(${w.term.length})</span>`;
-            if (isExample) htmlStr += `<span class="scramble-example-label" style="margin-left:6px;">★ example: <b>${w.term}</b></span>`;
+            if (isExample) htmlStr += `<span class="scramble-example-label" style="margin-left:6px;">★ example: <b>${escapeHTML(w.term)}</b></span>`;
         }
 
         htmlStr += '</div></div>';

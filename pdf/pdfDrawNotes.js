@@ -6,6 +6,11 @@ import { drawWordSearch } from './pdfDrawWordSearch.js';
 import { drawCrossword } from './pdfDrawCrossword.js';
 import { drawScramble } from './pdfDrawScramble.js';
 
+const sanitizePDFText = (text) => {
+  if (typeof text !== 'string') return '';
+  return text.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '').trim();
+};
+
 /**
  * Draw the notes/vocabulary page.
  *
@@ -66,8 +71,8 @@ export function drawNotes(ctx, notesList, startY, pScale) {
             ? (isExample ? `${i + 1}. ${w.correctLetter}` : `${i + 1}. ____`)
             : `${i + 1}.`;
         const clueStr = isMatching
-            ? `${w.matchLetter}. ${w.clue} (${w.clueTermLength ?? w.term.length})`
-            : `${w.clue} (${w.term.length})`;
+            ? `${w.matchLetter}. ${sanitizePDFText(w.clue)} (${w.clueTermLength ?? w.term.length})`
+            : `${sanitizePDFText(w.clue)} (${w.term.length})`;
 
         doc.setFont(pdfFont, 'bold');
         const tLines = showTerm ? doc.splitTextToSize(w.term, termColW - 4) : [];

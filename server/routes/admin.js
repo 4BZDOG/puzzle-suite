@@ -59,9 +59,15 @@ router.post('/licenses', async (req, res) => {
   if (!email || !plan) {
     return res.status(400).json({ error: 'email and plan are required' });
   }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'Invalid email format' });
+  }
   const validPlans = ['pro', 'school', 'lifetime'];
   if (!validPlans.includes(plan)) {
     return res.status(400).json({ error: `Invalid plan. Use: ${validPlans.join(', ')}` });
+  }
+  if (expiresAt && !(new Date(expiresAt) instanceof Date && !isNaN(new Date(expiresAt)))) {
+    return res.status(400).json({ error: 'Invalid expiresAt date format' });
   }
 
   const key = db.createLicense({ email, plan, billingInterval, expiresAt });
