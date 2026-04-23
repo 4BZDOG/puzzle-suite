@@ -181,8 +181,13 @@ function updateNotesInstruction() {
 
 function updateGridStyles() {
     const g = (id, def) => { const el = document.getElementById(id); return el ? el.value : def; };
+    const sp = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
     const wsOp = g('wsOpacity', 1), cwOp = g('cwOpacity', 1);
     const wsW = g('wsLineWidth', 1), cwW = g('cwLineWidth', 1);
+    sp('wsLineWidthVal', parseFloat(wsW).toFixed(1));
+    sp('wsOpacityVal',   parseFloat(wsOp).toFixed(2));
+    sp('cwLineWidthVal', parseFloat(cwW).toFixed(1));
+    sp('cwOpacityVal',   parseFloat(cwOp).toFixed(2));
     document.documentElement.style.setProperty('--ws-bg-color', `rgba(255,255,255,${wsOp})`);
     document.documentElement.style.setProperty('--cw-bg-color', `rgba(255,255,255,${cwOp})`);
     document.documentElement.style.setProperty('--ws-line-width', wsW + 'px');
