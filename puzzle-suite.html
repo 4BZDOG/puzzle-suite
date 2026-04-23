@@ -373,7 +373,7 @@
                         <label class="field-label label-flex"><span>Grid Scale</span><span class="action-link"
                                 onclick="autoFit('search')">Auto-Fit</span></label>
                         <div style="display:flex;align-items:center;gap:8px;">
-                            <input type="range" id="scaleSearch" min="15" max="60" value="32" oninput="focusPage(2); document.getElementById('scaleSearchVal').textContent=this.value; renderActivePage()">
+                            <input type="range" id="scaleSearch" min="15" max="60" value="32" oninput="focusPage(2); document.getElementById('scaleSearchVal').textContent=this.value; renderActivePage(); saveState()">
                             <span id="scaleSearchVal" class="slider-val">32</span>
                         </div>
 
@@ -416,7 +416,7 @@
                                 onclick="autoFit('crossword')">Auto-Fit</span></label>
                         <div style="display:flex;align-items:center;gap:8px;">
                             <input type="range" id="scaleCrossword" min="15" max="60" value="32"
-                                oninput="focusPage(3); document.getElementById('scaleCrosswordVal').textContent=this.value; renderActivePage()">
+                                oninput="focusPage(3); document.getElementById('scaleCrosswordVal').textContent=this.value; renderActivePage(); saveState()">
                             <span id="scaleCrosswordVal" class="slider-val">32</span>
                         </div>
 
@@ -691,7 +691,7 @@
         </div>
     </div>
 
-    <script src="bundle.js?v=19"></script>
+    <script src="bundle.js?v=20"></script>
 </body>
 
 </html>
