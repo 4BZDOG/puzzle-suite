@@ -143,9 +143,9 @@ export function drawMasterKeyPage(ctx, fullTitle, subText, currentPuzzleData, se
 
     doc.setDrawColor(15, 23, 42);
     doc.setLineWidth(0.4);
-    doc.line(MARGIN, MARGIN + 25 * scale, PAGE_WIDTH - MARGIN, MARGIN + 25 * scale);
+    doc.line(MARGIN, MARGIN + 25 * pScale, PAGE_WIDTH - MARGIN, MARGIN + 25 * pScale);
 
-    const startY = MARGIN + 35 * scale;
+    const startY = MARGIN + 35 * pScale;
     const isMatching = currentPuzzleData.notes?.length > 0 && currentPuzzleData.notes[0].matchLetter !== undefined;
     const availW = PAGE_WIDTH - 2 * MARGIN, availH = PAGE_HEIGHT - startY - MARGIN;
     const qW = (availW - 10) / 2, qH = (availH - 10) / 2;
@@ -167,13 +167,13 @@ export function drawMasterKeyPage(ctx, fullTitle, subText, currentPuzzleData, se
         doc.setFont(pdfFont, 'bold');
         doc.setFontSize(10 * pScale);
         doc.setTextColor(99, 102, 241);
-        doc.text(title, box.x + 5 * scale, box.y + 8 * pScale);
+        doc.text(title, box.x + 5 * pScale, box.y + 8 * pScale);
 
         doc.setDrawColor(99, 102, 241);
         doc.setLineWidth(0.15);
-        doc.line(box.x + 5 * scale, box.y + 11 * scale, box.x + box.w - 5 * scale, box.y + 11 * scale);
+        doc.line(box.x + 5 * pScale, box.y + 11 * pScale, box.x + box.w - 5 * pScale, box.y + 11 * pScale);
 
-        return { x: box.x + 5 * scale, y: box.y + 15 * scale, w: box.w - 10 * scale, h: box.h - (15 * scale + 5) };
+        return { x: box.x + 5 * pScale, y: box.y + 15 * pScale, w: box.w - 10 * pScale, h: box.h - (15 * pScale + 5) };
     };
 
     let bIdx = 0;

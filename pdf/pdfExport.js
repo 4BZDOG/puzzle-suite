@@ -162,7 +162,7 @@ export async function exportPDF() {
                     addPage();
                     const ps = getPScale('ws');
                     const sy = drawHeader(ctx, title, sub, '🔍 WORD SEARCH - HIGHLIGHT THE WORDS LISTED IN THE GRID.', false, setIndicator, ps);
-                    const layout = { x: MARGIN, y: sy, w: PAGE_WIDTH - 2 * MARGIN, h: PAGE_HEIGHT - sy - 30 * scale };
+                    const layout = { x: MARGIN, y: sy, w: PAGE_WIDTH - 2 * MARGIN, h: PAGE_HEIGHT - sy - 30 * ps };
                     drawWordSearch(ctx, cpd.ws, layout, state.words, cfg.wsUseClues, false, ps);
 
                 } else if (pType === 'cw') {
