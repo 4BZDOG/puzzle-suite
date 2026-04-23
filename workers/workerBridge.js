@@ -274,7 +274,12 @@ function getWorker() {
     }
 
     _worker.onmessage = (e) => {
-        const { id, result } = e.data;
+        const { id, result, error } = e.data;
+        if (error) {
+            console.error('Worker generation error:', error);
+            if (_pendingPromises[id]) { _pendingPromises[id](null); delete _pendingPromises[id]; }
+            return;
+        }
         if (result && result.ws) result.ws.solution = new Set(result.ws.solutionArray);
         if (_pendingPromises[id]) {
             _pendingPromises[id](result);

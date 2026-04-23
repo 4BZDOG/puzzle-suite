@@ -55,7 +55,7 @@ export function drawNotes(ctx, notesList, startY, pScale) {
 
     doc.setDrawColor(15, 23, 42);
     doc.setLineWidth(0.4);
-    doc.line(MARGIN, cy + 2 * scale, PAGE_WIDTH - MARGIN, cy + 2 * scale);
+    doc.line(MARGIN, cy + 2 * pScale, PAGE_WIDTH - MARGIN, cy + 2 * pScale);
     cy += 8 * pScale;
 
     const showExample = ctx.showExample || false;
@@ -78,7 +78,7 @@ export function drawNotes(ctx, notesList, startY, pScale) {
         if (cy + (maxLines * 4.5 * pScale) > PAGE_HEIGHT - MARGIN) {
             doc.addPage();
             drawWatermark();
-            cy = MARGIN + 10 * scale;
+            cy = MARGIN + 10 * pScale;
         }
 
         doc.setFont(pdfFont, 'bold');
@@ -189,7 +189,7 @@ export function drawMasterKeyPage(ctx, fullTitle, subText, currentPuzzleData, se
     }
     if (selections.scr && currentPuzzleData.scr) {
         const layout = drawBoxTitle('WORD SCRAMBLE', boxes[bIdx]);
-        const modLayout = { ...layout, y: layout.y + 5 * scale, h: layout.h - 5 * scale };
+        const modLayout = { ...layout, y: layout.y + 5 * pScale, h: layout.h - 5 * pScale };
         drawScramble(ctx, currentPuzzleData.scr, modLayout, true, false, pScale);
         bIdx++;
     }

@@ -86,7 +86,8 @@ async function generateAll() {
     renderStatusGenerating();
 
     const pData = await createPuzzleData();
-    if (seqId !== generationSequenceId || !pData) return;
+    if (seqId !== generationSequenceId) return;
+    if (!pData) { renderStatus(state.words, state.puzzleData, state.activePage); return; }
 
     setPuzzleData(pData);
     autoFit('search', true);
