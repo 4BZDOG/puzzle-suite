@@ -311,6 +311,7 @@ function addWordRow() {
 }
 
 function delWord(i) {
+    if (state.words.length <= 1) { showToast('At least one word is required.', 'warning'); return; }
     pushHistory();
     state.words.splice(i, 1);
     saveState();

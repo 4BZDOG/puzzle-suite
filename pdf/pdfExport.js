@@ -72,8 +72,8 @@ export async function exportPDF() {
     const title = cfg.title || 'Puzzle';
     const sub = cfg.sub || '';
     const count = (() => { const el = document.getElementById('bulkCount'); return el ? parseInt(el.value, 10) : 1; })();
-    const filename = (() => { const el = document.getElementById('exportFilename'); return el ? el.value : 'MyPuzzle'; })()
-        .replace(/[^a-z0-9-_]/gi, '_');
+    const filename = ((() => { const el = document.getElementById('exportFilename'); return el ? el.value.trim() : ''; })()
+        .replace(/[^a-z0-9-_]/gi, '_') || 'MyPuzzle');
     const scrShowHint = cfg.scrShowHint;
 
     if (L) { L.style.display = 'flex'; L.style.opacity = '1'; }

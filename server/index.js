@@ -104,7 +104,7 @@ app.use((err, _req, res, _next) => {
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 const PORT = parseInt(process.env.PORT || '3001', 10);
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`\nPuzzle Suite server running on http://localhost:${PORT}`);
   console.log(`  Admin dashboard:  http://localhost:${PORT}/admin`);
   console.log(`  Health check:     http://localhost:${PORT}/health`);
@@ -114,3 +114,15 @@ app.listen(PORT, () => {
   }
   console.log('');
 });
+
+const shutdown = (sig) => {
+  console.log(`\n[${sig}] Shutting down gracefully…`);
+  server.close(() => {
+    const { db } = require('./db');
+    try { db.close(); } catch (_) {}
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(1), 10000);
+};
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT',  () => shutdown('SIGINT'));
