@@ -35,6 +35,8 @@ export const state = {
         globalFontScale: 1,
         scales: { notes: 1, ws: 1, cw: 1, scr: 1, key: 1 },
         wsSize:         15,
+        wsGridScale:    null,
+        cwGridScale:    null,
         wsDiag:         true,
         wsBack:         true,
         wsInternalGrid: false,
@@ -126,6 +128,10 @@ export function syncSettingsFromDOM() {
         key:   parseFloat(getVal('scaleKeyFont',   s.scales.key)),
     };
     s.wsSize         = parseInt(getVal('wsGridSize', s.wsSize), 10);
+    const _wsgs = document.getElementById('scaleSearch');
+    if (_wsgs) s.wsGridScale = parseInt(_wsgs.value, 10) || null;
+    const _cwgs = document.getElementById('scaleCrossword');
+    if (_cwgs) s.cwGridScale = parseInt(_cwgs.value, 10) || null;
     s.wsDiag         = getChk('wsDiag', s.wsDiag);
     s.wsBack         = getChk('wsBack', s.wsBack);
     s.wsInternalGrid = getChk('wsInternalGrid', s.wsInternalGrid);
@@ -219,6 +225,16 @@ export function applyStateToDOM(s) {
     }
 
     setVal('wsGridSize',     cfg.wsSize);
+    if (cfg.wsGridScale) {
+        setVal('scaleSearch', cfg.wsGridScale);
+        const sp1 = document.getElementById('scaleSearchVal');
+        if (sp1) sp1.textContent = cfg.wsGridScale;
+    }
+    if (cfg.cwGridScale) {
+        setVal('scaleCrossword', cfg.cwGridScale);
+        const sp2 = document.getElementById('scaleCrosswordVal');
+        if (sp2) sp2.textContent = cfg.cwGridScale;
+    }
     setChk('wsDiag',         cfg.wsDiag);
     setChk('wsBack',         cfg.wsBack);
     setChk('wsInternalGrid', cfg.wsInternalGrid);

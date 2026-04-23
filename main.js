@@ -86,7 +86,8 @@ async function generateAll() {
     renderStatusGenerating();
 
     const pData = await createPuzzleData();
-    if (seqId !== generationSequenceId || !pData) return;
+    if (seqId !== generationSequenceId) return;
+    if (!pData) { renderStatus(state.words, state.puzzleData, state.activePage); return; }
 
     setPuzzleData(pData);
     autoFit('search', true);
@@ -117,9 +118,12 @@ function calcScale(type, isPrint = false) {
 }
 
 function autoFit(t, silent = false) {
-    const el = document.getElementById(t === 'search' ? 'scaleSearch' : 'scaleCrossword');
+    const id = t === 'search' ? 'scaleSearch' : 'scaleCrossword';
+    const el = document.getElementById(id);
     if (el) {
         el.value = calcScale(t);
+        const sp = document.getElementById(id + 'Val');
+        if (sp) sp.textContent = el.value;
         if (!silent) { renderActivePage(); showToast('Auto-fitted!'); }
     }
 }
@@ -177,8 +181,13 @@ function updateNotesInstruction() {
 
 function updateGridStyles() {
     const g = (id, def) => { const el = document.getElementById(id); return el ? el.value : def; };
+    const sp = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
     const wsOp = g('wsOpacity', 1), cwOp = g('cwOpacity', 1);
     const wsW = g('wsLineWidth', 1), cwW = g('cwLineWidth', 1);
+    sp('wsLineWidthVal', parseFloat(wsW).toFixed(1));
+    sp('wsOpacityVal',   parseFloat(wsOp).toFixed(2));
+    sp('cwLineWidthVal', parseFloat(cwW).toFixed(1));
+    sp('cwOpacityVal',   parseFloat(cwOp).toFixed(2));
     document.documentElement.style.setProperty('--ws-bg-color', `rgba(255,255,255,${wsOp})`);
     document.documentElement.style.setProperty('--cw-bg-color', `rgba(255,255,255,${cwOp})`);
     document.documentElement.style.setProperty('--ws-line-width', wsW + 'px');
@@ -302,6 +311,7 @@ function addWordRow() {
 }
 
 function delWord(i) {
+    if (state.words.length <= 1) { showToast('At least one word is required.', 'warning'); return; }
     pushHistory();
     state.words.splice(i, 1);
     saveState();
@@ -483,8 +493,8 @@ function _renderAIResults(words) {
     list.innerHTML = words.map((w, i) => `
         <label class="ai-result-item">
             <input type="checkbox" class="ai-result-cb" data-index="${i}" checked>
-            <span class="ai-result-word">${w.word}</span>
-            <span class="ai-result-clue">${w.clue}</span>
+            <span class="ai-result-word">${escapeHTML(w.word)}</span>
+            <span class="ai-result-clue">${escapeHTML(w.clue)}</span>
         </label>
     `).join('');
 
@@ -540,7 +550,7 @@ async function runAIGenerate() {
         syncSettingsFromDOM();
         saveState();
     } catch (err) {
-        const safe = (err.message || 'Unknown error').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const safe = escapeHTML(err.message || 'Unknown error');
         _setAIStatus(`<strong>Error:</strong> ${safe}`, 'error');
     } finally {
         if (btn) btn.disabled = false;
@@ -564,13 +574,20 @@ function aiImportSelected() {
         return _aiResults[i];
     }).filter(Boolean);
 
-    const newWords = [...state.words, ...toAdd.map(w => ({ word: w.word, clue: w.clue }))];
+    const existingSet = new Set(state.words.map(w => w.word.toLowerCase()));
+    const deduped = toAdd.filter(w => !existingSet.has(w.word.toLowerCase()));
+    if (deduped.length === 0) { showToast('All selected words are already in your list.', 'warning'); return; }
+    const newWords = [...state.words, ...deduped.map(w => ({ word: w.word, clue: w.clue }))];
     pushHistory();
     setWords(newWords);
     saveState();
     generateAll();
     closeAIModal();
-    showToast(`Added ${toAdd.length} word${toAdd.length !== 1 ? 's' : ''} to your list.`, 'success');
+    const skipped = toAdd.length - deduped.length;
+    const msg = skipped > 0
+        ? `Added ${deduped.length} word${deduped.length !== 1 ? 's' : ''} (${skipped} duplicate${skipped !== 1 ? 's' : ''} skipped).`
+        : `Added ${deduped.length} word${deduped.length !== 1 ? 's' : ''} to your list.`;
+    showToast(msg, 'success');
 }
 
 // =============================================================

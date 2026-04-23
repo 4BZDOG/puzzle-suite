@@ -49,37 +49,42 @@ function hasEmoji(str) {
  * returned image aligns with the typographic baseline.
  */
 function textToImgPDF(text, { fontSizePt, bold = false, italic = false, color = [0, 0, 0] }) {
-    const SCALE = 3;           // 3× canvas resolution for sharpness
-    const ptToPx = 96 / 72;   // 1 pt = 1.333 px at 96 dpi
-    const pxSize = fontSizePt * ptToPx * SCALE;
-    const lineH = Math.ceil(pxSize * 1.4);
+    try {
+        const SCALE = 3;           // 3× canvas resolution for sharpness
+        const ptToPx = 96 / 72;   // 1 pt = 1.333 px at 96 dpi
+        const pxSize = fontSizePt * ptToPx * SCALE;
+        const lineH = Math.ceil(pxSize * 1.4);
 
-    const canvas = document.createElement('canvas');
-    canvas.width = 3000;
-    canvas.height = lineH;
-    const ctx = canvas.getContext('2d');
+        const canvas = document.createElement('canvas');
+        canvas.width = 3000;
+        canvas.height = lineH;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return null;
 
-    const weight = bold ? 'bold' : 'normal';
-    const style  = italic ? 'italic' : 'normal';
-    ctx.font = `${style} ${weight} ${pxSize}px system-ui, -apple-system, sans-serif`;
-    ctx.fillStyle = `rgb(${color.join(',')})`;
-    ctx.textBaseline = 'bottom';
-    ctx.fillText(text, 0, lineH);
+        const weight = bold ? 'bold' : 'normal';
+        const style  = italic ? 'italic' : 'normal';
+        ctx.font = `${style} ${weight} ${pxSize}px system-ui, -apple-system, sans-serif`;
+        ctx.fillStyle = `rgb(${color.join(',')})`;
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(text, 0, lineH);
 
-    const w = Math.min(Math.ceil(ctx.measureText(text).width) + 4, 3000);
+        const w = Math.min(Math.ceil(ctx.measureText(text).width) + 4, 3000);
 
-    // Crop to actual text width
-    const crop = document.createElement('canvas');
-    crop.width = w;
-    crop.height = lineH;
-    crop.getContext('2d').drawImage(canvas, 0, 0);
+        // Crop to actual text width
+        const crop = document.createElement('canvas');
+        crop.width = w;
+        crop.height = lineH;
+        crop.getContext('2d').drawImage(canvas, 0, 0);
 
-    const mmPerPx = 25.4 / (96 * SCALE);
-    return {
-        url: crop.toDataURL('image/png'),
-        widthMm: w * mmPerPx,
-        heightMm: lineH * mmPerPx,
-    };
+        const mmPerPx = 25.4 / (96 * SCALE);
+        return {
+            url: crop.toDataURL('image/png'),
+            widthMm: w * mmPerPx,
+            heightMm: lineH * mmPerPx,
+        };
+    } catch (_) {
+        return null;
+    }
 }
 
 /**
@@ -91,10 +96,17 @@ function drawText(doc, text, x, y, { fontSizePt, bold = false, italic = false, c
 
     if (hasEmoji(text)) {
         const img = textToImgPDF(text, { fontSizePt, bold, italic, color });
-        const imgX = align === 'right' ? x - img.widthMm : x;
-        // Position image so its bottom edge (= canvas textBaseline 'bottom') aligns with PDF baseline y
-        doc.addImage(img.url, 'PNG', imgX, y - img.heightMm, img.widthMm, img.heightMm);
-    } else {
+        if (img) {
+            const imgX = align === 'right' ? x - img.widthMm : x;
+            // Position image so its bottom edge (= canvas textBaseline 'bottom') aligns with PDF baseline y
+            doc.addImage(img.url, 'PNG', imgX, y - img.heightMm, img.widthMm, img.heightMm);
+            return;
+        }
+        // Canvas unavailable — strip emoji and fall through to doc.text
+        text = text.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]️?⃣?(‍[\p{Emoji_Presentation}\p{Extended_Pictographic}]️?)*\s*/gu, '').trim();
+        if (!text) return;
+    }
+    {
         doc.setFont(pdfFont, italic ? (bold ? 'bolditalic' : 'italic') : (bold ? 'bold' : 'normal'));
         doc.setFontSize(fontSizePt);
         doc.setTextColor(...color);
@@ -163,7 +175,7 @@ export function drawHeader(ctx, fullTitle, subText, instructions, isKey, setIndi
     // Divider line (now above the instructions)
     doc.setDrawColor(15, 23, 42);
     doc.setLineWidth(0.4);
-    doc.line(MARGIN, MARGIN + 22 * scale, PAGE_WIDTH - MARGIN, MARGIN + 22 * scale);
+    doc.line(MARGIN, MARGIN + 22 * pScale, PAGE_WIDTH - MARGIN, MARGIN + 22 * pScale);
 
     // Instructions — below the divider line (uses drawText so emoji prefix renders correctly)
     drawText(doc, instructions.toUpperCase(), MARGIN, MARGIN + 29 * pScale, {
@@ -174,5 +186,5 @@ export function drawHeader(ctx, fullTitle, subText, instructions, isKey, setIndi
         pdfFont,
     });
 
-    return MARGIN + 38 * scale;
+    return MARGIN + 38 * pScale;
 }

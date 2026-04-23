@@ -237,22 +237,25 @@ function generateScramble(wordList) {
 
 self.onmessage = function (e) {
     const { id, words, wsSize, wsDiag, wsBack, wsHard, wsCustomFillers } = e.data;
+    try {
+        const ws = generateWS(wsSize, words, wsDiag, wsBack, wsHard, wsCustomFillers);
 
-    const ws = generateWS(wsSize, words, wsDiag, wsBack, wsHard, wsCustomFillers);
+        let bestCW = null, bestScore = Infinity;
+        const cwWords = words.filter(w => w.word && w.word.length > 1);
+        for (let i = 0; i < Math.min(5, cwWords.length); i++) {
+            const attempt = generateCW(words, i);
+            const area = attempt.cols * attempt.rows;
+            const aspect = Math.abs(attempt.cols - attempt.rows) * 10;
+            const unplaced = words.length - attempt.placed.length;
+            const score = (unplaced * 10000) + area + aspect;
+            if (score < bestScore) { bestCW = attempt; bestScore = score; }
+        }
+        if (!bestCW) bestCW = { grid: [], rows: 0, cols: 0, placed: [] };
 
-    let bestCW = null, bestScore = Infinity;
-    const cwWords = words.filter(w => w.word && w.word.length > 1);
-    for (let i = 0; i < Math.min(5, cwWords.length); i++) {
-        const attempt = generateCW(words, i);
-        const area = attempt.cols * attempt.rows;
-        const aspect = Math.abs(attempt.cols - attempt.rows) * 10;
-        const unplaced = words.length - attempt.placed.length;
-        const score = (unplaced * 10000) + area + aspect;
-        if (score < bestScore) { bestCW = attempt; bestScore = score; }
+        const scr = generateScramble(words);
+
+        self.postMessage({ id, result: { ws, cw: bestCW, scr } });
+    } catch (err) {
+        self.postMessage({ id, error: err.message || 'Worker generation failed' });
     }
-    if (!bestCW) bestCW = { grid: [], rows: 0, cols: 0, placed: [] };
-
-    const scr = generateScramble(words);
-
-    self.postMessage({ id, result: { ws, cw: bestCW, scr } });
 };

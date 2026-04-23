@@ -1,7 +1,8 @@
 // =============================================================
 // workers/workerBridge.js
 // Manages the generation Worker: lifecycle, sequencing,
-// stale-result rejection, and the public generateAllAsync() API.
+// and the public generateAllAsync() API.
+// Stale-result rejection is handled at main.js level via generationSequenceId.
 // =============================================================
 import { state } from '../core/state.js';
 
@@ -258,7 +259,6 @@ self.onmessage = function (e) {
 
 let _worker = null;
 let _msgId = 0;
-let _latestMsgId = 0;
 const _pendingPromises = {};
 
 function getWorker() {
@@ -274,7 +274,12 @@ function getWorker() {
     }
 
     _worker.onmessage = (e) => {
-        const { id, result } = e.data;
+        const { id, result, error } = e.data;
+        if (error) {
+            console.error('Worker generation error:', error);
+            if (_pendingPromises[id]) { _pendingPromises[id](null); delete _pendingPromises[id]; }
+            return;
+        }
         if (result && result.ws) result.ws.solution = new Set(result.ws.solutionArray);
         if (_pendingPromises[id]) {
             _pendingPromises[id](result);
@@ -306,7 +311,6 @@ export function generateAllAsync(settings) {
 
     return new Promise(resolve => {
         const id = ++_msgId;
-        _latestMsgId = id;
         _pendingPromises[id] = resolve;
 
         const s = settings || state.settings;
@@ -333,7 +337,6 @@ export function terminateWorker() {
         _worker = null;
     }
     _msgId = 0;
-    _latestMsgId = 0;
     for (const id in _pendingPromises) {
         _pendingPromises[id](null);
         delete _pendingPromises[id];

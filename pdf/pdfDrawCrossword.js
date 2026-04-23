@@ -71,7 +71,7 @@ export function drawCrossword(ctx, cwData, layout, isKey, pScale) {
     }
 
     if (!isKey) {
-        const cluesY = oy + gridH + 10 * scale;
+        const cluesY = oy + gridH + 10 * pScale;
         const ac = cwData.placed.filter(w => w.dir === 'across').sort((a, b) => a.num - b.num);
         const dn = cwData.placed.filter(w => w.dir === 'down').sort((a, b) => a.num - b.num);
         const colW = layout.w / 2;
@@ -85,7 +85,7 @@ export function drawCrossword(ctx, cwData, layout, isKey, pScale) {
             let h = titleH;
             doc.setFontSize(fontPt);
             list.forEach(w => {
-                const lines = doc.splitTextToSize(`${w.num}. ${w.clue} (${w.word.length})`, colW - 10 * scale);
+                const lines = doc.splitTextToSize(`${w.num}. ${w.clue} (${w.word.length})`, colW - 10 * pScale);
                 h += lines.length * lineH + spacingH;
             });
             return h;
@@ -110,7 +110,7 @@ export function drawCrossword(ctx, cwData, layout, isKey, pScale) {
             doc.text(title, colX, y);
             doc.setDrawColor(100, 116, 139);
             doc.setLineWidth(0.15);
-            doc.line(colX, y + 1.5 * scale, colX + colW - 4 * scale, y + 1.5 * scale);
+            doc.line(colX, y + 1.5 * pScale, colX + colW - 4 * pScale, y + 1.5 * pScale);
             y += 5 * pScale;
 
             const lineH = fontPt * 4 / 9;
@@ -121,7 +121,7 @@ export function drawCrossword(ctx, cwData, layout, isKey, pScale) {
             list.forEach(w => {
                 const isEx = showExample && firstAcross && w.num === firstAcross.num && w.dir === 'across';
                 const prefix = isEx ? '[EX] ' : '';
-                const lines = doc.splitTextToSize(`${prefix}${w.num}. ${w.clue} (${w.word.length})`, colW - 10 * scale);
+                const lines = doc.splitTextToSize(`${prefix}${w.num}. ${w.clue} (${w.word.length})`, colW - 10 * pScale);
                 if (isEx) doc.setTextColor(37, 99, 235);
                 lines.forEach(line => { doc.text(line, colX, y); y += lineH; });
                 if (isEx) doc.setTextColor(15, 23, 42);

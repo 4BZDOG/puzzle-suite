@@ -72,8 +72,8 @@ export async function exportPDF() {
     const title = cfg.title || 'Puzzle';
     const sub = cfg.sub || '';
     const count = (() => { const el = document.getElementById('bulkCount'); return el ? parseInt(el.value, 10) : 1; })();
-    const filename = (() => { const el = document.getElementById('exportFilename'); return el ? el.value : 'MyPuzzle'; })()
-        .replace(/[^a-z0-9-_]/gi, '_');
+    const filename = ((() => { const el = document.getElementById('exportFilename'); return el ? el.value.trim() : ''; })()
+        .replace(/[^a-z0-9-_]/gi, '_') || 'MyPuzzle');
     const scrShowHint = cfg.scrShowHint;
 
     if (L) { L.style.display = 'flex'; L.style.opacity = '1'; }
@@ -133,8 +133,9 @@ export async function exportPDF() {
             if (B) B.style.width = Math.round((i / count) * 100) + '%';
             await new Promise(r => setTimeout(r, 10));
 
-            const cpd = await createPuzzleData();
-            if (!cpd) { i--; continue; }
+            let cpd = null, attempts = 0;
+            while (!cpd && attempts++ < 3) cpd = await createPuzzleData();
+            if (!cpd) { showToast('Puzzle generation failed. Try again.', 'error'); break; }
 
             const setIndicator = count > 1 ? `SET ${i + 1}` : '';
 
@@ -162,7 +163,7 @@ export async function exportPDF() {
                     addPage();
                     const ps = getPScale('ws');
                     const sy = drawHeader(ctx, title, sub, '🔍 WORD SEARCH - HIGHLIGHT THE WORDS LISTED IN THE GRID.', false, setIndicator, ps);
-                    const layout = { x: MARGIN, y: sy, w: PAGE_WIDTH - 2 * MARGIN, h: PAGE_HEIGHT - sy - 30 * scale };
+                    const layout = { x: MARGIN, y: sy, w: PAGE_WIDTH - 2 * MARGIN, h: PAGE_HEIGHT - sy - 30 * ps };
                     drawWordSearch(ctx, cpd.ws, layout, state.words, cfg.wsUseClues, false, ps);
 
                 } else if (pType === 'cw') {
