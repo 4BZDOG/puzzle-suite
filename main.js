@@ -262,6 +262,11 @@ function updateWord(i, f, v) {
     if (f === 'word') {
         pushHistory();
         const val = v.toUpperCase().replace(/[^A-Z]/g, '');
+        if (!val) {
+            showToast('Word must contain at least one letter', 'error');
+            debouncedRenderActivePage();
+            return;
+        }
         state.words[i][f] = val;
         const szEl = document.getElementById('wsGridSize');
         if (szEl) {

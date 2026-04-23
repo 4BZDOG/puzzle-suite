@@ -83,6 +83,10 @@ async function handleCheckoutCompleted(stripe, session) {
     console.error('[webhook] No email on session', session.id);
     return;
   }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    console.error('[webhook] Invalid email format on session', session.id, email);
+    return;
+  }
 
   const VALID_PLANS = ['pro', 'school', 'lifetime'];
   const plan = session.metadata?.plan;
