@@ -133,8 +133,9 @@ export async function exportPDF() {
             if (B) B.style.width = Math.round((i / count) * 100) + '%';
             await new Promise(r => setTimeout(r, 10));
 
-            const cpd = await createPuzzleData();
-            if (!cpd) { i--; continue; }
+            let cpd = null, attempts = 0;
+            while (!cpd && attempts++ < 3) cpd = await createPuzzleData();
+            if (!cpd) { showToast('Puzzle generation failed. Try again.', 'error'); break; }
 
             const setIndicator = count > 1 ? `SET ${i + 1}` : '';
 
