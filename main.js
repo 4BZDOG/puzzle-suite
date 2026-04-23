@@ -117,9 +117,12 @@ function calcScale(type, isPrint = false) {
 }
 
 function autoFit(t, silent = false) {
-    const el = document.getElementById(t === 'search' ? 'scaleSearch' : 'scaleCrossword');
+    const id = t === 'search' ? 'scaleSearch' : 'scaleCrossword';
+    const el = document.getElementById(id);
     if (el) {
         el.value = calcScale(t);
+        const sp = document.getElementById(id + 'Val');
+        if (sp) sp.textContent = el.value;
         if (!silent) { renderActivePage(); showToast('Auto-fitted!'); }
     }
 }
@@ -564,13 +567,20 @@ function aiImportSelected() {
         return _aiResults[i];
     }).filter(Boolean);
 
-    const newWords = [...state.words, ...toAdd.map(w => ({ word: w.word, clue: w.clue }))];
+    const existingSet = new Set(state.words.map(w => w.word.toLowerCase()));
+    const deduped = toAdd.filter(w => !existingSet.has(w.word.toLowerCase()));
+    if (deduped.length === 0) { showToast('All selected words are already in your list.', 'warning'); return; }
+    const newWords = [...state.words, ...deduped.map(w => ({ word: w.word, clue: w.clue }))];
     pushHistory();
     setWords(newWords);
     saveState();
     generateAll();
     closeAIModal();
-    showToast(`Added ${toAdd.length} word${toAdd.length !== 1 ? 's' : ''} to your list.`, 'success');
+    const skipped = toAdd.length - deduped.length;
+    const msg = skipped > 0
+        ? `Added ${deduped.length} word${deduped.length !== 1 ? 's' : ''} (${skipped} duplicate${skipped !== 1 ? 's' : ''} skipped).`
+        : `Added ${deduped.length} word${deduped.length !== 1 ? 's' : ''} to your list.`;
+    showToast(msg, 'success');
 }
 
 // =============================================================

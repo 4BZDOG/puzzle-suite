@@ -372,7 +372,10 @@
                         <hr class="form-divider">
                         <label class="field-label label-flex"><span>Grid Scale</span><span class="action-link"
                                 onclick="autoFit('search')">Auto-Fit</span></label>
-                        <input type="range" id="scaleSearch" min="15" max="60" value="32" oninput="focusPage(2); renderActivePage()">
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <input type="range" id="scaleSearch" min="15" max="60" value="32" oninput="focusPage(2); document.getElementById('scaleSearchVal').textContent=this.value; renderActivePage()">
+                            <span id="scaleSearchVal" class="slider-val">32</span>
+                        </div>
 
                         <div class="slider-row" style="margin-top:8px;">
                             <span class="slider-label">Line Width</span>
@@ -409,8 +412,11 @@
                     <div class="card-content">
                         <label class="field-label label-flex"><span>Grid Scale</span><span class="action-link"
                                 onclick="autoFit('crossword')">Auto-Fit</span></label>
-                        <input type="range" id="scaleCrossword" min="15" max="60" value="32"
-                            oninput="focusPage(3); renderActivePage()">
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <input type="range" id="scaleCrossword" min="15" max="60" value="32"
+                                oninput="focusPage(3); document.getElementById('scaleCrosswordVal').textContent=this.value; renderActivePage()">
+                            <span id="scaleCrosswordVal" class="slider-val">32</span>
+                        </div>
 
                         <div class="slider-row" style="margin-top:8px;">
                             <span class="slider-label">Line Width</span>
@@ -681,7 +687,7 @@
         </div>
     </div>
 
-    <script src="bundle.js?v=17"></script>
+    <script src="bundle.js?v=18"></script>
 </body>
 
 </html>

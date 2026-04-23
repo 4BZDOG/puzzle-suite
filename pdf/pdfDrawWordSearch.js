@@ -86,7 +86,8 @@ export function drawWordSearch(ctx, wsData, layout, wordsList, showClues, isKey,
             return w;
         });
 
-        const numCols = showClues ? 2 : 3;
+        const maxLen = wsData.placed.reduce((m, w) => Math.max(m, w.length), 0);
+        const numCols = showClues ? 2 : (maxLen > 12 ? 2 : maxLen <= 8 ? 4 : 3);
         const colWidth = gridW / numCols;
         const itemsPerCol = Math.ceil(items.length / numCols);
         let cx = ox, cy = bankY;
