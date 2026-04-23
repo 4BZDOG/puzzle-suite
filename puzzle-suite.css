@@ -1191,6 +1191,31 @@ main {
     gap: 0;
 }
 
+/* ---- Dark mode: word bank ---- */
+[data-theme="dark"] .wb-item {
+    border-bottom-color: #334155;
+}
+[data-theme="dark"] .wb-check {
+    border-color: #475569;
+    background: #1e293b;
+}
+[data-theme="dark"] .wb-item-example {
+    background: #1e3a5f;
+    border-bottom-color: #2563eb;
+}
+
+/* ---- Dark mode: example highlight cells ---- */
+[data-theme="dark"] .scramble-example,
+[data-theme="dark"] .clue-example,
+[data-theme="dark"] .notes-row-example {
+    background: #1e3a5f;
+}
+
+/* ---- Dark mode: word-delete button hover ---- */
+[data-theme="dark"] .wm-btn:hover {
+    background: #450a0a;
+}
+
 } /* end @layer components */
 
 /* ============================================================
@@ -2022,7 +2047,7 @@ table.mode-cw td.cell.empty {
 @media print {
     aside, .preview-toolbar, .page-tabs, #loading-overlay { display: none !important; }
     .viewport { padding: 0; }
-    .page { box-shadow: none; margin: 0; }
+    .page { box-shadow: none; margin: 0; background: white !important; color: black !important; }
     .notes-row { break-inside: avoid; }
 }
 

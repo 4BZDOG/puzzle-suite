@@ -492,8 +492,8 @@ function _renderAIResults(words) {
     list.innerHTML = words.map((w, i) => `
         <label class="ai-result-item">
             <input type="checkbox" class="ai-result-cb" data-index="${i}" checked>
-            <span class="ai-result-word">${w.word}</span>
-            <span class="ai-result-clue">${w.clue}</span>
+            <span class="ai-result-word">${escapeHTML(w.word)}</span>
+            <span class="ai-result-clue">${escapeHTML(w.clue)}</span>
         </label>
     `).join('');
 
