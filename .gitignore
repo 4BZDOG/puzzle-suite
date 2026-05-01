@@ -6,8 +6,9 @@
 # Dependencies (commit package-lock.json so CI can use npm ci)
 node_modules/
 
-# Claude metadata (local only)
-.claude/
+# Claude metadata (local only — except shared commands/skills)
+.claude/*
+!.claude/commands/
 
 # Editor
 .vscode/
