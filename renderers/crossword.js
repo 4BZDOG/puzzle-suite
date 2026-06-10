@@ -79,7 +79,12 @@ export function renderCrossword(gridArea, footerArea, cwData, settings, preview 
                 return `<div class="clue-row${isEx ? ' clue-example' : ''}"><span class="clue-num-bold">${isEx ? '★ ' : ''}${w.num}.</span><span>${w.clue} <span class="notes-clue-length">(${w.word.length})</span>${isEx ? ` <span class="scramble-example-label">example</span>` : ''}</span></div>`;
             }).join('');
 
-        let html = '<div class="clues-two-col">';
+        const separateClues = settings.cwSeparateClues;
+        let html = '';
+        if (separateClues) {
+            html += '<div class="cw-separate-clues-badge"><i class="fas fa-file-alt"></i> Clues will appear on a separate page in PDF</div>';
+        }
+        html += '<div class="clues-two-col">';
         if (ac.length) html += `<div class="clue-col"><div class="clue-group-title first">ACROSS</div>${makeClueRows(ac)}</div>`;
         if (dn.length) html += `<div class="clue-col"><div class="clue-group-title first">DOWN</div>${makeClueRows(dn)}</div>`;
         html += '</div>';

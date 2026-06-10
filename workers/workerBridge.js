@@ -328,6 +328,7 @@ export function generateAllAsync(settings) {
             wsBack: s.wsBack ?? true,
             wsHard: s.wsHardFiller || false,
             wsCustomFillers: s.wsCustomFillers || '',
+            cwMaxWords: s.cwSeparateClues ? 999 : 15,
         });
     });
 }
