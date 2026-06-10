@@ -8,7 +8,7 @@ import { generateAllAsync } from '../workers/workerBridge.js';
 import { loadJSPDF, loadFontForPDF, FONT_SELECT_MAP } from './pdfFonts.js';
 import { buildCtx, drawHeader } from './pdfHelpers.js';
 import { drawWordSearch } from './pdfDrawWordSearch.js';
-import { drawCrossword } from './pdfDrawCrossword.js';
+import { drawCrossword, drawCrosswordClues } from './pdfDrawCrossword.js';
 import { drawScramble } from './pdfDrawScramble.js';
 import { drawNotes, drawMasterKeyPage } from './pdfDrawNotes.js';
 
@@ -167,11 +167,23 @@ export async function exportPDF() {
                     drawWordSearch(ctx, cpd.ws, layout, state.words, cfg.wsUseClues, false, ps);
 
                 } else if (pType === 'cw') {
-                    addPage();
                     const ps = getPScale('cw');
-                    const sy = drawHeader(ctx, title, sub, '✏️ CROSSWORD - USE THE CLUES PROVIDED TO FILL IN THE GRID.', false, setIndicator, ps);
-                    const layout = { x: MARGIN, y: sy, w: PAGE_WIDTH - 2 * MARGIN, h: (PAGE_HEIGHT - sy) * 0.45 };
-                    drawCrossword(ctx, cpd.cw, layout, false, ps);
+                    const useSeparateClues = cfg.cwSeparateClues;
+                    addPage();
+                    const cwInstruction = useSeparateClues
+                        ? '✏️ CROSSWORD - USE THE CLUES ON THE FOLLOWING PAGE TO FILL IN THE GRID.'
+                        : '✏️ CROSSWORD - USE THE CLUES PROVIDED TO FILL IN THE GRID.';
+                    const sy = drawHeader(ctx, title, sub, cwInstruction, false, setIndicator, ps);
+                    if (useSeparateClues) {
+                        const layout = { x: MARGIN, y: sy, w: PAGE_WIDTH - 2 * MARGIN, h: PAGE_HEIGHT - sy - MARGIN };
+                        drawCrossword(ctx, cpd.cw, layout, false, ps, true);
+                        addPage();
+                        const cluesSy = drawHeader(ctx, title, sub, '✏️ CROSSWORD CLUES', false, setIndicator, ps);
+                        drawCrosswordClues(ctx, cpd.cw, cluesSy, ps);
+                    } else {
+                        const layout = { x: MARGIN, y: sy, w: PAGE_WIDTH - 2 * MARGIN, h: (PAGE_HEIGHT - sy) * 0.45 };
+                        drawCrossword(ctx, cpd.cw, layout, false, ps);
+                    }
 
                 } else if (pType === 'scr') {
                     addPage();

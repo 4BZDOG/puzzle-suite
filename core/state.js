@@ -48,6 +48,7 @@ export const state = {
         cwOpacity:      1,
         cwLineWidth:    1,
         cwShowBank:     false,
+        cwSeparateClues: false,
         scrShowHint:    false,
         showExample:    true,
         wmOpacity:      0.15,
@@ -143,6 +144,7 @@ export function syncSettingsFromDOM() {
     s.cwOpacity      = parseFloat(getVal('cwOpacity', s.cwOpacity));
     s.cwLineWidth    = parseFloat(getVal('cwLineWidth', s.cwLineWidth));
     s.cwShowBank     = getChk('cwShowBank', s.cwShowBank);
+    s.cwSeparateClues = getChk('cwSeparateClues', s.cwSeparateClues);
     s.scrShowHint    = getChk('scrShowHint', s.scrShowHint);
     s.showExample    = getChk('showExample', s.showExample);
     s.titleScale     = parseFloat(getVal('titleScale', s.titleScale));
@@ -246,6 +248,7 @@ export function applyStateToDOM(s) {
     setVal('cwOpacity',      cfg.cwOpacity);
     setVal('cwLineWidth',    cfg.cwLineWidth);
     setChk('cwShowBank',     cfg.cwShowBank);
+    setChk('cwSeparateClues', cfg.cwSeparateClues);
     setChk('scrShowHint',    cfg.scrShowHint);
     setChk('showExample',    cfg.showExample);
     setVal('titleScale',     cfg.titleScale);
