@@ -69,8 +69,10 @@ export function renderNotes(container, puzzleData, words, settings, onUpdateWord
         const isExample = showExample && i === 0;
         htmlStr += `<div class="notes-row${isExample ? ' notes-row-example' : ''}">`;
         if (isMatching) {
-            const numStr = isExample ? `${i + 1}. <b style="color:var(--primary)">${w.correctLetter}</b>` : `${i + 1}. ____`;
-            htmlStr += `<span class="notes-num" style="width:60px">${numStr}</span>`;
+            const boxContent = isExample
+                ? `<span class="match-answer-box match-answer-filled">${w.correctLetter}</span>`
+                : `<span class="match-answer-box"></span>`;
+            htmlStr += `<span class="notes-num" style="width:60px">${i + 1}. ${boxContent}</span>`;
         } else {
             htmlStr += `<span class="notes-num">${i + 1}.</span>`;
         }

@@ -23,6 +23,7 @@ export function renderScramble(container, scrData, settings) {
     items.forEach((item, i) => {
         const isExample = showExample && i === 0;
         htmlStr += `<div class="scramble-item${isExample ? ' scramble-example' : ''}">
+            <span class="scramble-num">${i + 1}.</span>
             <div class="scramble-text">${item.scrambled}</div>
             ${isExample
                 ? `<div class="scramble-answer-filled">${item.original}</div><div class="scramble-example-label">★ example</div>`

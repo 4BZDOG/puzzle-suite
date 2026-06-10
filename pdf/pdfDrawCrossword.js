@@ -16,8 +16,8 @@ export function drawCrossword(ctx, cwData, layout, isKey, pScale) {
     const { doc, PAGE_HEIGHT, PAGE_WIDTH, MARGIN, scale, mmToPt, pdfFont, drawWatermark } = ctx;
     pScale = pScale || scale;
 
-    const maxCellSize = isKey ? 6 : 9;
-    const cSize = Math.min(layout.w / cwData.cols, layout.h / cwData.rows, maxCellSize);
+    const maxCellSize = isKey ? 6 : 8;
+    const cSize = Math.min(layout.w / cwData.cols, (layout.h * 0.85) / cwData.rows, maxCellSize);
     const gridW = cSize * cwData.cols, gridH = cSize * cwData.rows;
 
     const ox = layout.x + (layout.w - gridW) / 2;
@@ -71,29 +71,27 @@ export function drawCrossword(ctx, cwData, layout, isKey, pScale) {
     }
 
     if (!isKey) {
-        const cluesY = oy + gridH + 10 * pScale;
+        const cluesY = oy + gridH + 8 * pScale;
         const ac = cwData.placed.filter(w => w.dir === 'across').sort((a, b) => a.num - b.num);
         const dn = cwData.placed.filter(w => w.dir === 'down').sort((a, b) => a.num - b.num);
         const colW = layout.w / 2;
         const availH = PAGE_HEIGHT - MARGIN - cluesY;
 
-        // Estimate rendered height of a clue column at a given font size (pt)
         const calcColH = (list, fontPt) => {
-            const lineH = fontPt * 4 / 9;
-            const spacingH = fontPt * 1.5 / 9;
+            const lineH = fontPt * 0.5;
+            const spacingH = fontPt * 0.18;
             const titleH = 5 * pScale;
             let h = titleH;
             doc.setFontSize(fontPt);
             list.forEach(w => {
-                const lines = doc.splitTextToSize(`${w.num}. ${w.clue} (${w.word.length})`, colW - 10 * pScale);
+                const lines = doc.splitTextToSize(`${w.num}. ${w.clue} (${w.word.length})`, colW - 6 * pScale);
                 h += lines.length * lineH + spacingH;
             });
             return h;
         };
 
-        // Auto-scale font down until both columns fit within available height
         let fontPt = 9 * pScale;
-        const MIN_PT = 5;
+        const MIN_PT = 6.5;
         if (availH > 0) {
             while (fontPt > MIN_PT) {
                 if (Math.max(calcColH(ac, fontPt), calcColH(dn, fontPt)) <= availH) break;
@@ -101,35 +99,66 @@ export function drawCrossword(ctx, cwData, layout, isKey, pScale) {
             }
         }
 
-        const drawCol = (title, list, colX) => {
-            if (!list.length) return;
-            let y = cluesY;
+        let acrossY = cluesY;
+        let downY = cluesY;
+
+        const drawColHeader = (title, colX, y) => {
             doc.setFont(pdfFont, 'bold');
-            doc.setFontSize(10 * pScale);
+            doc.setFontSize(9 * pScale);
             doc.setTextColor(15, 23, 42);
             doc.text(title, colX, y);
             doc.setDrawColor(100, 116, 139);
             doc.setLineWidth(0.15);
             doc.line(colX, y + 1.5 * pScale, colX + colW - 4 * pScale, y + 1.5 * pScale);
-            y += 5 * pScale;
+            return y + 5 * pScale;
+        };
 
-            const lineH = fontPt * 4 / 9;
-            const spacingH = fontPt * 1.5 / 9;
+        const lineH = fontPt * 0.5;
+        const spacingH = fontPt * 0.18;
+
+        // Draw ACROSS column
+        if (ac.length) {
+            acrossY = drawColHeader('ACROSS', layout.x, acrossY);
             doc.setFont(pdfFont, 'normal');
             doc.setFontSize(fontPt);
             doc.setTextColor(15, 23, 42);
-            list.forEach(w => {
+            ac.forEach(w => {
                 const isEx = showExample && firstAcross && w.num === firstAcross.num && w.dir === 'across';
                 const prefix = isEx ? '[EX] ' : '';
-                const lines = doc.splitTextToSize(`${prefix}${w.num}. ${w.clue} (${w.word.length})`, colW - 10 * pScale);
+                const lines = doc.splitTextToSize(`${prefix}${w.num}. ${w.clue} (${w.word.length})`, colW - 6 * pScale);
+                if (acrossY + lines.length * lineH > PAGE_HEIGHT - MARGIN) {
+                    doc.addPage();
+                    drawWatermark();
+                    acrossY = MARGIN + 10 * pScale;
+                    doc.setFont(pdfFont, 'normal');
+                    doc.setFontSize(fontPt);
+                }
                 if (isEx) doc.setTextColor(37, 99, 235);
-                lines.forEach(line => { doc.text(line, colX, y); y += lineH; });
+                lines.forEach(line => { doc.text(line, layout.x, acrossY); acrossY += lineH; });
                 if (isEx) doc.setTextColor(15, 23, 42);
-                y += spacingH;
+                acrossY += spacingH;
             });
-        };
+        }
 
-        drawCol('ACROSS', ac, layout.x);
-        drawCol('DOWN', dn, layout.x + colW);
+        // Draw DOWN column
+        if (dn.length) {
+            downY = drawColHeader('DOWN', layout.x + colW, downY);
+            doc.setFont(pdfFont, 'normal');
+            doc.setFontSize(fontPt);
+            doc.setTextColor(15, 23, 42);
+            dn.forEach(w => {
+                const lines = doc.splitTextToSize(`${w.num}. ${w.clue} (${w.word.length})`, colW - 6 * pScale);
+                if (downY + lines.length * lineH > PAGE_HEIGHT - MARGIN) {
+                    doc.addPage();
+                    drawWatermark();
+                    downY = MARGIN + 10 * pScale;
+                    doc.setFont(pdfFont, 'normal');
+                    doc.setFontSize(fontPt);
+                }
+                doc.setTextColor(15, 23, 42);
+                lines.forEach(line => { doc.text(line, layout.x + colW, downY); downY += lineH; });
+                downY += spacingH;
+            });
+        }
     }
 }

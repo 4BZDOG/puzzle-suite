@@ -170,7 +170,7 @@ export async function exportPDF() {
                     addPage();
                     const ps = getPScale('cw');
                     const sy = drawHeader(ctx, title, sub, '✏️ CROSSWORD - USE THE CLUES PROVIDED TO FILL IN THE GRID.', false, setIndicator, ps);
-                    const layout = { x: MARGIN, y: sy, w: PAGE_WIDTH - 2 * MARGIN, h: (PAGE_HEIGHT - sy) * 0.55 };
+                    const layout = { x: MARGIN, y: sy, w: PAGE_WIDTH - 2 * MARGIN, h: (PAGE_HEIGHT - sy) * 0.45 };
                     drawCrossword(ctx, cpd.cw, layout, false, ps);
 
                 } else if (pType === 'scr') {

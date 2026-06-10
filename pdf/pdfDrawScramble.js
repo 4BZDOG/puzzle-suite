@@ -64,54 +64,64 @@ export function drawScramble(ctx, scrData, layout, isKey, showHint, pScale) {
         const numCols = 2;
         const itemsPerCol = Math.ceil(scrData.length / numCols);
         const colW = layout.w / numCols;
-        const maxRowH = 12 * pScale;
-        const rowH = Math.min(maxRowH, (layout.h - 10 * scale) / itemsPerCol);
+        const maxRowH = 14 * pScale;
+        const rowH = Math.min(maxRowH, (layout.h - 6 * scale) / itemsPerCol);
         const showExample = ctx.showExample || false;
 
-        let cy = layout.y + 10 * scale;
+        // Compute maximum scrambled word width to set a dynamic split point
+        const scramFontPt = Math.min(13 * pScale, rowH * 1.8);
+        doc.setFont('courier', 'bold');
+        doc.setFontSize(scramFontPt);
+        const maxScramW = Math.max(...scrData.map(s => doc.getTextWidth(s.scrambled)));
+        const numLabelW = doc.getTextWidth(`${scrData.length}. `);
+        const splitX = Math.min(numLabelW + maxScramW + 6 * scale, colW * 0.55);
+
+        let cy = layout.y + 6 * scale;
         let cx = layout.x;
 
         scrData.forEach((s, i) => {
-            if (i > 0 && i % itemsPerCol === 0) { cx += colW; cy = layout.y + 10 * scale; }
+            if (i > 0 && i % itemsPerCol === 0) { cx += colW; cy = layout.y + 6 * scale; }
 
             const isEx = showExample && i === 0;
 
-            doc.setFont('courier', 'bold');
-            doc.setFontSize(14 * pScale);
-            doc.setTextColor(15, 23, 42);
+            // Row number
+            doc.setFont(pdfFont, 'normal');
+            doc.setFontSize(scramFontPt * 0.7);
+            doc.setTextColor(100, 116, 139);
+            doc.text(`${i + 1}.`, cx + 2 * scale, cy);
 
-            const lineStartX = cx + colW * 0.40;
-            doc.text(s.scrambled, cx + 10 * scale, cy, { align: 'left' });
+            // Scrambled word
+            doc.setFont('courier', 'bold');
+            doc.setFontSize(scramFontPt);
+            doc.setTextColor(15, 23, 42);
+            doc.text(s.scrambled, cx + numLabelW + 3 * scale, cy, { align: 'left' });
+
+            const lineStartX = cx + splitX;
+            const hintW = showHint ? 18 * scale : 0;
+            const lineEndX = cx + colW - 4 * scale - hintW;
 
             if (isEx) {
-                // Show the answer filled in blue
                 doc.setFont(pdfFont, 'bold');
-                doc.setFontSize(14 * pScale);
+                doc.setFontSize(scramFontPt);
                 doc.setTextColor(37, 99, 235);
                 doc.text(s.original, lineStartX + 2 * scale, cy);
                 doc.setDrawColor(37, 99, 235);
                 doc.setLineWidth(0.4);
-                const ansW = doc.getTextWidth(s.original);
-                const lineEndX = showHint ? cx + colW - 20 * scale : cx + colW - 10 * scale;
-                doc.line(lineStartX, cy + 2 * scale, Math.max(lineStartX + ansW + 4 * scale, lineEndX), cy + 2 * scale);
-                // "★ example" label
+                doc.line(lineStartX, cy + 2 * scale, lineEndX, cy + 2 * scale);
                 doc.setFont(pdfFont, 'italic');
-                doc.setFontSize(8 * pScale);
-                doc.setTextColor(37, 99, 235);
+                doc.setFontSize(7 * pScale);
                 doc.text('[EXAMPLE]', cx + colW - 2 * scale, cy, { align: 'right' });
                 doc.setTextColor(15, 23, 42);
             } else {
-                doc.setDrawColor(15, 23, 42);
-                doc.setLineWidth(0.4);
-
-                const lineEndX = showHint ? cx + colW - 20 * scale : cx + colW - 10 * scale;
+                doc.setDrawColor(180, 180, 180);
+                doc.setLineWidth(0.3);
                 doc.line(lineStartX, cy + 2 * scale, lineEndX, cy + 2 * scale);
 
                 if (showHint) {
                     doc.setFont(pdfFont, 'normal');
-                    doc.setFontSize(10 * pScale);
-                    doc.setTextColor(100, 116, 139);
-                    doc.text(`(${s.original[0]}...)`, lineEndX + 3 * scale, cy, { align: 'left' });
+                    doc.setFontSize(9 * pScale);
+                    doc.setTextColor(150, 150, 150);
+                    doc.text(`(${s.original[0]}...)`, lineEndX + 2 * scale, cy, { align: 'left' });
                 }
             }
 
