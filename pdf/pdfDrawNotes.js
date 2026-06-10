@@ -33,7 +33,7 @@ export function drawNotes(ctx, notesList, startY, pScale) {
     const showDef = notesConfig ? notesConfig.showDef !== false : true;
 
     // Column positions — proportional to the user's term-width setting, not scale-dependent
-    const numColW = isMatching ? 22 : 10;   // mm reserved for the # / "1. ____" column
+    const numColW = isMatching ? 20 : 10;
     const termFrac = (notesConfig?.termWidth || 20) / 100;
     let termColW = Math.max(28, (availW - numColW) * termFrac);
 
@@ -67,9 +67,7 @@ export function drawNotes(ctx, notesList, startY, pScale) {
     doc.setTextColor(15, 23, 42);
     notesList.forEach((w, i) => {
         const isExample = showExample && i === 0;
-        const numStr = isMatching
-            ? (isExample ? `${i + 1}. ${w.correctLetter}` : `${i + 1}. ____`)
-            : `${i + 1}.`;
+        const numStr = `${i + 1}.`;
         const clueStr = isMatching
             ? `${w.matchLetter}. ${sanitizePDFText(w.clue)} (${w.clueTermLength ?? w.term.length})`
             : `${sanitizePDFText(w.clue)} (${w.term.length})`;
@@ -89,6 +87,28 @@ export function drawNotes(ctx, notesList, startY, pScale) {
         doc.setFont(pdfFont, 'bold');
         doc.setTextColor(isExample ? 37 : 100, isExample ? 99 : 116, isExample ? 235 : 139);
         doc.text(numStr, MARGIN, cy);
+
+        if (isMatching) {
+            const boxX = MARGIN + doc.getTextWidth(numStr) + 2;
+            const boxW = 8;
+            const boxH = 4.5 * pScale;
+            const boxY = cy - boxH + 1.2 * pScale;
+            if (isExample) {
+                doc.setFillColor(219, 234, 254);
+                doc.rect(boxX, boxY, boxW, boxH, 'FD');
+                doc.setDrawColor(37, 99, 235);
+                doc.rect(boxX, boxY, boxW, boxH, 'S');
+                doc.setFont(pdfFont, 'bold');
+                doc.setFontSize(10 * pScale);
+                doc.setTextColor(37, 99, 235);
+                doc.text(w.correctLetter, boxX + boxW / 2, cy, { align: 'center' });
+            } else {
+                doc.setDrawColor(100, 116, 139);
+                doc.setLineWidth(0.3);
+                doc.rect(boxX, boxY, boxW, boxH, 'S');
+            }
+            doc.setFontSize(10 * pScale);
+        }
 
         doc.setTextColor(15, 23, 42);
         if (showTerm) doc.text(tLines, termX, cy);

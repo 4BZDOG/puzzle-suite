@@ -1216,6 +1216,15 @@ main {
     background: #450a0a;
 }
 
+[data-theme="dark"] .match-answer-box {
+    background: #1e293b;
+    border-color: #475569;
+}
+[data-theme="dark"] .match-answer-filled {
+    background: #1e3a5f;
+    border-color: #3b82f6;
+}
+
 } /* end @layer components */
 
 /* ============================================================
@@ -1317,6 +1326,14 @@ table.mode-cw td.cell.empty {
     page-break-inside: avoid;
     font-family: var(--user-font);
     width: 100%;
+}
+
+.scramble-num {
+    font-size: calc(0.85rem * var(--global-font-scale) * var(--page-scale));
+    color: var(--text-muted);
+    min-width: 24px;
+    flex-shrink: 0;
+    font-weight: 500;
 }
 
 .scramble-text {
@@ -1918,6 +1935,27 @@ table.mode-cw td.cell.empty {
     color: #666;
     flex-shrink: 0;
     padding-top: 2px;
+}
+
+.match-answer-box {
+    display: inline-block;
+    width: 20px;
+    height: 18px;
+    border: 1.5px solid #94a3b8;
+    border-radius: 3px;
+    text-align: center;
+    line-height: 18px;
+    font-weight: 700;
+    font-size: 0.85em;
+    vertical-align: middle;
+    margin-left: 2px;
+    background: #fff;
+}
+
+.match-answer-filled {
+    background: #dbeafe;
+    border-color: #3b82f6;
+    color: #2563eb;
 }
 
 .notes-word {
