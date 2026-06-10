@@ -1510,8 +1510,8 @@ table.mode-cw td.cell.empty {
 }
 
 .clue-row {
-    margin-bottom: 6px;
-    line-height: 1.35;
+    margin-bottom: 8px;
+    line-height: 1.4;
     display: flex;
     align-items: baseline;
     break-inside: avoid;
