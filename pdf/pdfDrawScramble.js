@@ -64,12 +64,13 @@ export function drawScramble(ctx, scrData, layout, isKey, showHint, pScale) {
         const numCols = 2;
         const itemsPerCol = Math.ceil(scrData.length / numCols);
         const colW = layout.w / numCols;
-        const maxRowH = 14 * pScale;
-        const rowH = Math.min(maxRowH, (layout.h - 6 * scale) / itemsPerCol);
+        const availH = layout.h - 6 * scale;
+        const naturalRowH = availH / itemsPerCol;
+        const maxRowH = 22 * pScale;
+        const rowH = Math.min(maxRowH, naturalRowH);
         const showExample = ctx.showExample || false;
 
-        // Compute maximum scrambled word width to set a dynamic split point
-        const scramFontPt = Math.min(13 * pScale, rowH * 1.8);
+        const scramFontPt = Math.min(14 * pScale, Math.max(10 * pScale, rowH * 1.4));
         doc.setFont('courier', 'bold');
         doc.setFontSize(scramFontPt);
         const maxScramW = Math.max(...scrData.map(s => doc.getTextWidth(s.scrambled)));

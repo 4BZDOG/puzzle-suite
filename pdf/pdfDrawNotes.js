@@ -79,7 +79,7 @@ export function drawNotes(ctx, notesList, startY, pScale) {
         const dLines = showDef ? doc.splitTextToSize(clueStr, defW) : [];
         const maxLines = Math.max(tLines.length, dLines.length, 1);
 
-        const rowH = maxLines * 4.5 * pScale + 4.5 * pScale;
+        const rowH = maxLines * 4.5 * pScale + 3.5 * pScale;
         if (cy + rowH > PAGE_HEIGHT - MARGIN) {
             doc.addPage();
             drawWatermark();
@@ -151,13 +151,12 @@ export function drawNotes(ctx, notesList, startY, pScale) {
             doc.setTextColor(15, 23, 42);
         }
 
-        cy += (maxLines * 4.5 * pScale) + 2 * pScale;
-        // Extra space when example answer text is appended below the definition
+        cy += (maxLines * 4.5 * pScale) + 1.5 * pScale;
         if (isExample && !isMatching && showDef) cy += 5 * pScale;
         doc.setDrawColor(203, 213, 225);
         doc.setLineWidth(0.2);
-        doc.line(MARGIN, cy - 1.5 * pScale, PAGE_WIDTH - MARGIN, cy - 1.5 * pScale);
-        cy += 2.5 * pScale;
+        doc.line(MARGIN, cy - 1 * pScale, PAGE_WIDTH - MARGIN, cy - 1 * pScale);
+        cy += 2 * pScale;
     });
 }
 
