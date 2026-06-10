@@ -90,7 +90,7 @@ export function drawCrossword(ctx, cwData, layout, isKey, pScale) {
             return h;
         };
 
-        let fontPt = 9 * pScale;
+        let fontPt = 10 * pScale;
         const MIN_PT = 6.5;
         if (availH > 0) {
             while (fontPt > MIN_PT) {

@@ -235,17 +235,22 @@ function generateScramble(wordList) {
 }
 
 self.onmessage = function (e) {
-    const { id, words, wsSize, wsDiag, wsBack, wsHard, wsCustomFillers } = e.data;
+    const { id, words, wsSize, wsDiag, wsBack, wsHard, wsCustomFillers, cwMaxWords } = e.data;
 
     const ws = generateWS(wsSize, words, wsDiag, wsBack, wsHard, wsCustomFillers);
 
+    const CW_CAP = cwMaxWords || 15;
+    let cwInput = words.filter(w => w.word && w.word.length > 1);
+    if (cwInput.length > CW_CAP) {
+        cwInput = [...cwInput].sort((a, b) => b.word.length - a.word.length).slice(0, CW_CAP);
+    }
+
     let bestCW = null, bestScore = Infinity;
-    const cwWords = words.filter(w => w.word && w.word.length > 1);
-    for (let i = 0; i < Math.min(5, cwWords.length); i++) {
-        const attempt = generateCW(words, i);
+    for (let i = 0; i < Math.min(5, cwInput.length); i++) {
+        const attempt = generateCW(cwInput, i);
         const area    = attempt.cols * attempt.rows;
         const aspect  = Math.abs(attempt.cols - attempt.rows) * 10;
-        const unplaced = words.length - attempt.placed.length;
+        const unplaced = cwInput.length - attempt.placed.length;
         const score   = (unplaced * 10000) + area + aspect;
         if (score < bestScore) { bestCW = attempt; bestScore = score; }
     }

@@ -177,7 +177,7 @@ export async function exportPDF() {
                     addPage();
                     const ps = getPScale('scr');
                     const sy = drawHeader(ctx, title, sub, '🔀 WORD SCRAMBLE - UNSCRAMBLE THE LETTERS TO FIND THE WORDS.', false, setIndicator, ps);
-                    const layout = { x: MARGIN, y: sy, w: PAGE_WIDTH - 2 * MARGIN, h: PAGE_HEIGHT - sy };
+                    const layout = { x: MARGIN, y: sy, w: PAGE_WIDTH - 2 * MARGIN, h: PAGE_HEIGHT - sy - MARGIN };
                     drawScramble(ctx, cpd.scr, layout, false, scrShowHint, ps);
 
                 } else if (pType === 'key') {
