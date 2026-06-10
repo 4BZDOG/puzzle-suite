@@ -68,9 +68,10 @@ export function drawNotes(ctx, notesList, startY, pScale) {
     notesList.forEach((w, i) => {
         const isExample = showExample && i === 0;
         const numStr = `${i + 1}.`;
-        const clueStr = isMatching
-            ? `${w.matchLetter}. ${sanitizePDFText(w.clue)} (${w.clueTermLength ?? w.term.length})`
-            : `${sanitizePDFText(w.clue)} (${w.term.length})`;
+        const clueBody = sanitizePDFText(w.clue);
+        const letterCount = isMatching ? (w.clueTermLength ?? w.term.length) : w.term.length;
+        const cluePrefix = isMatching ? `${w.matchLetter}. ` : '';
+        const clueStr = `${cluePrefix}${clueBody} (${letterCount})`;
 
         doc.setFont(pdfFont, 'bold');
         const tLines = showTerm ? doc.splitTextToSize(w.term, termColW - 4) : [];
@@ -78,10 +79,16 @@ export function drawNotes(ctx, notesList, startY, pScale) {
         const dLines = showDef ? doc.splitTextToSize(clueStr, defW) : [];
         const maxLines = Math.max(tLines.length, dLines.length, 1);
 
-        if (cy + (maxLines * 4.5 * pScale) > PAGE_HEIGHT - MARGIN) {
+        const rowH = maxLines * 4.5 * pScale + 4.5 * pScale;
+        if (cy + rowH > PAGE_HEIGHT - MARGIN) {
             doc.addPage();
             drawWatermark();
             cy = MARGIN + 10 * pScale;
+        }
+
+        if (i % 2 === 1 && !isExample) {
+            doc.setFillColor(248, 250, 252);
+            doc.rect(MARGIN, cy - 3.5 * pScale, availW, rowH, 'F');
         }
 
         doc.setFont(pdfFont, 'bold');
@@ -113,8 +120,25 @@ export function drawNotes(ctx, notesList, startY, pScale) {
         doc.setTextColor(15, 23, 42);
         if (showTerm) doc.text(tLines, termX, cy);
 
-        doc.setFont(pdfFont, 'normal');
-        if (showDef) doc.text(dLines, defX, cy);
+        if (showDef) {
+            if (isMatching && cluePrefix) {
+                doc.setFont(pdfFont, 'bold');
+                doc.setTextColor(99, 102, 241);
+                doc.text(cluePrefix, defX, cy);
+                const prefixW = doc.getTextWidth(cluePrefix);
+                doc.setFont(pdfFont, 'normal');
+                doc.setTextColor(51, 65, 85);
+                const bodyWithCount = `${clueBody} (${letterCount})`;
+                const bodyLines = doc.splitTextToSize(bodyWithCount, defW - prefixW);
+                bodyLines.forEach((line, idx) => {
+                    doc.text(line, defX + (idx === 0 ? prefixW : 0), cy + idx * 4.5 * pScale);
+                });
+            } else {
+                doc.setFont(pdfFont, 'normal');
+                doc.setTextColor(51, 65, 85);
+                doc.text(dLines, defX, cy);
+            }
+        }
         if (isExample && !isMatching && showDef) {
             // Show answer after the clue lines in blue
             const answerY = cy + (dLines.length * 4.5 * pScale);
@@ -130,8 +154,8 @@ export function drawNotes(ctx, notesList, startY, pScale) {
         cy += (maxLines * 4.5 * pScale) + 2 * pScale;
         // Extra space when example answer text is appended below the definition
         if (isExample && !isMatching && showDef) cy += 5 * pScale;
-        doc.setDrawColor(226, 232, 240);
-        doc.setLineWidth(0.15);
+        doc.setDrawColor(203, 213, 225);
+        doc.setLineWidth(0.2);
         doc.line(MARGIN, cy - 1.5 * pScale, PAGE_WIDTH - MARGIN, cy - 1.5 * pScale);
         cy += 2.5 * pScale;
     });
@@ -156,7 +180,7 @@ export function drawMasterKeyPage(ctx, fullTitle, subText, currentPuzzleData, se
     doc.setTextColor(15, 23, 42);
     doc.text(fullTitle.toUpperCase(), MARGIN, MARGIN + 10 * pScale);
 
-    doc.setFont('helvetica', 'italic');
+    doc.setFont(pdfFont, 'italic');
     doc.setFontSize(11 * pScale);
     doc.setTextColor(100, 116, 139);
     doc.text(subText, MARGIN, MARGIN + 18 * pScale);

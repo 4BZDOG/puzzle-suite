@@ -34,12 +34,21 @@ export function drawWordSearch(ctx, wsData, layout, wordsList, showClues, isKey,
     const exWordPos = showExample && wsData.wordPositions?.length ? wsData.wordPositions[0] : null;
     const exCells = new Set(exWordPos?.cells ? exWordPos.cells.map(c => `${c.x},${c.y}`) : []);
 
+    if (!isKey) {
+        for (let y = 0; y < wsData.size; y++) {
+            if (y % 2 === 1) {
+                doc.setFillColor(248, 250, 252);
+                doc.rect(ox, oy + y * cSize, gridW, cSize, 'F');
+            }
+        }
+    }
+
     for (let y = 0; y < wsData.size; y++) {
         for (let x = 0; x < wsData.size; x++) {
             const cx = ox + x * cSize, cy = oy + y * cSize;
 
             if (!isKey && showInternalGrid) {
-                doc.setDrawColor(200);
+                doc.setDrawColor(220);
                 doc.rect(cx, cy, cSize, cSize, 'S');
             }
 
@@ -73,10 +82,22 @@ export function drawWordSearch(ctx, wsData, layout, wordsList, showClues, isKey,
     doc.rect(ox, oy, gridW, gridW, 'S');
 
     if (!isKey) {
-        const bankY = oy + gridW + 10 * scale;
+        const bankY = oy + gridW + 8 * scale;
+        const bankW = layout.w;
+        const bankX = layout.x;
+
+        doc.setFont(pdfFont, 'bold');
+        doc.setFontSize(9 * pScale);
+        doc.setTextColor(100, 116, 139);
+        doc.text('FIND THESE WORDS:', bankX, bankY);
+        doc.setDrawColor(200);
+        doc.setLineWidth(0.15);
+        doc.line(bankX, bankY + 2 * pScale, bankX + bankW, bankY + 2 * pScale);
+
+        const listStartY = bankY + 6 * pScale;
         doc.setFont(pdfFont, 'normal');
         doc.setTextColor(15, 23, 42);
-        doc.setFontSize(9 * pScale);
+        doc.setFontSize(9.5 * pScale);
 
         const items = wsData.placed.map(w => {
             if (showClues && wordsList) {
@@ -88,25 +109,24 @@ export function drawWordSearch(ctx, wsData, layout, wordsList, showClues, isKey,
 
         const maxLen = wsData.placed.reduce((m, w) => Math.max(m, w.length), 0);
         const numCols = showClues ? 2 : (maxLen > 12 ? 2 : maxLen <= 8 ? 4 : 3);
-        const colWidth = gridW / numCols;
+        const colWidth = bankW / numCols;
         const itemsPerCol = Math.ceil(items.length / numCols);
-        let cx = ox, cy = bankY;
-        const sq = 2.5 * scale;
+        let cx = bankX, cy = listStartY;
+        const sq = 3 * scale;
 
         const exWord = exWordPos ? exWordPos.word : null;
         items.forEach((text, i) => {
-            if (i > 0 && i % itemsPerCol === 0) { cx += colWidth; cy = bankY; }
+            if (i > 0 && i % itemsPerCol === 0) { cx += colWidth; cy = listStartY; }
             const isEx = exWord && wsData.placed[i] === exWord;
-            const lines = doc.splitTextToSize(text, colWidth - 8 * scale);
+            const lines = doc.splitTextToSize(text, colWidth - 10 * scale);
 
-            if (cy + (lines.length * 4 * pScale) > PAGE_HEIGHT - MARGIN) {
+            if (cy + (lines.length * 4.5 * pScale) > PAGE_HEIGHT - MARGIN) {
                 doc.addPage();
                 drawWatermark();
                 cy = MARGIN + 10 * scale;
             }
 
             if (isEx) {
-                // Draw a tick/checkmark in blue (avoids unicode rendering issues)
                 doc.setFillColor(219, 234, 254);
                 doc.rect(cx, cy - sq + 0.5 * scale, sq, sq, 'F');
                 doc.setDrawColor(37, 99, 235);
@@ -116,17 +136,17 @@ export function drawWordSearch(ctx, wsData, layout, wordsList, showClues, isKey,
                 doc.line(bx + sq * 0.42, by + sq * 0.80, bx + sq * 0.85, by + sq * 0.20);
                 doc.setTextColor(37, 99, 235);
             } else {
-                doc.setDrawColor(100);
+                doc.setDrawColor(150);
                 doc.setLineWidth(0.3);
                 doc.rect(cx, cy - sq + 0.5 * scale, sq, sq, 'S');
                 doc.setTextColor(15, 23, 42);
             }
             lines.forEach((line, idx) => {
-                doc.text(line, cx + 5 * scale, cy);
-                if (idx < lines.length - 1) cy += 4 * pScale;
+                doc.text(line, cx + sq + 3 * scale, cy);
+                if (idx < lines.length - 1) cy += 4.5 * pScale;
             });
             if (isEx) doc.setTextColor(15, 23, 42);
-            cy += 6 * pScale;
+            cy += 6.5 * pScale;
         });
     }
 }

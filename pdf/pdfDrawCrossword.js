@@ -104,60 +104,66 @@ export function drawCrossword(ctx, cwData, layout, isKey, pScale) {
 
         const drawColHeader = (title, colX, y) => {
             doc.setFont(pdfFont, 'bold');
-            doc.setFontSize(9 * pScale);
+            doc.setFontSize(10 * pScale);
             doc.setTextColor(15, 23, 42);
             doc.text(title, colX, y);
-            doc.setDrawColor(100, 116, 139);
-            doc.setLineWidth(0.15);
-            doc.line(colX, y + 1.5 * pScale, colX + colW - 4 * pScale, y + 1.5 * pScale);
-            return y + 5 * pScale;
+            doc.setDrawColor(15, 23, 42);
+            doc.setLineWidth(0.3);
+            doc.line(colX, y + 2 * pScale, colX + colW - 4 * pScale, y + 2 * pScale);
+            return y + 6 * pScale;
         };
 
         const lineH = fontPt * 0.5;
         const spacingH = fontPt * 0.18;
 
+        const drawClue = (w, colX, yRef, isExClue) => {
+            const prefix = isExClue ? '[EX] ' : '';
+            const numPrefix = `${prefix}${w.num}. `;
+            const clueText = `${w.clue} (${w.word.length})`;
+            doc.setFontSize(fontPt);
+            doc.setFont(pdfFont, 'bold');
+            const numW = doc.getTextWidth(numPrefix);
+            const hangIndent = numW * 0.6;
+            doc.setFont(pdfFont, 'normal');
+            const bodyWrapW = colW - 6 * pScale - hangIndent;
+            const clueLines = doc.splitTextToSize(clueText, bodyWrapW);
+            const totalLines = clueLines.length;
+            if (yRef.y + totalLines * lineH > PAGE_HEIGHT - MARGIN) {
+                doc.addPage();
+                drawWatermark();
+                yRef.y = MARGIN + 10 * pScale;
+            }
+            doc.setFontSize(fontPt);
+            doc.setFont(pdfFont, 'bold');
+            if (isExClue) doc.setTextColor(37, 99, 235);
+            else doc.setTextColor(15, 23, 42);
+            doc.text(numPrefix, colX, yRef.y);
+            doc.setFont(pdfFont, 'normal');
+            if (!isExClue) doc.setTextColor(51, 65, 85);
+            clueLines.forEach((line, idx) => {
+                doc.text(line, colX + (idx === 0 ? numW : hangIndent), yRef.y);
+                yRef.y += lineH;
+            });
+            if (isExClue) doc.setTextColor(15, 23, 42);
+            yRef.y += spacingH;
+        };
+
         // Draw ACROSS column
         if (ac.length) {
             acrossY = drawColHeader('ACROSS', layout.x, acrossY);
-            doc.setFont(pdfFont, 'normal');
-            doc.setFontSize(fontPt);
-            doc.setTextColor(15, 23, 42);
+            const yRefAc = { y: acrossY };
             ac.forEach(w => {
                 const isEx = showExample && firstAcross && w.num === firstAcross.num && w.dir === 'across';
-                const prefix = isEx ? '[EX] ' : '';
-                const lines = doc.splitTextToSize(`${prefix}${w.num}. ${w.clue} (${w.word.length})`, colW - 6 * pScale);
-                if (acrossY + lines.length * lineH > PAGE_HEIGHT - MARGIN) {
-                    doc.addPage();
-                    drawWatermark();
-                    acrossY = MARGIN + 10 * pScale;
-                    doc.setFont(pdfFont, 'normal');
-                    doc.setFontSize(fontPt);
-                }
-                if (isEx) doc.setTextColor(37, 99, 235);
-                lines.forEach(line => { doc.text(line, layout.x, acrossY); acrossY += lineH; });
-                if (isEx) doc.setTextColor(15, 23, 42);
-                acrossY += spacingH;
+                drawClue(w, layout.x, yRefAc, isEx);
             });
         }
 
         // Draw DOWN column
         if (dn.length) {
             downY = drawColHeader('DOWN', layout.x + colW, downY);
-            doc.setFont(pdfFont, 'normal');
-            doc.setFontSize(fontPt);
-            doc.setTextColor(15, 23, 42);
+            const yRefDn = { y: downY };
             dn.forEach(w => {
-                const lines = doc.splitTextToSize(`${w.num}. ${w.clue} (${w.word.length})`, colW - 6 * pScale);
-                if (downY + lines.length * lineH > PAGE_HEIGHT - MARGIN) {
-                    doc.addPage();
-                    drawWatermark();
-                    downY = MARGIN + 10 * pScale;
-                    doc.setFont(pdfFont, 'normal');
-                    doc.setFontSize(fontPt);
-                }
-                doc.setTextColor(15, 23, 42);
-                lines.forEach(line => { doc.text(line, layout.x + colW, downY); downY += lineH; });
-                downY += spacingH;
+                drawClue(w, layout.x + colW, yRefDn, false);
             });
         }
     }

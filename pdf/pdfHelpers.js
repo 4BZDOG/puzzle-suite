@@ -161,15 +161,17 @@ export function drawHeader(ctx, fullTitle, subText, instructions, isKey, setIndi
             doc.setTextColor(99, 102, 241);
             doc.text(setIndicator, PAGE_WIDTH - MARGIN, MARGIN + 4 * pScale, { align: 'right' });
         }
+        const fieldLabelX = PAGE_WIDTH - 90;
+        const fieldLineStart = PAGE_WIDTH - 72;
         doc.setFont(pdfFont, 'bold');
-        doc.setFontSize(9 * pScale);
+        doc.setFontSize(10 * pScale);
         doc.setTextColor(100, 116, 139);
-        doc.text('NAME:', PAGE_WIDTH - 70, MARGIN + 8 * pScale);
-        doc.setDrawColor(200);
-        doc.setLineWidth(0.3);
-        doc.line(PAGE_WIDTH - 55, MARGIN + 8 * pScale, PAGE_WIDTH - MARGIN, MARGIN + 8 * pScale);
-        doc.text('DATE:', PAGE_WIDTH - 70, MARGIN + 18 * pScale);
-        doc.line(PAGE_WIDTH - 55, MARGIN + 18 * pScale, PAGE_WIDTH - MARGIN, MARGIN + 18 * pScale);
+        doc.text('NAME:', fieldLabelX, MARGIN + 8 * pScale);
+        doc.setDrawColor(180);
+        doc.setLineWidth(0.4);
+        doc.line(fieldLineStart, MARGIN + 9 * pScale, PAGE_WIDTH - MARGIN, MARGIN + 9 * pScale);
+        doc.text('DATE:', fieldLabelX, MARGIN + 18 * pScale);
+        doc.line(fieldLineStart, MARGIN + 19 * pScale, PAGE_WIDTH - MARGIN, MARGIN + 19 * pScale);
     }
 
     // Divider line (now above the instructions)
