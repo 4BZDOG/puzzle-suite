@@ -64,7 +64,7 @@ export function renderWordSearch(gridArea, footerArea, wsData, words, settings, 
                     ? `${escapeHTML(clue)} <span class="notes-clue-length">(${wStr.length})</span>`
                     : escapeHTML(wStr);
             }
-            return wStr;
+            return escapeHTML(wStr);
         });
 
         const gridPx = wsData.size * z;

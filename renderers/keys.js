@@ -2,6 +2,10 @@
 // renderers/keys.js — Page 5: Answer keys preview
 // =============================================================
 
+const escapeHTML = str => str.replace(/[&<>'"]/g, tag => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
+}[tag]));
+
 /**
  * @param {HTMLElement} container
  * @param {Object}      puzzleData  - state.puzzleData
@@ -77,7 +81,7 @@ export function renderKeys(container, puzzleData, settings) {
     if (hasScr) {
         let scrHTML = '<div class="split-half"><div class="split-title">WORD SCRAMBLE</div><div class="scramble-solution">';
         puzzleData.scr.forEach(s => {
-            scrHTML += `<div class="scr-sol-row"><span>${s.scrambled}</span><b>${s.original}</b></div>`;
+            scrHTML += `<div class="scr-sol-row"><span>${escapeHTML(s.scrambled)}</span><b>${escapeHTML(s.original)}</b></div>`;
         });
         scrHTML += '</div></div>';
         htmlStr += scrHTML;
@@ -87,7 +91,7 @@ export function renderKeys(container, puzzleData, settings) {
     if (isMatching && puzzleData.notes) {
         let notesHTML = '<div class="split-half"><div class="split-title">MATCHING KEY</div><div class="scramble-solution">';
         puzzleData.notes.forEach((n, i) => {
-            notesHTML += `<div class="scr-sol-row"><span>${i + 1}. ${n.term}</span><b style="color:var(--danger)">${n.correctLetter}</b></div>`;
+            notesHTML += `<div class="scr-sol-row"><span>${i + 1}. ${escapeHTML(n.term)}</span><b style="color:var(--danger)">${escapeHTML(n.correctLetter)}</b></div>`;
         });
         notesHTML += '</div></div>';
         htmlStr += notesHTML;

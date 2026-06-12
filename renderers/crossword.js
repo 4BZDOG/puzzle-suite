@@ -101,7 +101,7 @@ export function renderCrossword(gridArea, footerArea, cwData, settings, preview 
             if (ml > 15) c = 2;
             html += `<div style="border-top:1px solid #cbd5e1; margin-top:20px; padding-top:20px;">
                 <div class="word-bank-styled" style="column-count:${c}; display:block; column-gap:20px;">
-                    ${bk.map(w => `<div class="wb-item" style="margin-bottom:6px"><span class="wb-check"></span> ${w}</div>`).join('')}
+                    ${bk.map(w => `<div class="wb-item" style="margin-bottom:6px"><span class="wb-check"></span> ${escapeHTML(w)}</div>`).join('')}
                 </div>
             </div>`;
         }
