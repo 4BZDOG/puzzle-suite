@@ -37,6 +37,8 @@ router.get('/validate', (req, res) => {
     return res.json({ valid: false, reason: result.reason });
   }
 
+  db.markActivated(sanitized);
+
   const lic = result.license;
   res.json({
     valid: true,

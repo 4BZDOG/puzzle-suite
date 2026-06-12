@@ -26,6 +26,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const Stripe = require('stripe');
+const { createRateLimiter } = require('./rateLimit');
 
 // ── Validate required env ─────────────────────────────────────────────────────
 const REQUIRED_ENV = ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'ADMIN_SECRET'];
@@ -76,9 +77,13 @@ app.use('/api/webhook', (req, res, next) => {
 // ── JSON middleware (all other routes) ───────────────────────────────────────
 app.use(express.json());
 
+// ── Rate limiting ────────────────────────────────────────────────────────────
+const apiLimiter = createRateLimiter({ windowMs: 60000, max: 30, message: 'Too many requests, please try again later' });
+const validateLimiter = createRateLimiter({ windowMs: 60000, max: 10, message: 'Too many validation attempts' });
+
 // ── Routes ────────────────────────────────────────────────────────────────────
-app.use('/api/checkout', require('./routes/checkout'));
-app.use('/api/license',  require('./routes/license'));
+app.use('/api/checkout', apiLimiter, require('./routes/checkout'));
+app.use('/api/license',  validateLimiter, require('./routes/license'));
 app.use('/api/admin',    require('./routes/admin'));
 
 // Admin dashboard HTML
