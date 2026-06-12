@@ -4,7 +4,7 @@
 // =============================================================
 import { state, syncSettingsFromDOM } from '../core/state.js';
 import { showToast } from '../ui/toast.js';
-import { generateAllAsync } from '../workers/workerBridge.js';
+import { createPuzzleData } from '../core/puzzleDataBuilder.js';
 import { loadJSPDF, loadFontForPDF, FONT_SELECT_MAP } from './pdfFonts.js';
 import { buildCtx, drawHeader } from './pdfHelpers.js';
 import { drawWordSearch } from './pdfDrawWordSearch.js';
@@ -13,35 +13,6 @@ import { drawScramble } from './pdfDrawScramble.js';
 import { drawNotes, drawMasterKeyPage } from './pdfDrawNotes.js';
 
 let isExporting = false;
-
-const getLetter = (i) => {
-    let res = '', num = i;
-    while (num >= 0) { res = String.fromCharCode(65 + (num % 26)) + res; num = Math.floor(num / 26) - 1; }
-    return res;
-};
-
-async function createPuzzleData() {
-    const pData = await generateAllAsync(state.settings);
-    if (!pData) return null;
-
-    const isMatching = state.settings.notesConfig.shuffle;
-    let notesData = state.words.map((w, i) => ({ term: w.word, clue: w.clue, origIdx: i }));
-
-    if (isMatching) {
-        let clues = [...notesData].sort(() => Math.random() - 0.5);
-        notesData = notesData.map((item, i) => ({
-            term: item.term,
-            clue: clues[i].clue,
-            matchLetter: getLetter(i),
-            correctLetter: getLetter(clues.findIndex(c => c.origIdx === item.origIdx)),
-            origIdx: item.origIdx,
-            clueOrigIdx: clues[i].origIdx,
-            clueTermLength: clues[i].term.length,
-        }));
-    }
-    pData.notes = notesData;
-    return pData;
-}
 
 export async function exportPDF() {
     if (isExporting) return;

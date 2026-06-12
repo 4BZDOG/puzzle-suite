@@ -241,6 +241,12 @@
 <div class="toast" id="toast"></div>
 
 <script>
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function esc(str) {
+  if (!str && str !== 0) return '';
+  return String(str).replace(/[&<>'"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[c]));
+}
+
 // ─── State ────────────────────────────────────────────────────────────────────
 let SECRET = localStorage.getItem('ps_admin_secret') || '';
 const API = ''; // relative — served from same origin
@@ -332,7 +338,7 @@ async function loadStats() {
     return;
   }
   breakdown.innerHTML = `<table style="width:auto"><thead><tr><th>Plan</th><th>Count</th></tr></thead><tbody>
-    ${data.byPlan.map(r => `<tr><td>${r.plan}</td><td style="font-weight:700;color:var(--accent)">${r.count}</td></tr>`).join('')}
+    ${data.byPlan.map(r => `<tr><td>${esc(r.plan)}</td><td style="font-weight:700;color:var(--accent)">${esc(r.count)}</td></tr>`).join('')}
   </tbody></table>`;
 }
 
@@ -363,18 +369,18 @@ function renderTable(rows) {
   }
   tbody.innerHTML = rows.map(r => `
     <tr>
-      <td><span class="key-mono">${r.key}</span></td>
-      <td>${r.email}</td>
-      <td><span class="badge badge-${r.plan}">${r.plan}${r.billing_interval ? ` / ${r.billing_interval}` : ''}</span></td>
+      <td><span class="key-mono">${esc(r.key)}</span></td>
+      <td>${esc(r.email)}</td>
+      <td><span class="badge badge-${esc(r.plan)}">${esc(r.plan)}${r.billing_interval ? ` / ${esc(r.billing_interval)}` : ''}</span></td>
       <td><span class="badge badge-${r.active ? 'active' : 'inactive'}">${r.active ? 'Active' : 'Inactive'}</span></td>
       <td>${fmtDate(r.created_at)}</td>
       <td>${r.expires_at ? fmtDate(r.expires_at) : '—'}</td>
       <td style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="btn btn-outline btn-sm" onclick="viewDetail('${r.key}')">View</button>
+        <button class="btn btn-outline btn-sm" onclick="viewDetail('${esc(r.key)}')">View</button>
         ${r.active
-          ? `<button class="btn btn-danger btn-sm" onclick="deactivate('${r.key}')">Deactivate</button>`
-          : `<button class="btn btn-success btn-sm" onclick="reactivate('${r.key}')">Reactivate</button>`}
-        <button class="btn btn-outline btn-sm" onclick="resendEmail('${r.key}')">Resend</button>
+          ? `<button class="btn btn-danger btn-sm" onclick="deactivate('${esc(r.key)}')">Deactivate</button>`
+          : `<button class="btn btn-success btn-sm" onclick="reactivate('${esc(r.key)}')">Reactivate</button>`}
+        <button class="btn btn-outline btn-sm" onclick="resendEmail('${esc(r.key)}')">Resend</button>
       </td>
     </tr>
   `).join('');
@@ -417,10 +423,10 @@ async function viewDetail(key) {
   const { license: l, events } = data;
 
   document.getElementById('detail-body').innerHTML = `
-    <div class="detail-row"><span class="lbl">Key</span><span class="key-mono">${l.key}</span></div>
-    <div class="detail-row"><span class="lbl">Email</span><span>${l.email}</span></div>
+    <div class="detail-row"><span class="lbl">Key</span><span class="key-mono">${esc(l.key)}</span></div>
+    <div class="detail-row"><span class="lbl">Email</span><span>${esc(l.email)}</span></div>
     <div class="detail-row"><span class="lbl">Plan</span>
-      <span class="badge badge-${l.plan}">${l.plan}${l.billing_interval ? ` / ${l.billing_interval}` : ''}</span>
+      <span class="badge badge-${esc(l.plan)}">${esc(l.plan)}${l.billing_interval ? ` / ${esc(l.billing_interval)}` : ''}</span>
     </div>
     <div class="detail-row"><span class="lbl">Status</span>
       <span class="badge badge-${l.active ? 'active' : 'inactive'}">${l.active ? 'Active' : 'Inactive'}</span>
@@ -428,14 +434,14 @@ async function viewDetail(key) {
     <div class="detail-row"><span class="lbl">Created</span><span>${fmtDate(l.created_at, true)}</span></div>
     <div class="detail-row"><span class="lbl">Activated</span><span>${l.activated_at ? fmtDate(l.activated_at, true) : '—'}</span></div>
     <div class="detail-row"><span class="lbl">Expires</span><span>${l.expires_at ? fmtDate(l.expires_at, true) : 'Never'}</span></div>
-    <div class="detail-row"><span class="lbl">Stripe Session</span><span style="font-size:11px;word-break:break-all">${l.stripe_session_id || '—'}</span></div>
-    <div class="detail-row"><span class="lbl">Stripe Customer</span><span style="font-size:11px;word-break:break-all">${l.stripe_customer_id || '—'}</span></div>
-    <div class="detail-row"><span class="lbl">Stripe Subscription</span><span style="font-size:11px;word-break:break-all">${l.stripe_subscription_id || '—'}</span></div>
+    <div class="detail-row"><span class="lbl">Stripe Session</span><span style="font-size:11px;word-break:break-all">${esc(l.stripe_session_id) || '—'}</span></div>
+    <div class="detail-row"><span class="lbl">Stripe Customer</span><span style="font-size:11px;word-break:break-all">${esc(l.stripe_customer_id) || '—'}</span></div>
+    <div class="detail-row"><span class="lbl">Stripe Subscription</span><span style="font-size:11px;word-break:break-all">${esc(l.stripe_subscription_id) || '—'}</span></div>
 
     <h4 style="margin:20px 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Plan</h4>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
       ${['pro','school','lifetime'].map(p => `
-        <button class="btn btn-outline btn-sm" onclick="changePlan('${l.key}','${p}')">${p}</button>
+        <button class="btn btn-outline btn-sm" onclick="changePlan('${esc(l.key)}','${p}')">${p}</button>
       `).join('')}
     </div>
 
@@ -444,8 +450,8 @@ async function viewDetail(key) {
       ${events.length ? events.map(e => `
         <li>
           <span class="time">${fmtDate(e.created_at, true)}</span>
-          <span class="type">${e.event_type}</span>
-          <span>${e.note || ''}</span>
+          <span class="type">${esc(e.event_type)}</span>
+          <span>${esc(e.note)}</span>
         </li>`).join('') : '<li style="color:var(--muted)">No events yet.</li>'}
     </ul>
   `;
@@ -490,8 +496,8 @@ async function createLicense() {
   result.innerHTML = `
     <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px">
       <div style="font-weight:700;color:var(--success);margin-bottom:8px">License created!</div>
-      <div style="font-family:monospace;font-size:16px;letter-spacing:2px;color:var(--text)">${data.key}</div>
-      <div style="font-size:12px;color:var(--muted);margin-top:6px">${email} · ${plan}${data.warning ? `<br><span style="color:var(--warning)">⚠ ${data.warning}</span>` : ''}</div>
+      <div style="font-family:monospace;font-size:16px;letter-spacing:2px;color:var(--text)">${esc(data.key)}</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:6px">${esc(email)} · ${esc(plan)}${data.warning ? `<br><span style="color:var(--warning)">${esc(data.warning)}</span>` : ''}</div>
     </div>`;
   document.getElementById('new-email').value = '';
   toast('License created' + (sendEmail ? ' & email sent' : ''));

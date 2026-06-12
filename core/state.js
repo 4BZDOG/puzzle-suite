@@ -187,7 +187,15 @@ export function applyStateToDOM(s) {
         if (el && val !== undefined) el.checked = val;
     };
 
-    if (s.words)  state.words = s.words;
+    if (s.words && Array.isArray(s.words)) {
+        state.words = s.words
+            .filter(w => w && typeof w === 'object')
+            .map(w => ({
+                word: String(w.word || '').toUpperCase().replace(/[^A-Z]/g, ''),
+                clue: String(w.clue || ''),
+            }))
+            .filter(w => w.word.length > 0);
+    }
 
     // Restore watermark (can be saved at top level or inside settings)
     const wSrc = s.watermarkSrc || s.settings?.watermarkSrc;
