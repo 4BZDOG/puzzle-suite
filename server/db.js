@@ -119,7 +119,7 @@ function getLicensesByEmail(email) {
 }
 
 /**
- * Validate a license key for use in the app.
+ * Validate a license key for use in the app (read-only).
  * Returns { valid, license } or { valid: false, reason }.
  */
 function validateKey(key) {
@@ -129,12 +129,18 @@ function validateKey(key) {
   if (lic.expires_at && new Date(lic.expires_at) < new Date()) {
     return { valid: false, reason: 'Key has expired' };
   }
-  // Mark activated_at on first use
-  if (!lic.activated_at) {
+  return { valid: true, license: lic };
+}
+
+/**
+ * Mark a license as activated (first use). Idempotent.
+ */
+function markActivated(key) {
+  const lic = getLicense(key);
+  if (lic && !lic.activated_at) {
     db.prepare("UPDATE licenses SET activated_at = datetime('now') WHERE key = ?").run(key);
     logEvent(key, 'activated');
   }
-  return { valid: true, license: lic };
 }
 
 /**
@@ -227,6 +233,7 @@ module.exports = {
   getLicense,
   getLicensesByEmail,
   validateKey,
+  markActivated,
   deactivateKey,
   reactivateKey,
   updateLicensePlan,

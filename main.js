@@ -6,7 +6,7 @@ import { state, setWords, setPuzzleData, updateSetting, applyStateToDOM, syncSet
 import { pushHistory, undo, redo } from './core/history.js';
 import { saveState, saveStateNow, loadRawState, hardReset } from './core/storage.js';
 
-import { generateAllAsync } from './workers/workerBridge.js';
+import { createPuzzleData } from './core/puzzleDataBuilder.js';
 
 import { renderWordList, renderStatus, renderStatusGenerating } from './renderers/wordList.js';
 import { renderWordSearch, calcWSScale } from './renderers/wordSearch.js';
@@ -47,33 +47,7 @@ const debounceFn = (func, wait) => {
     return (...args) => { clearTimeout(t); t = setTimeout(() => func(...args), wait); };
 };
 
-// =============================================================
-// Puzzle data helpers
-// =============================================================
-const getLetter = (i) => {
-    let res = '', num = i;
-    while (num >= 0) { res = String.fromCharCode(65 + (num % 26)) + res; num = Math.floor(num / 26) - 1; }
-    return res;
-};
-
-async function createPuzzleData() {
-    const pData = await generateAllAsync(state.settings);
-    if (!pData) return null;
-    const isMatching = state.settings.notesConfig.shuffle;
-    let notesData = state.words.map((w, i) => ({ term: w.word, clue: w.clue, origIdx: i }));
-    if (isMatching) {
-        let clues = [...notesData].sort(() => Math.random() - 0.5);
-        notesData = notesData.map((item, i) => ({
-            term: item.term, clue: clues[i].clue,
-            matchLetter: getLetter(i),
-            correctLetter: getLetter(clues.findIndex(c => c.origIdx === item.origIdx)),
-            origIdx: item.origIdx, clueOrigIdx: clues[i].origIdx,
-            clueTermLength: clues[i].term.length,
-        }));
-    }
-    pData.notes = notesData;
-    return pData;
-}
+// createPuzzleData is imported from core/puzzleDataBuilder.js
 
 // =============================================================
 // Generation
@@ -237,7 +211,8 @@ function updatePageScales() {
         const el = document.getElementById('scale' + p + 'Font');
         if (el) {
             const val = parseFloat(el.value).toFixed(2);
-            document.getElementById('scale' + p + 'FontVal').innerText = val + 'x';
+            const valEl = document.getElementById('scale' + p + 'FontVal');
+            if (valEl) valEl.innerText = val + 'x';
             document.documentElement.style.setProperty('--scale-' + p.toLowerCase(), val);
         }
     });

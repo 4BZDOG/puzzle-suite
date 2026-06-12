@@ -14,6 +14,7 @@
  */
 
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const db = require('../db');
 const { sendLicenseEmail, sendKeyReminder } = require('../email');
@@ -26,7 +27,8 @@ function requireAdmin(req, res, next) {
   }
   const auth = req.headers.authorization || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  if (token !== secret) {
+  if (!token || token.length !== secret.length ||
+      !crypto.timingSafeEqual(Buffer.from(token), Buffer.from(secret))) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   next();

@@ -138,8 +138,11 @@ Sequencing: each call increments `_msgId`; only the latest message id is retaine
 
 The crossword attempts up to 5 different seed words and picks the layout with the best score (fewest unplaced × 10000 + area + aspect). 1500 ms hard timeout per attempt.
 
+### Puzzle Data Builder (`core/puzzleDataBuilder.js`)
+Shared module exporting `getLetter(i)` and `createPuzzleData()`. Used by both `main.js` (live preview) and `pdf/pdfExport.js` (PDF generation). Avoids code duplication.
+
 ### Undo/Redo (`core/history.js`)
-`pushHistory()` must be called BEFORE mutating `state.words`. Max 50 entries. Word reorder, add, and delete operations push history; clue/term inline edits do not.
+`pushHistory()` must be called BEFORE mutating `state.words`. Max 50 entries. Word reorder, add, and delete operations push history; clue/term inline edits do not. Undo saves the current post-mutation state for redo before restoring. A `_mutatedSinceSnap` flag prevents duplicate history entries when undoing from a mid-history position.
 
 ### AI Word Generation (`ai/aiGenerate.js`)
 BYOK (bring your own key). API keys stored in `puzzleSuiteAIKeys` localStorage key, separate from main state. Supported providers: Google Gemini, Groq, OpenAI, Anthropic Claude, OpenRouter. All requests go browser → provider directly (no server).
@@ -167,6 +170,7 @@ The payment server is a separate Node.js + Express process. It is **optional** �
 | `server/routes/license.js` | `GET /api/license/validate` |
 | `server/routes/admin.js` | `GET/POST/PUT/DELETE /api/admin/*` |
 | `server/admin.html` | Self-contained admin dashboard SPA |
+| `server/rateLimit.js` | In-memory sliding-window rate limiter (no deps) |
 
 ### Database schema (`server/db.js`)
 Two tables:
@@ -179,7 +183,10 @@ Key format uses a 32-character unambiguous alphabet (no 0, O, I, 1) grouped as `
 `POST /api/webhook` is registered **before** `express.json()` middleware. Stripe uses the raw body to verify the `stripe-signature` header. Do not apply `json()` to this route. The route file uses `express.raw({ type: 'application/json' })` directly.
 
 ### Admin API authentication
-All `/api/admin/*` routes require `Authorization: Bearer <ADMIN_SECRET>`. The secret is set in `.env`. Admin dashboard at `/admin` uses localStorage to persist the token in the browser session.
+All `/api/admin/*` routes require `Authorization: Bearer <ADMIN_SECRET>`. The secret is set in `.env`. Admin dashboard at `/admin` uses localStorage to persist the token in the browser session. The secret comparison uses `crypto.timingSafeEqual` to prevent timing side-channel attacks.
+
+### Rate limiting
+`/api/checkout` and `/api/license` have in-memory rate limits (30 and 10 req/min per IP respectively). The limiter is in `server/rateLimit.js` — a sliding-window counter with no external dependencies. Admin routes are not rate-limited (already behind ADMIN_SECRET).
 
 ### Tier limits
 Defined in two places (must be kept in sync):
@@ -217,12 +224,16 @@ Price IDs are read from env vars at module load (`PLAN_PRICE_IDS` is a plain con
 - **Matching `isMatching` detection**: ALWAYS check `'matchLetter' in data[0]`, never `settings.notesConfig.shuffle` alone in a renderer. Settings-driven detection causes "undefined." rendering and wrong layout class when puzzle hasn't been generated yet.
 - **`clueTermLength` in matching mode**: when writing any code that displays `(N)` after a definition in matching context, use `w.clueTermLength` not `w.term.length`. They diverge because definitions are shuffled across rows.
 - **Editing clues in matching mode**: `updateWord` patches `puzzleData.notes` in-place via `clueOrigIdx`. If you add new code paths that mutate clues, follow this same pattern or call `debouncedGenerate()`.
+- **XSS in renderers**: ALL six renderer files (notes, crossword, wordSearch, scramble, keys, wordList) use `escapeHTML()` on user-controlled strings before innerHTML injection. When adding new renderers or modifying existing ones, always escape term/clue/word data. Input sanitization (A-Z only) is defense layer 1; output escaping is defense layer 2.
+- **Word charset is A-Z only**: `updateWord` strips non-A-Z, `processImport` strips non-A-Z, `applyStateToDOM` sanitizes JSON imports to A-Z. All three paths must stay consistent.
+- **JSON import sanitization**: `applyStateToDOM` validates and sanitizes `s.words` — filters non-objects, strips non-A-Z from terms, coerces types. This prevents stored XSS via crafted config files.
 
 ### License / payment
 - **Double-calling badge/bulk updates**: `licenseManager._notify()` fires `onChange` callbacks. Don't also manually call `_updateProBadge`/`_updateBulkLimit` in the same flow — that causes two redundant DOM updates. Let `onChange` handle them; only call `_refreshLicenseModal()` manually when you need the modal content refreshed.
-- **XSS from server data**: all plan fields (label, price, priceNote, features, id) and user info (email) from server responses must be passed through `escapeHTML()` before injection into `innerHTML`. Use `textContent` for text-only nodes, or `_renderPlans()` which escapes everything.
+- **XSS from server data**: all plan fields (label, price, priceNote, features, id) and user info (email) from server responses must be passed through `escapeHTML()` before injection into `innerHTML`. Use `textContent` for text-only nodes, or `_renderPlans()` which escapes everything. The admin dashboard (`server/admin.html`) uses its own `esc()` function for the same purpose.
 - **`_cachedPlans` not invalidated**: plan data is cached for the session. If you change plan definitions on the server, users need a page reload to see them. This is acceptable for static plan configurations.
 - **Webhook raw body**: if you add new Express middleware before the webhook route, ensure it doesn't consume or transform the raw body.
+- **Webhook errors return 500**: handler errors in `routes/webhook.js` return HTTP 500 so Stripe retries. Never swallow errors with 200 — a customer who pays must always get their license key.
 
 ### Server
 - **`.env` must exist**: server fails to start usefully without env vars. Copy `.env.example` and fill in values. The server starts but logs warnings for missing vars.
@@ -308,3 +319,27 @@ Status dots reflect placement in the currently-visible puzzle page.
 
 ### Stale State on Toggle Changes
 `renderActivePage()` calls `syncSettingsFromDOM()` at start so toggles take effect instantly.
+
+---
+
+## Session Fixes (2026-06-11 — Technical Audit)
+
+### Security Fixes
+- **XSS hardening (all renderers)**: `escapeHTML()` applied to all user-controlled strings (term, clue, word, scrambled, original, matchLetter, correctLetter) across all 6 renderer files, admin dashboard, and plan display
+- **Input sanitization**: `applyStateToDOM` now validates/sanitizes words from JSON imports (A-Z only, type coercion, array/object validation)
+- **Import charset unified**: `importWords.js` changed from A-Z0-9 to A-Z only, matching `updateWord`
+- **Timing attack fix**: admin secret comparison uses `crypto.timingSafeEqual`
+- **Rate limiting**: in-memory sliding-window limiter on `/api/checkout` (30/min) and `/api/license` (10/min)
+- **SRI hash**: jsPDF CDN script loads with sha384 subresource integrity check
+- **Anthropic CORS header**: fixed from `anthropic-dangerous-allow-browser` to `anthropic-dangerous-direct-browser-access`
+
+### Reliability Fixes
+- **Webhook errors**: return 500 instead of swallowing with 200, enabling Stripe retries on transient failures
+- **validateKey side-effect**: split into read-only `validateKey()` + explicit `markActivated()` called by route handler
+- **Undo/redo**: fixed broken redo — undo now saves post-mutation state for recovery; dirty-tracking prevents duplicates
+
+### Code Quality
+- **Deduplicated `createPuzzleData`/`getLetter`**: extracted to `core/puzzleDataBuilder.js`, removing copies from `main.js` and `pdf/pdfExport.js`
+- **Deleted dead code**: `workers/generation.worker.js` (266 lines, never imported)
+- **Removed unused dep**: `uuid` from `server/package.json`
+- **Null guard**: `updatePageScales` no longer crashes on missing DOM elements

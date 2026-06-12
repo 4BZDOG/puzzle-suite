@@ -28,6 +28,8 @@ export async function loadJSPDF() {
     return new Promise((resolve, reject) => {
         const s = document.createElement('script');
         s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+        s.integrity = 'sha384-xscEkekms/SQq5SFOOIcbfflRgUup5sdW1duER21mIKxWcHi9Xyv37aIOSrCepJf';
+        s.crossOrigin = 'anonymous';
         s.onload  = () => resolve(window.jspdf);
         s.onerror = () => {
             reject(new Error('PDF engine failed to load'));

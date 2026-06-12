@@ -2,6 +2,10 @@
 // renderers/crossword.js — Page 3: Crossword preview
 // =============================================================
 
+const escapeHTML = str => str.replace(/[&<>'"]/g, tag => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
+}[tag]));
+
 const CELL_SIZE_MIN = 15, CELL_SIZE_MAX = 60;
 
 export function calcCWScale(cwData, isPrint = false) {
@@ -76,7 +80,7 @@ export function renderCrossword(gridArea, footerArea, cwData, settings, preview 
         const makeClueRows = (list) =>
             list.map(w => {
                 const isEx = settings.showExample && w.num === exampleNum && w.dir === 'across';
-                return `<div class="clue-row${isEx ? ' clue-example' : ''}"><span class="clue-num-bold">${isEx ? '★ ' : ''}${w.num}.</span><span>${w.clue} <span class="notes-clue-length">(${w.word.length})</span>${isEx ? ` <span class="scramble-example-label">example</span>` : ''}</span></div>`;
+                return `<div class="clue-row${isEx ? ' clue-example' : ''}"><span class="clue-num-bold">${isEx ? '★ ' : ''}${w.num}.</span><span>${escapeHTML(w.clue)} <span class="notes-clue-length">(${w.word.length})</span>${isEx ? ` <span class="scramble-example-label">example</span>` : ''}</span></div>`;
             }).join('');
 
         const separateClues = settings.cwSeparateClues;
@@ -97,7 +101,7 @@ export function renderCrossword(gridArea, footerArea, cwData, settings, preview 
             if (ml > 15) c = 2;
             html += `<div style="border-top:1px solid #cbd5e1; margin-top:20px; padding-top:20px;">
                 <div class="word-bank-styled" style="column-count:${c}; display:block; column-gap:20px;">
-                    ${bk.map(w => `<div class="wb-item" style="margin-bottom:6px"><span class="wb-check"></span> ${w}</div>`).join('')}
+                    ${bk.map(w => `<div class="wb-item" style="margin-bottom:6px"><span class="wb-check"></span> ${escapeHTML(w)}</div>`).join('')}
                 </div>
             </div>`;
         }

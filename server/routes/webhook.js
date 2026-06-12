@@ -61,8 +61,7 @@ router.post('/', express.raw({ type: 'application/json' }), async (req, res) => 
     }
   } catch (err) {
     console.error(`[webhook] Error handling ${event.type}:`, err);
-    // Return 200 anyway so Stripe doesn't keep retrying — log for manual review
-    return res.json({ received: true, warning: err.message });
+    return res.status(500).json({ error: err.message });
   }
 
   res.json({ received: true });

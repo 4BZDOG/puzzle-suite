@@ -2,6 +2,10 @@
 // renderers/wordSearch.js — Page 2: Word Search preview
 // =============================================================
 
+const escapeHTML = str => str.replace(/[&<>'"]/g, tag => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
+}[tag]));
+
 const CELL_SIZE_MIN = 15, CELL_SIZE_MAX = 60;
 
 export function calcWSScale(wsData, isPrint = false) {
@@ -57,10 +61,10 @@ export function renderWordSearch(gridArea, footerArea, wsData, words, settings, 
                 const match = words.find(x => x.word === wStr);
                 const clue = match?.clue?.trim();
                 return clue
-                    ? `${clue} <span class="notes-clue-length">(${wStr.length})</span>`
-                    : wStr;
+                    ? `${escapeHTML(clue)} <span class="notes-clue-length">(${wStr.length})</span>`
+                    : escapeHTML(wStr);
             }
-            return wStr;
+            return escapeHTML(wStr);
         });
 
         const gridPx = wsData.size * z;

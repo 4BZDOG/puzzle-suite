@@ -30,11 +30,11 @@ export function processImport(onComplete) {
         let w, clue;
 
         if (match && match[1]) {
-            w = match[1].trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+            w = match[1].trim().toUpperCase().replace(/[^A-Z]/g, '');
             clue = match[2].trim() || 'Find the word';
         } else {
             // Fallback for just a word on a line without separators
-            w = l.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+            w = l.trim().toUpperCase().replace(/[^A-Z]/g, '');
             clue = 'Find the word';
         }
 
