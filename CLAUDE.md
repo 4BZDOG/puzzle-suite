@@ -9,6 +9,22 @@ python3 -m http.server 8082    # serve at http://localhost:8082/puzzle-suite.htm
 ```
 After any JS change: rebuild, then bump `?v=N` in `<script src="bundle.js?v=N">` (puzzle-suite.html, last `<script>` tag) to bypass browser cache.
 
+### Lint & test
+```bash
+npm run lint                   # eslint (flat config); CI runs with --max-warnings 0
+npm test                       # node --test "test/**/*.test.mjs"
+```
+Run both before committing — CI gates on them (see below). `npm run lint:fix` auto-fixes.
+
+### CI / CD (`.github/workflows/deploy.yml`)
+A single pipeline gates the GitHub Pages deploy:
+- **pull_request** → `verify` only (lint → test → build → bundle-freshness check)
+- **push to main** / **workflow_dispatch** → `verify` → `build` → `deploy`
+
+`build`/`deploy` `needs: verify` and skip on PRs, so a failing lint/test/build never ships. The **bundle-freshness** step rebuilds and fails if the committed `bundle.js` differs from a fresh build — this catches the "edited JS but forgot to rebuild" pitfall. Pages deploys are serialized by a job-level `concurrency: pages` group.
+
+> The gate only *blocks merges* if the `Lint, test & build` check is marked **required** in the branch protection rules (repo Settings → Branches). Without that, CI reports but doesn't block.
+
 ### Payment server (optional — required for license features)
 ```bash
 cd server
@@ -139,7 +155,22 @@ Sequencing: each call increments `_msgId`; only the latest message id is retaine
 The crossword attempts up to 5 different seed words and picks the layout with the best score (fewest unplaced × 10000 + area + aspect). 1500 ms hard timeout per attempt.
 
 ### Puzzle Data Builder (`core/puzzleDataBuilder.js`)
-Shared module exporting `getLetter(i)` and `createPuzzleData()`. Used by both `main.js` (live preview) and `pdf/pdfExport.js` (PDF generation). Avoids code duplication.
+Shared module exporting `getLetter(i)` and `createPuzzleData()`. Used by both `main.js` (live preview) and `pdf/pdfExport.js` (PDF generation). Avoids code duplication. `getLetter` itself lives in `core/letters.js` (re-exported here) so the base-26 logic is testable.
+
+### Pure modules & testing
+The frontend is heavily DOM/`window`-coupled, so pure logic is **extracted into dependency-free modules** that both the app and Node tests can import. This is the pattern to follow when you write logic worth testing: lift it out of a DOM-bound file into its own module.
+
+| Module | Purpose | Test |
+|--------|---------|------|
+| `core/letters.js` | `getLetter()` bijective base-26 labels | `test/letters.test.mjs` |
+| `core/escapeHTML.js` | shared HTML escaping (XSS layer 2) — single source for all 6 renderers + `main.js`; coerces nullish to `''` | `test/escapeHTML.test.mjs` |
+| `import-export/parseWordList.js` | import parse + A-Z sanitization (XSS layer 1) | `test/parseWordList.test.mjs` |
+| `server/keygen.js` | license key gen + `isValidKeyFormat()` (pure; no SQLite) | `test/keygen.test.mjs` |
+| `server/rateLimit.js` | sliding-window limiter (cleanup timer is `unref()`'d) | `test/rateLimit.test.mjs` |
+
+Tests use the built-in `node:test` runner — **no test framework dependency**. Files are `.mjs` (the repo has no `"type":"module"`, so `.js` would be parsed as CommonJS). To test a CommonJS server module from an `.mjs` test, load it via `createRequire(import.meta.url)`.
+
+**`escapeHTML` is now imported, never inlined** — do not re-add a local `const escapeHTML` to a renderer; import from `core/escapeHTML.js`.
 
 ### Undo/Redo (`core/history.js`)
 `pushHistory()` must be called BEFORE mutating `state.words`. Max 50 entries. Word reorder, add, and delete operations push history; clue/term inline edits do not. Undo saves the current post-mutation state for redo before restoring. A `_mutatedSinceSnap` flag prevents duplicate history entries when undoing from a mid-history position.
@@ -343,3 +374,26 @@ Status dots reflect placement in the currently-visible puzzle page.
 - **Deleted dead code**: `workers/generation.worker.js` (266 lines, never imported)
 - **Removed unused dep**: `uuid` from `server/package.json`
 - **Null guard**: `updatePageScales` no longer crashes on missing DOM elements
+
+---
+
+## Session Fixes (2026-06-13 — CI, Tests & Critical Hotfix)
+
+### Critical Hotfix
+- **PDF export broken in production**: the jsPDF CDN SRI hash was computed in a container and didn't match the CDN-served file, so the browser blocked the script (`PDF engine failed to load`). Corrected the `sha384` integrity value in `pdf/pdfFonts.js`.
+
+### CI / CD Pipeline
+- **Validation gate before deploy**: consolidated into one `deploy.yml` — PRs run `verify` (lint → test → build → bundle-freshness); pushes to main run `verify` → `build` → `deploy`. A failing check can no longer ship to Pages.
+- **ESLint**: flat config (`eslint.config.js`) scoped per environment (browser ESM / Node CJS server / tooling); codebase is clean at `--max-warnings 0`.
+- **Bundle-freshness check**: CI fails if committed `bundle.js` ≠ fresh build.
+
+### Test Suite (foundation)
+- **`node:test`, zero framework deps** — 28 tests across 5 `.mjs` files covering security-critical pure logic: `getLetter`, `escapeHTML`, import parsing/sanitization, license keygen + format validation, and the rate limiter.
+- See **Pure modules & testing** above for the extraction pattern.
+
+### Refactors enabling tests (behavior-neutral except where noted)
+- **`escapeHTML` deduped**: 7 byte-identical inline copies → `core/escapeHTML.js` (hardened to coerce nullish → `''`).
+- **`getLetter`** → `core/letters.js`; **import parser** → `import-export/parseWordList.js`; **keygen** → `server/keygen.js` (out of `db.js`, which opens SQLite at import).
+- **Fixed latent import bug**: a line with leading whitespace defeated the separator regex and produced a mangled concatenated word (`"  DOG - loyal"` → `"DOGLOYAL"`). Lines are now trimmed before matching.
+- **Keygen hardening**: `isValidKeyFormat()` rejects malformed keys at `GET /api/license/validate` before any DB lookup.
+- **`rateLimit.js`**: cleanup `setInterval` is `unref()`'d so it no longer keeps the process/test runner alive.
