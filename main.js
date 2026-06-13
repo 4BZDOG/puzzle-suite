@@ -30,16 +30,13 @@ import { processImport, handleDroppedFile } from './import-export/importWords.js
 import { downloadConfig } from './import-export/exportConfig.js';
 
 import { licenseManager, TIERS } from './license/licenseManager.js';
+import { escapeHTML } from './core/escapeHTML.js';
 
 // =============================================================
 // Constants
 // =============================================================
 const CELL_SIZE_MIN = 15, CELL_SIZE_MAX = 60;
 const WATERMARK_MAX_BYTES = 2e6;
-
-const escapeHTML = str => str.replace(/[&<>'"]/g, tag => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
-}[tag]));
 
 // Debounce helper
 const debounceFn = (func, wait) => {

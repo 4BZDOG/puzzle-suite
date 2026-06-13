@@ -2,9 +2,7 @@
 // renderers/keys.js — Page 5: Answer keys preview
 // =============================================================
 
-const escapeHTML = str => str.replace(/[&<>'"]/g, tag => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
-}[tag]));
+import { escapeHTML } from '../core/escapeHTML.js';
 
 /**
  * @param {HTMLElement} container

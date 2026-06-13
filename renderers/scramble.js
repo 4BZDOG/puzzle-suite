@@ -2,9 +2,7 @@
 // renderers/scramble.js — Page 4: Word Scramble preview
 // =============================================================
 
-const escapeHTML = str => str.replace(/[&<>'"]/g, tag => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
-}[tag]));
+import { escapeHTML } from '../core/escapeHTML.js';
 
 /**
  * @param {HTMLElement} container

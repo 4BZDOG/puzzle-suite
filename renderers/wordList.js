@@ -2,9 +2,7 @@
 // renderers/wordList.js — Sidebar word list & status badge
 // =============================================================
 
-const escapeHTML = str => str.replace(/[&<>'"]/g, tag => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
-}[tag]));
+import { escapeHTML } from '../core/escapeHTML.js';
 
 /**
  * Render the interactive word-list rows in the sidebar.

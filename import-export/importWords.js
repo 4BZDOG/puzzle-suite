@@ -6,6 +6,7 @@ import { state, setWords } from '../core/state.js';
 import { pushHistory } from '../core/history.js';
 import { showToast } from '../ui/toast.js';
 import { closeModal } from '../ui/modal.js';
+import { parseWordList } from './parseWordList.js';
 
 /**
  * Parse and import words from the import textarea.
@@ -19,30 +20,8 @@ export function processImport(onComplete) {
 
     pushHistory();
     const newWords = [...state.words];
-    const existingWordSet = new Set(newWords.map(w => w.word));
-
-    text.split('\n').forEach(l => {
-        if (!l.trim()) return;
-
-        // Match a word followed by a separator (-, :, ,, or multiple spaces/tabs) and then a clue
-        const match = l.match(/^([^-:,\t\s]+)[-:,\t\s]+(.*)$/);
-
-        let w, clue;
-
-        if (match && match[1]) {
-            w = match[1].trim().toUpperCase().replace(/[^A-Z]/g, '');
-            clue = match[2].trim() || 'Find the word';
-        } else {
-            // Fallback for just a word on a line without separators
-            w = l.trim().toUpperCase().replace(/[^A-Z]/g, '');
-            clue = 'Find the word';
-        }
-
-        if (w && w.length > 1 && !existingWordSet.has(w)) {
-            newWords.push({ word: w, clue: clue });
-            existingWordSet.add(w);
-        }
-    });
+    const added = parseWordList(text, newWords.map(w => w.word));
+    newWords.push(...added);
 
     setWords(newWords);
     closeModal();

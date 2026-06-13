@@ -2,9 +2,7 @@
 // renderers/crossword.js — Page 3: Crossword preview
 // =============================================================
 
-const escapeHTML = str => str.replace(/[&<>'"]/g, tag => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
-}[tag]));
+import { escapeHTML } from '../core/escapeHTML.js';
 
 const CELL_SIZE_MIN = 15, CELL_SIZE_MAX = 60;
 

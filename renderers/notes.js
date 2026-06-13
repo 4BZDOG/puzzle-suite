@@ -2,9 +2,7 @@
 // renderers/notes.js — Page 1: Notes/vocabulary page preview
 // =============================================================
 
-const escapeHTML = str => str.replace(/[&<>'"]/g, tag => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
-}[tag]));
+import { escapeHTML } from '../core/escapeHTML.js';
 
 /**
  * @param {HTMLElement} container
