@@ -132,6 +132,9 @@
       <a class="active" onclick="showPage('dashboard')" data-page="dashboard">
         <span class="icon">📊</span> Dashboard
       </a>
+      <a onclick="showPage('usage')" data-page="usage">
+        <span class="icon">📄</span> PDF Usage
+      </a>
       <a onclick="showPage('licenses')" data-page="licenses">
         <span class="icon">🔑</span> Licenses
       </a>
@@ -154,6 +157,36 @@
         <div class="card">
           <h3>Licenses by Plan</h3>
           <div id="plan-breakdown">Loading…</div>
+        </div>
+      </div>
+
+      <!-- PDF Usage page -->
+      <div class="page" id="page-usage">
+        <h2>PDF Usage <span id="usage-month-label" style="color:var(--muted);font-weight:400;font-size:15px"></span></h2>
+        <div class="stats-grid" id="usage-stats-grid">
+          <div class="stat-card"><div class="val" id="usage-pages">—</div><div class="lbl">Pages This Month</div></div>
+          <div class="stat-card"><div class="val" id="usage-exports">—</div><div class="lbl">Exports This Month</div></div>
+          <div class="stat-card"><div class="val" id="usage-users">—</div><div class="lbl">Active Users</div></div>
+          <div class="stat-card"><div class="val" id="usage-alltime">—</div><div class="lbl">All-Time Pages</div></div>
+        </div>
+        <div class="card">
+          <h3>Pages per Day (last 30 days)</h3>
+          <div id="usage-chart" style="display:flex;align-items:flex-end;gap:3px;height:140px;padding:8px 0">
+            <span style="color:var(--muted)">Loading…</span>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Usage by Tier (this month)</h3>
+          <div id="usage-by-tier">Loading…</div>
+        </div>
+        <div class="card" style="padding:0">
+          <div style="padding:16px 16px 0"><h3 style="margin:0">Top Consumers (this month)</h3></div>
+          <table>
+            <thead><tr><th>Identity</th><th>Email</th><th>Tier</th><th>Pages</th><th>Exports</th></tr></thead>
+            <tbody id="usage-top-tbody">
+              <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px">Loading…</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -291,6 +324,7 @@ function showPage(id) {
   });
   document.getElementById(`page-${id}`).classList.add('active');
   if (id === 'dashboard') loadStats();
+  if (id === 'usage') loadUsage();
   if (id === 'licenses') loadLicenses();
 }
 
@@ -340,6 +374,57 @@ async function loadStats() {
   breakdown.innerHTML = `<table style="width:auto"><thead><tr><th>Plan</th><th>Count</th></tr></thead><tbody>
     ${data.byPlan.map(r => `<tr><td>${esc(r.plan)}</td><td style="font-weight:700;color:var(--accent)">${esc(r.count)}</td></tr>`).join('')}
   </tbody></table>`;
+}
+
+// ─── PDF Usage ────────────────────────────────────────────────────────────────
+function fmtNum(n) { return (n == null ? 0 : n).toLocaleString(); }
+
+async function loadUsage() {
+  const data = await api('/api/admin/usage').catch(e => { toast(e.message); return null; });
+  if (!data) return;
+
+  document.getElementById('usage-month-label').textContent = '· ' + data.month;
+  document.getElementById('usage-pages').textContent = fmtNum(data.monthPages);
+  document.getElementById('usage-exports').textContent = fmtNum(data.monthExports);
+  document.getElementById('usage-users').textContent = fmtNum(data.activeIdentities);
+  document.getElementById('usage-alltime').textContent = fmtNum(data.allTimePages);
+
+  // Daily bar chart
+  const chart = document.getElementById('usage-chart');
+  if (!data.daily.length) {
+    chart.innerHTML = '<span style="color:var(--muted)">No exports recorded yet.</span>';
+  } else {
+    const max = Math.max(...data.daily.map(d => d.pages), 1);
+    chart.innerHTML = data.daily.map(d => {
+      const h = Math.max(2, Math.round((d.pages / max) * 120));
+      return `<div title="${esc(d.day)}: ${fmtNum(d.pages)} pages" style="flex:1;min-width:6px;height:${h}px;background:var(--accent);border-radius:3px 3px 0 0;opacity:.85"></div>`;
+    }).join('');
+  }
+
+  // By tier
+  const byTier = document.getElementById('usage-by-tier');
+  if (!data.byTier.length) {
+    byTier.innerHTML = '<p style="color:var(--muted)">No usage this month.</p>';
+  } else {
+    byTier.innerHTML = `<table style="width:auto"><thead><tr><th>Tier</th><th>Pages</th><th>Exports</th><th>Users</th></tr></thead><tbody>
+      ${data.byTier.map(r => `<tr><td>${esc(r.tier)}</td><td style="font-weight:700;color:var(--accent)">${fmtNum(r.pages)}</td><td>${fmtNum(r.exports)}</td><td>${fmtNum(r.users)}</td></tr>`).join('')}
+    </tbody></table>`;
+  }
+
+  // Top consumers
+  const tbody = document.getElementById('usage-top-tbody');
+  if (!data.topConsumers.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:24px">No usage this month.</td></tr>';
+  } else {
+    tbody.innerHTML = data.topConsumers.map(c => `
+      <tr>
+        <td style="font-family:monospace;font-size:12px">${esc(c.license_key || c.identity)}</td>
+        <td>${esc(c.email || '—')}</td>
+        <td>${esc(c.tier)}</td>
+        <td style="font-weight:700">${fmtNum(c.pages)}</td>
+        <td>${fmtNum(c.exports)}</td>
+      </tr>`).join('');
+  }
 }
 
 // ─── Licenses ─────────────────────────────────────────────────────────────────
@@ -420,7 +505,7 @@ async function resendEmail(key) {
 async function viewDetail(key) {
   const data = await api(`/api/admin/licenses/${key}`).catch(e => { toast(e.message); return null; });
   if (!data) return;
-  const { license: l, events } = data;
+  const { license: l, events, usage } = data;
 
   document.getElementById('detail-body').innerHTML = `
     <div class="detail-row"><span class="lbl">Key</span><span class="key-mono">${esc(l.key)}</span></div>
@@ -437,6 +522,10 @@ async function viewDetail(key) {
     <div class="detail-row"><span class="lbl">Stripe Session</span><span style="font-size:11px;word-break:break-all">${esc(l.stripe_session_id) || '—'}</span></div>
     <div class="detail-row"><span class="lbl">Stripe Customer</span><span style="font-size:11px;word-break:break-all">${esc(l.stripe_customer_id) || '—'}</span></div>
     <div class="detail-row"><span class="lbl">Stripe Subscription</span><span style="font-size:11px;word-break:break-all">${esc(l.stripe_subscription_id) || '—'}</span></div>
+
+    <h4 style="margin:20px 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">PDF Usage</h4>
+    <div class="detail-row"><span class="lbl">Pages (${esc(usage ? usage.month : '')})</span><span style="font-weight:700;color:var(--accent)">${fmtNum(usage ? usage.monthPages : 0)} <span style="color:var(--muted);font-weight:400">(${fmtNum(usage ? usage.monthExports : 0)} exports)</span></span></div>
+    <div class="detail-row"><span class="lbl">Pages (all time)</span><span>${fmtNum(usage ? usage.allTimePages : 0)} <span style="color:var(--muted)">(${fmtNum(usage ? usage.allTimeExports : 0)} exports)</span></span></div>
 
     <h4 style="margin:20px 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)">Plan</h4>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">

@@ -93,7 +93,8 @@ router.get('/licenses/:key', (req, res) => {
   const lic = db.getLicense(req.params.key);
   if (!lic) return res.status(404).json({ error: 'License not found' });
   const events = db.getEvents(req.params.key);
-  res.json({ license: lic, events });
+  const usage = db.getLicenseUsage(req.params.key);
+  res.json({ license: lic, events, usage });
 });
 
 /**
@@ -178,6 +179,18 @@ router.get('/stats', (req, res) => {
     "SELECT COUNT(*) as count FROM licenses WHERE created_at >= date('now', 'start of month')"
   ).get();
   res.json({ total, active, byPlan, newToday: today.count, newThisMonth: thisMonth.count });
+});
+
+/**
+ * GET /api/admin/usage?month=YYYY-MM
+ * PDF page metering dashboard data: month totals, per-tier breakdown,
+ * 30-day daily series, and top consumers.
+ */
+router.get('/usage', (req, res) => {
+  const month = /^\d{4}-\d{2}$/.test(req.query.month || '') ? req.query.month : undefined;
+  const summary = db.getUsageSummary(month);
+  const topConsumers = db.getTopConsumers(summary.month, 20);
+  res.json({ ...summary, topConsumers });
 });
 
 module.exports = router;

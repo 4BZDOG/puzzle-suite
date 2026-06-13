@@ -8,6 +8,13 @@
 
 const express = require('express');
 const router = express.Router();
+const { getTier } = require('../tiers');
+
+// PDF page quota strings for plan marketing, sourced from tiers.js
+const pagesNote = (plan) => {
+  const n = getTier(plan).limits.pdfPagesPerMonth;
+  return n == null ? 'Unlimited PDF pages/month' : `${n.toLocaleString()} PDF pages/month`;
+};
 
 // Stripe is initialized in index.js and attached to req.stripe via middleware
 // Read once at module load — env vars are immutable at runtime
@@ -99,7 +106,7 @@ router.get('/plans', (_req, res) => {
         label: 'Pro Monthly',
         price: '$5/month',
         description: 'All Pro features, billed monthly',
-        features: ['50 words per set', '25 bulk export sets', 'Priority support'],
+        features: ['50 words per set', '25 bulk export sets', pagesNote('pro'), 'Premium fonts & layouts', 'Priority support'],
         popular: false,
       },
       {
@@ -108,7 +115,7 @@ router.get('/plans', (_req, res) => {
         price: '$45/year',
         priceNote: '($3.75/month, save 25%)',
         description: 'All Pro features, billed annually',
-        features: ['50 words per set', '25 bulk export sets', 'Priority support', '2 months free vs monthly'],
+        features: ['50 words per set', '25 bulk export sets', pagesNote('pro'), 'Premium fonts & layouts', '2 months free vs monthly'],
         popular: true,
       },
       {
@@ -116,7 +123,7 @@ router.get('/plans', (_req, res) => {
         label: 'School',
         price: '$49/month',
         description: 'Unlimited teachers, pooled AI credits, admin dashboard',
-        features: ['Everything in Pro', '2,500 AI credits/month', 'Admin dashboard', 'Custom branding', 'LMS export helpers'],
+        features: ['Everything in Pro', pagesNote('school'), '2,500 AI credits/month', 'Admin dashboard', 'Custom branding'],
         popular: false,
       },
       {
@@ -124,7 +131,7 @@ router.get('/plans', (_req, res) => {
         label: 'Lifetime Pro',
         price: '$99 once',
         description: 'Pay once, own it forever',
-        features: ['All Pro features forever', 'Free future updates', 'No recurring charges'],
+        features: ['All Pro features forever', pagesNote('lifetime'), 'Free future updates', 'No recurring charges'],
         popular: false,
       },
     ],

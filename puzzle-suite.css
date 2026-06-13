@@ -2412,6 +2412,32 @@ table.mode-cw td.cell.empty {
     color: #92400e;
 }
 
+/* PDF page usage meter */
+.lic-usage {
+    margin: 0 24px 14px;
+    padding: 10px 14px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+}
+.lic-usage-label { font-size: 0.8rem; color: #475569; margin-bottom: 6px; }
+.lic-usage-bar {
+    height: 7px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+.lic-usage-fill {
+    height: 100%;
+    background: #4338ca;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+.lic-usage-fill--warn { background: #ea580c; }
+[data-theme="dark"] .lic-usage { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .lic-usage-label { color: #cbd5e1; }
+[data-theme="dark"] .lic-usage-bar { background: #334155; }
+
 /* Plan cards grid */
 .lic-plans {
     display: grid;

@@ -165,17 +165,27 @@ The payment server is a separate Node.js + Express process. It is **optional** �
 | `server/index.js` | Express app; registers routes; CORS; Stripe init |
 | `server/db.js` | SQLite via better-sqlite3; all DB helpers |
 | `server/email.js` | Nodemailer; `sendLicenseEmail`, `sendKeyReminder` |
+| `server/tiers.js` | **Single source of truth** for tier limits, feature flags, PDF page quotas |
 | `server/routes/checkout.js` | `POST /api/checkout/session`, `GET /api/checkout/plans` |
 | `server/routes/webhook.js` | `POST /api/webhook` — Stripe events |
-| `server/routes/license.js` | `GET /api/license/validate` |
-| `server/routes/admin.js` | `GET/POST/PUT/DELETE /api/admin/*` |
-| `server/admin.html` | Self-contained admin dashboard SPA |
+| `server/routes/license.js` | `GET /api/license/validate` (returns limits + features + usage) |
+| `server/routes/usage.js` | `GET /api/usage`, `POST /api/usage/pdf` — PDF page metering |
+| `server/routes/admin.js` | `GET/POST/PUT/DELETE /api/admin/*` (incl. `GET /api/admin/usage`) |
+| `server/admin.html` | Self-contained admin dashboard SPA (Dashboard / PDF Usage / Licenses / Create) |
 | `server/rateLimit.js` | In-memory sliding-window rate limiter (no deps) |
 
 ### Database schema (`server/db.js`)
-Two tables:
+Three tables:
 - **`licenses`**: `key` (PK, e.g. `PSP-XXXXX-XXXXX-XXXXX-XXXXX`), `email`, `plan` (pro/school/lifetime), `billing_interval` (monthly/annual/null), Stripe IDs, `active` (0/1), timestamps
 - **`events`**: audit log of key lifecycle (created/activated/deactivated/reactivated/expired/plan_changed)
+- **`usage_events`**: one row per PDF export — `identity` (license key or `anon:<clientId>`), `license_key`, `tier`, `pages`, `sets`, `page_types`, `month` (`YYYY-MM` for fast rollups). This is the metering basis for monetising PDF generation by page.
+
+### PDF page metering (monetisation)
+- Every PDF export reports its **total page count** (sets × pages-per-set) to `POST /api/usage/pdf`. A crossword with "clues on separate page" counts as 2 pages.
+- Free/anonymous users are tracked by an opaque `clientId` (localStorage `puzzleSuiteClientId`); licensed users by their key.
+- Monthly quota per tier is `limits.pdfPagesPerMonth` in `tiers.js` (`null` = unlimited). The frontend pre-checks via `licenseManager.canExport(pages)` and blocks/​warns when over quota; **non-blocking if the server is unreachable** (consistent with license validation).
+- The server records actuals even when over quota (for analytics/overage); enforcement is the frontend's pre-export check.
+- Admin dashboard "PDF Usage" tab reads `GET /api/admin/usage` (month totals, per-tier breakdown, 30-day daily chart, top consumers). Per-license usage shows in the license detail modal.
 
 Key format uses a 32-character unambiguous alphabet (no 0, O, I, 1) grouped as `PSP-XXXXX-XXXXX-XXXXX-XXXXX`.
 
@@ -186,19 +196,19 @@ Key format uses a 32-character unambiguous alphabet (no 0, O, I, 1) grouped as `
 All `/api/admin/*` routes require `Authorization: Bearer <ADMIN_SECRET>`. The secret is set in `.env`. Admin dashboard at `/admin` uses localStorage to persist the token in the browser session. The secret comparison uses `crypto.timingSafeEqual` to prevent timing side-channel attacks.
 
 ### Rate limiting
-`/api/checkout` and `/api/license` have in-memory rate limits (30 and 10 req/min per IP respectively). The limiter is in `server/rateLimit.js` — a sliding-window counter with no external dependencies. Admin routes are not rate-limited (already behind ADMIN_SECRET).
+`/api/checkout`, `/api/license`, and `/api/usage` have in-memory rate limits (30, 10, and 60 req/min per IP respectively). The limiter is in `server/rateLimit.js` — a sliding-window counter with no external dependencies. Admin routes are not rate-limited (already behind ADMIN_SECRET).
 
-### Tier limits
-Defined in two places (must be kept in sync):
-- **Frontend**: `TIERS` object in `license/licenseManager.js`
-- **Server**: `TIER_LIMITS` in `server/routes/license.js` (returned to frontend on validation) and `PLAN_LIMITS` in `server/email.js` (used in license delivery email)
+### Tier limits & features (TUNABLE)
+**`server/tiers.js` is now the single source of truth** for limits, feature flags, and PDF page quotas. `routes/license.js`, `routes/usage.js`, `email.js`, and `routes/checkout.js` all import it — change a number there and it propagates everywhere server-side. The **frontend mirrors** these in the `TIERS` object in `license/licenseManager.js` as an offline fallback; the **server response always wins** when reachable (`licenseManager.getLimit()` / `hasFeature()` prefer `info.limits` / `info.features`), so you can re-price or re-gate without shipping new frontend code.
 
-| Tier | Words | Bulk Sets |
-|------|-------|-----------|
-| free | 30 | 3 |
-| pro | 50 | 25 |
-| school | 50 | 25 |
-| lifetime | 50 | 25 |
+| Tier | Words | Bulk Sets | PDF Pages/mo | separateCluePages | premiumFonts |
+|------|-------|-----------|--------------|-------------------|--------------|
+| free | 30 | 3 | 30 | ✗ | ✗ |
+| pro | 50 | 25 | 1,000 | ✓ | ✓ |
+| school | 50 | 25 | 10,000 | ✓ | ✓ |
+| lifetime | 50 | 25 | 2,000 | ✓ | ✓ |
+
+Feature gating is enforced at the PDF export boundary (`pdf/pdfExport.js`): locked features in use → upgrade prompt + abort. Add new gates by adding a flag to `tiers.js` features + the frontend mirror, then calling `licenseManager.hasFeature('name')`.
 
 ### Stripe plans
 | Plan key | Mode | DB plan | Interval |
@@ -253,10 +263,11 @@ Price IDs are read from env vars at module load (`PLAN_PRICE_IDS` is a plain con
 7. If affects PDF, pass via `cfg` (which is `state.settings`) or add to `buildCtx()` return
 
 ## Adding a New License-Gated Feature
-1. Define the limit in all three places: `TIERS` (licenseManager.js), `TIER_LIMITS` (routes/license.js), `PLAN_LIMITS` (email.js)
-2. Call `licenseManager.getLimit('yourLimit')` at the enforcement point
+1. Define the limit/flag in **`server/tiers.js`** (the source of truth) and mirror it in the `TIERS` object in `license/licenseManager.js` (offline fallback). `email.js`, `routes/license.js`, `routes/usage.js`, `routes/checkout.js` already read `tiers.js` automatically.
+2. For a numeric cap: call `licenseManager.getLimit('yourLimit')`. For a boolean feature: call `licenseManager.hasFeature('yourFeature')`. Both prefer the server-supplied value (`info.limits` / `info.features`) and fall back to the local mirror.
 3. Call `showUpgradePrompt(message)` for free-tier users hitting the wall; `showToast(message, 'warning')` for pro users at their (higher) cap
 4. If it affects a DOM control (like `bulkCount`), update `_updateBulkLimit()` or write an equivalent function and register it in the `onChange` callback
+5. To meter usage of a metered resource, record it via the usage endpoint pattern (`POST /api/usage/*`) keyed by `licenseManager.getClientId()` / stored key.
 
 ---
 

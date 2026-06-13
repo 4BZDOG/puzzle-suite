@@ -4,6 +4,7 @@
 // =============================================================
 import { state, syncSettingsFromDOM } from '../core/state.js';
 import { showToast } from '../ui/toast.js';
+import { licenseManager } from '../license/licenseManager.js';
 import { createPuzzleData } from '../core/puzzleDataBuilder.js';
 import { loadJSPDF, loadFontForPDF, FONT_SELECT_MAP } from './pdfFonts.js';
 import { buildCtx, drawHeader } from './pdfHelpers.js';
@@ -13,6 +14,21 @@ import { drawScramble } from './pdfDrawScramble.js';
 import { drawNotes, drawMasterKeyPage } from './pdfDrawNotes.js';
 
 let isExporting = false;
+
+// Premium font select values (gated behind the premiumFonts feature flag)
+const PREMIUM_FONT_VALUES = ["'Lora', serif", "'Comic Neue', cursive"];
+
+/**
+ * Pages produced per set, given the selected page types and config.
+ * A crossword with "clues on separate page" produces 2 pages; everything
+ * else is 1 page each. This is the unit we meter for PDF monetisation.
+ */
+function pagesPerSet(selectedPages, cfg) {
+  return selectedPages.reduce((n, p) => {
+    if (p === 'cw' && cfg.cwSeparateClues) return n + 2;
+    return n + 1;
+  }, 0);
+}
 
 export async function exportPDF() {
     if (isExporting) return;
@@ -46,6 +62,40 @@ export async function exportPDF() {
     const filename = ((() => { const el = document.getElementById('exportFilename'); return el ? el.value.trim() : ''; })()
         .replace(/[^a-z0-9-_]/gi, '_') || 'MyPuzzle');
     const scrShowHint = cfg.scrShowHint;
+
+    // --- Feature gating: block locked features for the current tier ---
+    const lockedFeatures = [];
+    if (selections.cw && cfg.cwSeparateClues && !licenseManager.hasFeature('separateCluePages')) {
+        lockedFeatures.push('Crossword clues on a separate page');
+    }
+    if (PREMIUM_FONT_VALUES.includes(cfg.font) && !licenseManager.hasFeature('premiumFonts')) {
+        lockedFeatures.push('Premium fonts (Classic & Playful)');
+    }
+    if (lockedFeatures.length) {
+        const msg = `${lockedFeatures.join(' and ')} ${lockedFeatures.length > 1 ? 'are' : 'is a'} Pro feature${lockedFeatures.length > 1 ? 's' : ''}. Upgrade to include ${lockedFeatures.length > 1 ? 'them' : 'it'} in your PDF.`;
+        isExporting = false;
+        if (exportBtn) exportBtn.disabled = false;
+        if (typeof window !== 'undefined' && window.showUpgradePrompt) window.showUpgradePrompt(msg);
+        else showToast(msg, 'warning');
+        return;
+    }
+
+    // --- Page-quota check: monetise PDF generation by page ---
+    const totalPages = pagesPerSet(selectedPages, cfg) * (Number.isFinite(count) && count > 0 ? count : 1);
+    const quota = await licenseManager.canExport(totalPages);
+    if (!quota.allowed) {
+        const u = quota.usage || {};
+        isExporting = false;
+        if (exportBtn) exportBtn.disabled = false;
+        if (licenseManager.isPro) {
+            showToast(`Monthly PDF page limit reached (${u.pagesUsed}/${u.pageLimit}). This export needs ${totalPages} pages.`, 'warning');
+        } else {
+            const msg = `You've used ${u.pagesUsed} of ${u.pageLimit} free PDF pages this month, and this export needs ${totalPages} more. Upgrade for a higher monthly limit.`;
+            if (typeof window !== 'undefined' && window.showUpgradePrompt) window.showUpgradePrompt(msg);
+            else showToast(msg, 'warning');
+        }
+        return;
+    }
 
     if (L) { L.style.display = 'flex'; L.style.opacity = '1'; }
     if (T) T.innerText = 'Starting Export...';
@@ -176,6 +226,12 @@ export async function exportPDF() {
         await new Promise(r => setTimeout(r, 100));
 
         doc.save(filename + '.pdf');
+        // Record usage for monetisation metering (fire-and-forget, non-blocking)
+        licenseManager.recordPdfUsage({
+            pages: totalPages,
+            sets: count,
+            pageTypes: selectedPages.join(','),
+        }).catch(() => {});
         showToast('PDF exported successfully!');
 
     } catch (e) {

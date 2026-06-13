@@ -9,19 +9,12 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-
-// Tier limits served to the frontend
-const TIER_LIMITS = {
-  free:     { words: 30, bulkSets: 3  },
-  pro:      { words: 50, bulkSets: 25 },
-  school:   { words: 50, bulkSets: 25 },
-  lifetime: { words: 50, bulkSets: 25 },
-};
+const { getTier } = require('../tiers');
 
 /**
  * GET /api/license/validate
  * Query: key=PSP-XXXXX-XXXXX-XXXXX-XXXXX
- * Returns: { valid, plan, limits, email, expiresAt }
+ * Returns: { valid, plan, limits, features, email, expiresAt, usage }
  */
 router.get('/validate', (req, res) => {
   const { key } = req.query;
@@ -40,6 +33,10 @@ router.get('/validate', (req, res) => {
   db.markActivated(sanitized);
 
   const lic = result.license;
+  const tier = getTier(lic.plan);
+  const { pages } = db.getMonthlyPages(sanitized);
+  const limit = tier.limits.pdfPagesPerMonth;
+
   res.json({
     valid: true,
     plan: lic.plan,
@@ -47,7 +44,14 @@ router.get('/validate', (req, res) => {
     email: lic.email,
     expiresAt: lic.expires_at || null,
     activatedAt: lic.activated_at || null,
-    limits: TIER_LIMITS[lic.plan] || TIER_LIMITS.free,
+    limits: tier.limits,
+    features: tier.features,
+    usage: {
+      month: db.currentMonth(),
+      pagesUsed: pages,
+      pageLimit: limit ?? null,
+      remaining: (limit == null) ? null : Math.max(0, limit - pages),
+    },
   });
 });
 

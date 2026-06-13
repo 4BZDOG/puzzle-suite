@@ -26,26 +26,34 @@ const SERVER_URL = (typeof window !== 'undefined' && window.PUZZLE_SUITE_SERVER_
 
 const LS_KEY        = 'puzzleSuiteLicense';    // stored license key
 const LS_CACHE_KEY  = 'puzzleSuiteLicenseCache'; // cached validation result
+const LS_CLIENT_ID  = 'puzzleSuiteClientId';   // anonymous metering id (free tier)
 const CACHE_TTL_MS  = 24 * 60 * 60 * 1000;     // 24 hours
 
 // ─── Tier definitions ─────────────────────────────────────────────────────────
+// Offline fallback mirror of server/tiers.js. The server response (info.limits /
+// info.features) always wins when reachable — keep these in sync but treat the
+// server as the source of truth for tuning.
 
 export const TIERS = {
   free: {
     label: 'Free',
-    limits: { words: 30, bulkSets: 3 },
+    limits: { words: 30, bulkSets: 3, pdfPagesPerMonth: 30 },
+    features: { separateCluePages: false, premiumFonts: false, removeWatermark: false },
   },
   pro: {
     label: 'Pro',
-    limits: { words: 50, bulkSets: 25 },
+    limits: { words: 50, bulkSets: 25, pdfPagesPerMonth: 1000 },
+    features: { separateCluePages: true, premiumFonts: true, removeWatermark: true },
   },
   school: {
     label: 'School',
-    limits: { words: 50, bulkSets: 25 },
+    limits: { words: 50, bulkSets: 25, pdfPagesPerMonth: 10000 },
+    features: { separateCluePages: true, premiumFonts: true, removeWatermark: true },
   },
   lifetime: {
     label: 'Lifetime Pro',
-    limits: { words: 50, bulkSets: 25 },
+    limits: { words: 50, bulkSets: 25, pdfPagesPerMonth: 2000 },
+    features: { separateCluePages: true, premiumFonts: true, removeWatermark: true },
   },
 };
 
@@ -187,11 +195,101 @@ class LicenseManager {
 
   /**
    * Get a numeric limit for the current tier.
-   * limitName: 'words' | 'bulkSets'
+   * Prefers the server-supplied limits (info.limits) so quotas can be tuned
+   * server-side without a frontend release; falls back to the local mirror.
+   * limitName: 'words' | 'bulkSets' | 'pdfPagesPerMonth'
    */
   getLimit(limitName) {
+    const serverLimits = this._info?.limits;
+    if (serverLimits && limitName in serverLimits) return serverLimits[limitName];
     return (TIERS[this._tier] || TIERS.free).limits[limitName]
         ?? (TIERS.free.limits[limitName]);
+  }
+
+  /**
+   * Whether the current tier has a named feature flag enabled.
+   * Prefers server-supplied flags (info.features), falls back to local mirror.
+   * featureName: 'separateCluePages' | 'premiumFonts' | 'removeWatermark'
+   */
+  hasFeature(featureName) {
+    const serverFeatures = this._info?.features;
+    if (serverFeatures && featureName in serverFeatures) return !!serverFeatures[featureName];
+    return !!(TIERS[this._tier] || TIERS.free).features?.[featureName];
+  }
+
+  // ── Usage metering (PDF pages) ─────────────────────────────────────────────
+
+  /**
+   * Stable anonymous client id for metering free-tier usage.
+   * Generated once and persisted in localStorage.
+   */
+  getClientId() {
+    let id = localStorage.getItem(LS_CLIENT_ID);
+    if (!id) {
+      id = (crypto?.randomUUID?.() || `c${Date.now()}${Math.random().toString(36).slice(2)}`);
+      localStorage.setItem(LS_CLIENT_ID, id);
+    }
+    return id;
+  }
+
+  _usageQuery() {
+    const params = new URLSearchParams();
+    const key = this.getStoredKey();
+    if (key) params.set('key', key);
+    params.set('clientId', this.getClientId());
+    return params.toString();
+  }
+
+  /**
+   * Fetch current-month PDF page usage + quota from the server.
+   * Returns { tier, month, pagesUsed, pageLimit, remaining } or null if
+   * the server is unreachable (caller should treat null as "unknown / allow").
+   */
+  async getUsage() {
+    try {
+      const ac = new AbortController();
+      const tid = setTimeout(() => ac.abort(), 6000);
+      let r;
+      try { r = await fetch(`${SERVER_URL}/api/usage?${this._usageQuery()}`, { signal: ac.signal }); }
+      finally { clearTimeout(tid); }
+      if (!r.ok) return null;
+      return await r.json();
+    } catch { return null; }
+  }
+
+  /**
+   * Record a completed PDF export. Fire-and-forget; resolves to the updated
+   * usage payload or null on failure (never throws).
+   */
+  async recordPdfUsage({ pages, sets = 1, pageTypes = '' }) {
+    try {
+      const r = await fetch(`${SERVER_URL}/api/usage/pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: this.getStoredKey() || undefined,
+          clientId: this.getClientId(),
+          pages, sets, pageTypes,
+        }),
+      });
+      if (!r.ok) return null;
+      const data = await r.json();
+      // Keep the cached info.usage fresh so the modal reflects the new total
+      if (this._info) this._info.usage = { month: data.month, pagesUsed: data.pagesUsed, pageLimit: data.pageLimit, remaining: data.remaining };
+      return data;
+    } catch { return null; }
+  }
+
+  /**
+   * Check whether an export of `pages` pages is within the monthly quota.
+   * Returns { allowed, usage, remaining } — when the server is unreachable
+   * or the tier is unlimited, allowed is true (non-blocking by design).
+   */
+  async canExport(pages) {
+    const usage = await this.getUsage();
+    if (!usage || usage.pageLimit == null) return { allowed: true, usage };
+    const allowed = usage.pagesUsed + pages <= usage.pageLimit;
+    return { allowed, usage, remaining: usage.remaining };
   }
 
   // ── Checkout ─────────────────────────────────────────────────────────────────

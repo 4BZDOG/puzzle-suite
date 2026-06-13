@@ -646,6 +646,26 @@ function _refreshLicenseModal() {
     }
     // Populate plans (uses cache after first load)
     _loadPlansUI();
+    // Populate PDF page usage meter (async, non-blocking)
+    _refreshUsageMeter();
+}
+
+async function _refreshUsageMeter() {
+    const el = document.getElementById('lic-usage');
+    if (!el) return;
+    const usage = await licenseManager.getUsage();
+    if (!usage) { el.style.display = 'none'; return; }
+    const { pagesUsed = 0, pageLimit } = usage;
+    if (pageLimit == null) {
+        el.innerHTML = `<div class="lic-usage-label">PDF pages this month: <strong>${pagesUsed.toLocaleString()}</strong> · Unlimited</div>`;
+    } else {
+        const pct = Math.min(100, Math.round((pagesUsed / pageLimit) * 100));
+        const near = pct >= 80;
+        el.innerHTML = `
+            <div class="lic-usage-label">PDF pages this month: <strong>${pagesUsed.toLocaleString()} / ${pageLimit.toLocaleString()}</strong></div>
+            <div class="lic-usage-bar"><div class="lic-usage-fill${near ? ' lic-usage-fill--warn' : ''}" style="width:${pct}%"></div></div>`;
+    }
+    el.style.display = 'block';
 }
 
 let _cachedPlans = null;
