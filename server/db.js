@@ -9,7 +9,7 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
-const crypto = require('crypto');
+const { generateKey } = require('./keygen');
 
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'data', 'licenses.db');
 
@@ -55,25 +55,7 @@ db.exec(`
 `);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-/**
- * Generate a human-readable license key.
- * Format: PSP-XXXXX-XXXXX-XXXXX-XXXXX
- * Uses a 32-character unambiguous alphabet (no 0, O, I, 1).
- */
-function generateKey() {
-  const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const GROUP_LEN = 5;
-  const GROUPS = 4;
-  let key = 'PSP';
-  for (let g = 0; g < GROUPS; g++) {
-    key += '-';
-    for (let c = 0; c < GROUP_LEN; c++) {
-      key += ALPHABET[crypto.randomInt(0, ALPHABET.length)];
-    }
-  }
-  return key;
-}
+// generateKey() is imported from ./keygen (pure, no DB dependency).
 
 /**
  * Create a new license in the database.

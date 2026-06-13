@@ -9,6 +9,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const { isValidKeyFormat } = require('../keygen');
 
 // Tier limits served to the frontend
 const TIER_LIMITS = {
@@ -31,6 +32,12 @@ router.get('/validate', (req, res) => {
   }
 
   const sanitized = key.trim().toUpperCase();
+
+  // Reject malformed keys before touching the database.
+  if (!isValidKeyFormat(sanitized)) {
+    return res.json({ valid: false, reason: 'Invalid key format' });
+  }
+
   const result = db.validateKey(sanitized);
 
   if (!result.valid) {
