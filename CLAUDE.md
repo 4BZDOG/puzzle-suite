@@ -164,6 +164,7 @@ The frontend is heavily DOM/`window`-coupled, so pure logic is **extracted into 
 |--------|---------|------|
 | `core/letters.js` | `getLetter()` bijective base-26 labels | `test/letters.test.mjs` |
 | `core/escapeHTML.js` | shared HTML escaping (XSS layer 2) — single source for all 6 renderers + `main.js`; coerces nullish to `''` | `test/escapeHTML.test.mjs` |
+| `core/historyStack.js` | pure undo/redo stack state machine (`history.js` is thin wiring over it) | `test/historyStack.test.mjs` |
 | `import-export/parseWordList.js` | import parse + A-Z sanitization (XSS layer 1) | `test/parseWordList.test.mjs` |
 | `server/keygen.js` | license key gen + `isValidKeyFormat()` (pure; no SQLite) | `test/keygen.test.mjs` |
 | `server/rateLimit.js` | sliding-window limiter (cleanup timer is `unref()`'d) | `test/rateLimit.test.mjs` |
@@ -172,8 +173,10 @@ Tests use the built-in `node:test` runner — **no test framework dependency**. 
 
 **`escapeHTML` is now imported, never inlined** — do not re-add a local `const escapeHTML` to a renderer; import from `core/escapeHTML.js`.
 
-### Undo/Redo (`core/history.js`)
-`pushHistory()` must be called BEFORE mutating `state.words`. Max 50 entries. Word reorder, add, and delete operations push history; clue/term inline edits do not. Undo saves the current post-mutation state for redo before restoring. A `_mutatedSinceSnap` flag prevents duplicate history entries when undoing from a mid-history position.
+### Undo/Redo (`core/history.js` + `core/historyStack.js`)
+`pushHistory()` must be called BEFORE mutating `state.words`. Max 50 entries. Word reorder, add, and delete operations push history; clue/term inline edits do not. Undo saves the current post-mutation state for redo before restoring. A `mutatedSinceSnap` flag prevents duplicate history entries when undoing from a mid-history position.
+
+The stack logic lives in the pure `core/historyStack.js` (`createHistoryStack({ max })` → `push/undo/redo/canUndo/canRedo`); `history.js` is thin wiring connecting it to `state.words`, `setWords`, and the toolbar buttons. `undo`/`redo` return `null` when there's nothing to do — the wiring then skips `setWords`/button refresh, matching the original early-return behavior. Add stack-behavior tests to `historyStack.test.mjs`, not the DOM-coupled wrapper.
 
 ### AI Word Generation (`ai/aiGenerate.js`)
 BYOK (bring your own key). API keys stored in `puzzleSuiteAIKeys` localStorage key, separate from main state. Supported providers: Google Gemini, Groq, OpenAI, Anthropic Claude, OpenRouter. All requests go browser → provider directly (no server).

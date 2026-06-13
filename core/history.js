@@ -1,48 +1,39 @@
 // =============================================================
-// core/history.js — Undo / Redo stack for word list edits
+// core/history.js — Undo / Redo for word list edits
+//
+// Thin wiring over the pure stack in core/historyStack.js: connects the
+// stack to `state.words` (source), `setWords` (sink), and the toolbar
+// button enabled-state. All stack logic and its tests live in historyStack.js.
 // =============================================================
 import { state, setWords } from './state.js';
+import { createHistoryStack } from './historyStack.js';
 
 const MAX_HISTORY = 50;
-let wordHistory  = [];
-let historyIndex = -1;
-let _mutatedSinceSnap = false;
+const stack = createHistoryStack({ max: MAX_HISTORY });
 
 export function pushHistory() {
-    wordHistory = wordHistory.slice(0, historyIndex + 1);
-    if (_mutatedSinceSnap || wordHistory.length === 0) {
-        wordHistory.push(JSON.parse(JSON.stringify(state.words)));
-    }
-    historyIndex = wordHistory.length - 1;
-    if (wordHistory.length > MAX_HISTORY) { wordHistory.shift(); historyIndex = wordHistory.length - 1; }
-    _mutatedSinceSnap = true;
+    stack.push(state.words);
     _updateButtons();
 }
 
 export function undo(onComplete) {
-    if (_mutatedSinceSnap && historyIndex >= 0) {
-        wordHistory = wordHistory.slice(0, historyIndex + 1);
-        wordHistory.push(JSON.parse(JSON.stringify(state.words)));
-        historyIndex = wordHistory.length - 1;
-        _mutatedSinceSnap = false;
-    }
-    if (historyIndex <= 0) return;
-    historyIndex--;
-    setWords(JSON.parse(JSON.stringify(wordHistory[historyIndex])));
+    const restored = stack.undo(state.words);
+    if (restored === null) return;
+    setWords(restored);
     _updateButtons();
     if (onComplete) onComplete();
 }
 
 export function redo(onComplete) {
-    if (historyIndex >= wordHistory.length - 1) return;
-    historyIndex++;
-    setWords(JSON.parse(JSON.stringify(wordHistory[historyIndex])));
+    const restored = stack.redo();
+    if (restored === null) return;
+    setWords(restored);
     _updateButtons();
     if (onComplete) onComplete();
 }
 
-export function canUndo() { return historyIndex > 0 || (historyIndex >= 0 && _mutatedSinceSnap); }
-export function canRedo() { return historyIndex < wordHistory.length - 1 && !_mutatedSinceSnap; }
+export function canUndo() { return stack.canUndo(); }
+export function canRedo() { return stack.canRedo(); }
 
 function _updateButtons() {
     const u = document.getElementById('btn-undo');
