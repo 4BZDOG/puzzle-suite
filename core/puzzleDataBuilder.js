@@ -3,12 +3,10 @@
 // =============================================================
 import { state } from './state.js';
 import { generateAllAsync } from '../workers/workerBridge.js';
+import { getLetter } from './letters.js';
 
-export const getLetter = (i) => {
-    let res = '', num = i;
-    while (num >= 0) { res = String.fromCharCode(65 + (num % 26)) + res; num = Math.floor(num / 26) - 1; }
-    return res;
-};
+// Re-export so existing importers of getLetter from this module keep working.
+export { getLetter };
 
 export async function createPuzzleData() {
     const pData = await generateAllAsync(state.settings);

@@ -1,13 +1,14 @@
 // =============================================================
 // pdf/pdfDrawNotes.js
 // =============================================================
-import { drawHeader } from './pdfHelpers.js';
 import { drawWordSearch } from './pdfDrawWordSearch.js';
 import { drawCrossword } from './pdfDrawCrossword.js';
 import { drawScramble } from './pdfDrawScramble.js';
 
 const sanitizePDFText = (text) => {
   if (typeof text !== 'string') return '';
+  // Strip control characters that would corrupt PDF text streams.
+  // eslint-disable-next-line no-control-regex
   return text.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '').trim();
 };
 
@@ -171,7 +172,7 @@ export function drawNotes(ctx, notesList, startY, pScale) {
  * @param {number} pScale
  */
 export function drawMasterKeyPage(ctx, fullTitle, subText, currentPuzzleData, selections, pScale) {
-    const { doc, PAGE_WIDTH, PAGE_HEIGHT, MARGIN, scale, pdfFont, drawWatermark } = ctx;
+    const { doc, PAGE_WIDTH, PAGE_HEIGHT, MARGIN, scale, pdfFont } = ctx;
     pScale = pScale || scale;
 
     doc.setFont(pdfFont, 'bold');

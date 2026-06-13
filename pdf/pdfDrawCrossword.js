@@ -16,7 +16,7 @@
  */
 export function drawCrossword(ctx, cwData, layout, isKey, pScale, separateClues = false) {
     if (!cwData || !cwData.placed.length) return;
-    const { doc, PAGE_HEIGHT, PAGE_WIDTH, MARGIN, scale, mmToPt, pdfFont, drawWatermark } = ctx;
+    const { doc, scale, mmToPt, pdfFont } = ctx;
     pScale = pScale || scale;
 
     const maxCellSize = isKey ? 6 : (separateClues ? 10 : 8);

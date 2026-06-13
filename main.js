@@ -2,15 +2,15 @@
 // main.js — Application entry point
 // Imports all modules, wires events, initialises the app.
 // =============================================================
-import { state, setWords, setPuzzleData, updateSetting, applyStateToDOM, syncSettingsFromDOM } from './core/state.js';
+import { state, setWords, setPuzzleData, applyStateToDOM, syncSettingsFromDOM } from './core/state.js';
 import { pushHistory, undo, redo } from './core/history.js';
 import { saveState, saveStateNow, loadRawState, hardReset } from './core/storage.js';
 
 import { createPuzzleData } from './core/puzzleDataBuilder.js';
 
 import { renderWordList, renderStatus, renderStatusGenerating } from './renderers/wordList.js';
-import { renderWordSearch, calcWSScale } from './renderers/wordSearch.js';
-import { renderCrossword, calcCWScale } from './renderers/crossword.js';
+import { renderWordSearch } from './renderers/wordSearch.js';
+import { renderCrossword } from './renderers/crossword.js';
 import { renderScramble } from './renderers/scramble.js';
 import { renderNotes, updateNotesStyles } from './renderers/notes.js';
 import { renderKeys } from './renderers/keys.js';

@@ -15,7 +15,7 @@ const escapeHTML = str => str.replace(/[&<>'"]/g, tag => ({
  * @param {Function}    onUpdateWord(index, field, value)
  * @param {Function}    onDeleteWord(index)
  */
-export function renderWordList(container, words, puzzleData, activePage, onUpdateWord, onDeleteWord) {
+export function renderWordList(container, words, puzzleData, activePage, _onUpdateWord, _onDeleteWord) {
     if (!container) return;
     container.innerHTML = '';
 

@@ -13,7 +13,7 @@ const escapeHTML = str => str.replace(/[&<>'"]/g, tag => ({
  * @param {Object}      settings    - state.settings
  * @param {Function}    onUpdateWord(index, field, value)
  */
-export function renderNotes(container, puzzleData, words, settings, onUpdateWord) {
+export function renderNotes(container, puzzleData, words, settings, _onUpdateWord) {
     if (!container) return;
     _updateNotesStyles(settings);
 

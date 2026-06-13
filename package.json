@@ -5,9 +5,15 @@
   "private": true,
   "scripts": {
     "build": "bash build.sh",
-    "start": "python3 -m http.server 8082"
+    "start": "python3 -m http.server 8082",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test": "node --test \"test/**/*.test.mjs\""
   },
   "devDependencies": {
-    "esbuild": "^0.25.0"
+    "@eslint/js": "^9.39.4",
+    "esbuild": "^0.25.0",
+    "eslint": "^9.39.4",
+    "globals": "^15.15.0"
   }
 }
