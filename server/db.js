@@ -138,10 +138,54 @@ function getLicensesByEmail(email) {
 }
 
 /**
+ * Dev / owner master key. When DEV_LICENSE_KEY is set in the environment,
+ * a key matching it validates as a synthetic all-access license (no DB row,
+ * no Stripe). This is the "secure, easy full access" path for testing every
+ * feature. It is OFF by default — absent or short/placeholder values disable it.
+ *
+ * Security model:
+ *   - Only valid if you set a strong secret in env (min 24 chars enforced).
+ *   - Compared with a constant-time SHA-256 digest comparison (no length leak).
+ *   - Grants only the app feature tier — NOT admin dashboard access (that
+ *     remains behind ADMIN_SECRET / Bearer auth).
+ *   - The granted tier defaults to 'admin' but can be set via DEV_LICENSE_TIER
+ *     (e.g. 'pro') to test a specific paid tier.
+ */
+function getDevLicense(rawKey) {
+  const devKey = process.env.DEV_LICENSE_KEY;
+  if (!devKey || devKey.length < 24 || devKey.includes('REPLACE')) return null;
+  if (!rawKey || typeof rawKey !== 'string') return null;
+
+  const a = crypto.createHash('sha256').update(rawKey.trim().toUpperCase()).digest();
+  const b = crypto.createHash('sha256').update(devKey.trim().toUpperCase()).digest();
+  if (!crypto.timingSafeEqual(a, b)) return null;
+
+  const plan = process.env.DEV_LICENSE_TIER || 'admin';
+  const now = new Date().toISOString();
+  return {
+    key: rawKey.trim().toUpperCase(),
+    email: 'owner@puzzle-suite.local',
+    plan,
+    billing_interval: null,
+    stripe_session_id: null,
+    stripe_customer_id: null,
+    stripe_subscription_id: null,
+    active: 1,
+    created_at: now,
+    activated_at: now,
+    expires_at: null,
+    _dev: true,
+  };
+}
+
+/**
  * Validate a license key for use in the app (read-only).
  * Returns { valid, license } or { valid: false, reason }.
  */
 function validateKey(key) {
+  const dev = getDevLicense(key);
+  if (dev) return { valid: true, license: dev };
+
   const lic = getLicense(key);
   if (!lic) return { valid: false, reason: 'Key not found' };
   if (!lic.active) return { valid: false, reason: 'Key has been deactivated' };
@@ -357,6 +401,7 @@ module.exports = {
   getLicense,
   getLicensesByEmail,
   validateKey,
+  getDevLicense,
   markActivated,
   deactivateKey,
   reactivateKey,

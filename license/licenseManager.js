@@ -55,6 +55,11 @@ export const TIERS = {
     limits: { words: 50, bulkSets: 25, pdfPagesPerMonth: 2000 },
     features: { separateCluePages: true, premiumFonts: true, removeWatermark: true },
   },
+  admin: {
+    label: 'Admin',
+    limits: { words: 200, bulkSets: 100, pdfPagesPerMonth: null },
+    features: { separateCluePages: true, premiumFonts: true, removeWatermark: true },
+  },
 };
 
 // ─── Manager ──────────────────────────────────────────────────────────────────

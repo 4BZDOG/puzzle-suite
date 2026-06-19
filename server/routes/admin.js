@@ -17,6 +17,7 @@ const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
 const db = require('../db');
+const { VALID_PLANS } = require('../tiers');
 const { sendLicenseEmail, sendKeyReminder } = require('../email');
 
 // ── Auth middleware ────────────────────────────────────────────────────────────
@@ -64,9 +65,8 @@ router.post('/licenses', async (req, res) => {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return res.status(400).json({ error: 'Invalid email format' });
   }
-  const validPlans = ['pro', 'school', 'lifetime'];
-  if (!validPlans.includes(plan)) {
-    return res.status(400).json({ error: `Invalid plan. Use: ${validPlans.join(', ')}` });
+  if (!VALID_PLANS.includes(plan)) {
+    return res.status(400).json({ error: `Invalid plan. Use: ${VALID_PLANS.join(', ')}` });
   }
   if (expiresAt && !(new Date(expiresAt) instanceof Date && !isNaN(new Date(expiresAt)))) {
     return res.status(400).json({ error: 'Invalid expiresAt date format' });
@@ -84,6 +84,25 @@ router.post('/licenses', async (req, res) => {
   }
 
   res.status(201).json({ key, email, plan, billingInterval });
+});
+
+/**
+ * POST /api/admin/test-account
+ * One-click: create an all-access (admin tier) license for testing every
+ * feature. No email is sent; the key is returned for you to paste into the app.
+ * Body (optional): { email?, plan? } — defaults to a local test email + 'admin'.
+ */
+router.post('/test-account', (req, res) => {
+  const email = (req.body && req.body.email) || 'tester@puzzle-suite.local';
+  const plan = (req.body && req.body.plan) || 'admin';
+  if (!VALID_PLANS.includes(plan)) {
+    return res.status(400).json({ error: `Invalid plan. Use: ${VALID_PLANS.join(', ')}` });
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'Invalid email format' });
+  }
+  const key = db.createLicense({ email, plan });
+  res.status(201).json({ key, email, plan });
 });
 
 /**
@@ -141,9 +160,8 @@ router.put('/licenses/:key/plan', (req, res) => {
   const lic = db.getLicense(req.params.key);
   if (!lic) return res.status(404).json({ error: 'License not found' });
   const { plan, billingInterval = null } = req.body;
-  const validPlans = ['pro', 'school', 'lifetime'];
-  if (!validPlans.includes(plan)) {
-    return res.status(400).json({ error: `Invalid plan. Use: ${validPlans.join(', ')}` });
+  if (!VALID_PLANS.includes(plan)) {
+    return res.status(400).json({ error: `Invalid plan. Use: ${VALID_PLANS.join(', ')}` });
   }
   db.updateLicensePlan(req.params.key, plan, billingInterval);
   res.json({ ok: true });

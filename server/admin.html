@@ -217,6 +217,17 @@
       <!-- Create license page -->
       <div class="page" id="page-create">
         <h2>Create License</h2>
+
+        <div class="card" style="max-width:480px;margin-bottom:16px">
+          <h3 style="margin-top:0">Quick Test Account</h3>
+          <p style="color:var(--muted);font-size:13px;margin-top:0">
+            One click creates an <strong>all-access (Admin tier)</strong> license — every feature unlocked,
+            unlimited PDF pages. No email sent; copy the key into the app's “I have a key” box.
+          </p>
+          <button class="btn btn-primary" onclick="createTestAccount()">Create Test Account</button>
+          <div id="test-account-result" style="margin-top:16px;display:none"></div>
+        </div>
+
         <div class="card" style="max-width:480px">
           <div class="form-row">
             <label>Email <span style="color:var(--danger)">*</span></label>
@@ -228,6 +239,7 @@
               <option value="pro">Pro</option>
               <option value="school">School</option>
               <option value="lifetime">Lifetime Pro</option>
+              <option value="admin">Admin (full access / testing)</option>
             </select>
           </div>
           <div class="form-row">
@@ -590,6 +602,26 @@ async function createLicense() {
     </div>`;
   document.getElementById('new-email').value = '';
   toast('License created' + (sendEmail ? ' & email sent' : ''));
+}
+
+// ─── Quick test account ─────────────────────────────────────────────────────────
+async function createTestAccount() {
+  const result = document.getElementById('test-account-result');
+  result.style.display = 'none';
+
+  const data = await api('/api/admin/test-account', { method: 'POST', body: {} })
+    .catch(e => { toast(e.message); return null; });
+  if (!data) return;
+
+  result.style.display = 'block';
+  result.innerHTML = `
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px">
+      <div style="font-weight:700;color:var(--success);margin-bottom:8px">All-access test key created!</div>
+      <div style="font-family:monospace;font-size:16px;letter-spacing:2px;color:var(--text);word-break:break-all">${esc(data.key)}</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:6px">${esc(data.email)} · ${esc(data.plan)} tier</div>
+      <button class="btn btn-outline btn-sm" style="margin-top:10px" onclick="navigator.clipboard.writeText('${esc(data.key)}').then(()=>toast('Key copied'))">Copy key</button>
+    </div>`;
+  toast('Test account created');
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
