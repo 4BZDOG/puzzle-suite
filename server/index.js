@@ -80,10 +80,12 @@ app.use(express.json());
 // ── Rate limiting ────────────────────────────────────────────────────────────
 const apiLimiter = createRateLimiter({ windowMs: 60000, max: 30, message: 'Too many requests, please try again later' });
 const validateLimiter = createRateLimiter({ windowMs: 60000, max: 10, message: 'Too many validation attempts' });
+const usageLimiter = createRateLimiter({ windowMs: 60000, max: 60, message: 'Too many usage updates' });
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use('/api/checkout', apiLimiter, require('./routes/checkout'));
 app.use('/api/license',  validateLimiter, require('./routes/license'));
+app.use('/api/usage',    usageLimiter, require('./routes/usage'));
 app.use('/api/admin',    require('./routes/admin'));
 
 // Admin dashboard HTML

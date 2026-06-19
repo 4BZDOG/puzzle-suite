@@ -6,6 +6,7 @@
  */
 
 const nodemailer = require('nodemailer');
+const { getTier } = require('./tiers');
 
 let _transporter = null;
 
@@ -23,24 +24,13 @@ function getTransporter() {
   return _transporter;
 }
 
-const PLAN_LABELS = {
-  pro: 'Pro',
-  school: 'School',
-  lifetime: 'Lifetime Pro',
-};
-
-const PLAN_LIMITS = {
-  pro:      { words: 50, bulkSets: 25 },
-  school:   { words: 50, bulkSets: 25 },
-  lifetime: { words: 50, bulkSets: 25 },
-};
-
 /**
  * Send the license key delivery email after a successful purchase.
  */
 async function sendLicenseEmail({ to, key, plan, billingInterval }) {
-  const planLabel = PLAN_LABELS[plan] || plan;
-  const limits = PLAN_LIMITS[plan] || {};
+  const tier = getTier(plan);
+  const planLabel = tier.label;
+  const limits = tier.limits;
   const intervalNote = billingInterval === 'annual'
     ? 'Your subscription renews annually.'
     : billingInterval === 'monthly'
@@ -101,6 +91,7 @@ async function sendLicenseEmail({ to, key, plan, billingInterval }) {
     <ul style="font-size:14px;color:#374151;">
       <li>Up to <strong>${limits.words} words</strong> per puzzle set</li>
       <li>Up to <strong>${limits.bulkSets} bulk export sets</strong></li>
+      <li><strong>${limits.pdfPagesPerMonth == null ? 'Unlimited' : limits.pdfPagesPerMonth.toLocaleString()} PDF pages</strong> per month</li>
       <li>Managed AI (coming soon) — no API key needed</li>
       <li>Cloud save (coming soon)</li>
     </ul>
@@ -145,7 +136,7 @@ Keep this email for your records.
  * Send a key reminder (re-send at admin request).
  */
 async function sendKeyReminder({ to, key, plan }) {
-  const planLabel = PLAN_LABELS[plan] || plan;
+  const planLabel = getTier(plan).label;
   return getTransporter().sendMail({
     from: process.env.EMAIL_FROM || 'Puzzle Suite <noreply@example.com>',
     to,

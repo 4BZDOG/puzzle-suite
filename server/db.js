@@ -52,6 +52,25 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_events_key ON events(license_key);
+
+  -- One row per PDF export. This is the metering basis for monetising
+  -- PDF generation by page. Free/anonymous users are tracked by an opaque
+  -- client id (identity = 'anon:<uuid>'); licensed users by their key.
+  CREATE TABLE IF NOT EXISTS usage_events (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    identity    TEXT NOT NULL,   -- license key, or 'anon:<clientId>'
+    license_key TEXT,            -- the key if licensed, else null
+    tier        TEXT NOT NULL,   -- snapshot of tier at export time
+    pages       INTEGER NOT NULL,
+    sets        INTEGER NOT NULL DEFAULT 1,
+    page_types  TEXT,            -- csv of page types, e.g. 'notes,ws,key'
+    month       TEXT NOT NULL,   -- 'YYYY-MM' (UTC) for fast monthly rollups
+    created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_usage_identity_month ON usage_events(identity, month);
+  CREATE INDEX IF NOT EXISTS idx_usage_month ON usage_events(month);
+  CREATE INDEX IF NOT EXISTS idx_usage_key ON usage_events(license_key);
 `);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -226,6 +245,111 @@ function logEvent(key, eventType, note = '') {
     .run(key, eventType, note);
 }
 
+// ── Usage metering ──────────────────────────────────────────────────────────────
+
+/** Current calendar month in UTC as 'YYYY-MM'. */
+function currentMonth(d = new Date()) {
+  return d.toISOString().slice(0, 7);
+}
+
+/**
+ * Record a PDF export. `pages` is the total printed page count of the export
+ * (sets × pages-per-set). Returns the inserted row id.
+ */
+function recordPdfUsage({ identity, licenseKey = null, tier = 'free', pages, sets = 1, pageTypes = '' }) {
+  const month = currentMonth();
+  const info = db.prepare(`
+    INSERT INTO usage_events (identity, license_key, tier, pages, sets, page_types, month)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(identity, licenseKey, tier, pages, sets, pageTypes, month);
+  return info.lastInsertRowid;
+}
+
+/** Total pages an identity has generated in a given month (defaults to now). */
+function getMonthlyPages(identity, month = currentMonth()) {
+  const row = db.prepare(
+    'SELECT COALESCE(SUM(pages), 0) AS pages, COUNT(*) AS exports FROM usage_events WHERE identity = ? AND month = ?'
+  ).get(identity, month);
+  return { pages: row.pages, exports: row.exports };
+}
+
+/**
+ * Aggregate usage stats for the admin dashboard.
+ * Returns month totals, all-time totals, a per-tier breakdown for the month,
+ * and a 30-day daily series of pages generated.
+ */
+function getUsageSummary(month = currentMonth()) {
+  const monthTotals = db.prepare(
+    'SELECT COALESCE(SUM(pages),0) AS pages, COALESCE(SUM(sets),0) AS sets, COUNT(*) AS exports FROM usage_events WHERE month = ?'
+  ).get(month);
+
+  const allTime = db.prepare(
+    'SELECT COALESCE(SUM(pages),0) AS pages, COUNT(*) AS exports FROM usage_events'
+  ).get();
+
+  const activeIdentities = db.prepare(
+    'SELECT COUNT(DISTINCT identity) AS n FROM usage_events WHERE month = ?'
+  ).get(month).n;
+
+  const byTier = db.prepare(`
+    SELECT tier, COALESCE(SUM(pages),0) AS pages, COUNT(*) AS exports,
+           COUNT(DISTINCT identity) AS users
+    FROM usage_events WHERE month = ?
+    GROUP BY tier ORDER BY pages DESC
+  `).all(month);
+
+  const daily = db.prepare(`
+    SELECT date(created_at) AS day, COALESCE(SUM(pages),0) AS pages, COUNT(*) AS exports
+    FROM usage_events
+    WHERE created_at >= datetime('now', '-30 days')
+    GROUP BY day ORDER BY day ASC
+  `).all();
+
+  return {
+    month,
+    monthPages: monthTotals.pages,
+    monthSets: monthTotals.sets,
+    monthExports: monthTotals.exports,
+    allTimePages: allTime.pages,
+    allTimeExports: allTime.exports,
+    activeIdentities,
+    byTier,
+    daily,
+  };
+}
+
+/** Top page consumers for a month. */
+function getTopConsumers(month = currentMonth(), limit = 20) {
+  return db.prepare(`
+    SELECT u.identity, u.license_key, u.tier,
+           COALESCE(SUM(u.pages),0) AS pages, COUNT(*) AS exports,
+           l.email AS email
+    FROM usage_events u
+    LEFT JOIN licenses l ON l.key = u.license_key
+    WHERE u.month = ?
+    GROUP BY u.identity
+    ORDER BY pages DESC
+    LIMIT ?
+  `).all(month, limit);
+}
+
+/** Usage rollup for a single license (this month + all time). */
+function getLicenseUsage(key, month = currentMonth()) {
+  const thisMonth = db.prepare(
+    'SELECT COALESCE(SUM(pages),0) AS pages, COUNT(*) AS exports FROM usage_events WHERE license_key = ? AND month = ?'
+  ).get(key, month);
+  const allTime = db.prepare(
+    'SELECT COALESCE(SUM(pages),0) AS pages, COUNT(*) AS exports FROM usage_events WHERE license_key = ?'
+  ).get(key);
+  return {
+    month,
+    monthPages: thisMonth.pages,
+    monthExports: thisMonth.exports,
+    allTimePages: allTime.pages,
+    allTimeExports: allTime.exports,
+  };
+}
+
 module.exports = {
   db,
   generateKey,
@@ -244,4 +368,11 @@ module.exports = {
   listLicenses,
   getEvents,
   logEvent,
+  // usage metering
+  currentMonth,
+  recordPdfUsage,
+  getMonthlyPages,
+  getUsageSummary,
+  getTopConsumers,
+  getLicenseUsage,
 };
