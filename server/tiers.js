@@ -79,9 +79,29 @@ const TIERS = {
       prioritySupport: true,
     },
   },
+
+  // All-access tier for the product owner / QA. Not sold via Stripe — only
+  // reachable via a manually-created license or the DEV_LICENSE_KEY (see db.js).
+  // Everything unlocked, no caps, unlimited PDF pages.
+  admin: {
+    label: 'Admin',
+    limits: {
+      words: 200,
+      bulkSets: 100,
+      pdfPagesPerMonth: null, // unlimited
+    },
+    features: {
+      separateCluePages: true,
+      premiumFonts: true,
+      removeWatermark: true,
+      prioritySupport: true,
+    },
+  },
 };
 
-const VALID_PLANS = ['pro', 'school', 'lifetime'];
+// Plans that can be created manually via the admin API / dashboard.
+// (Stripe-created plans are validated separately in webhook.js.)
+const VALID_PLANS = ['pro', 'school', 'lifetime', 'admin'];
 
 /** Resolve a tier definition, falling back to free for unknown plans. */
 function getTier(plan) {

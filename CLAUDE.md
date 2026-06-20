@@ -207,8 +207,21 @@ All `/api/admin/*` routes require `Authorization: Bearer <ADMIN_SECRET>`. The se
 | pro | 50 | 25 | 1,000 | ✓ | ✓ |
 | school | 50 | 25 | 10,000 | ✓ | ✓ |
 | lifetime | 50 | 25 | 2,000 | ✓ | ✓ |
+| admin | 200 | 100 | unlimited | ✓ | ✓ |
 
 Feature gating is enforced at the PDF export boundary (`pdf/pdfExport.js`): locked features in use → upgrade prompt + abort. Add new gates by adding a flag to `tiers.js` features + the frontend mirror, then calling `licenseManager.hasFeature('name')`.
+
+### Admin & test access (full access for the owner / QA)
+There are two independent access mechanisms — keep them mentally separate:
+
+1. **Admin dashboard** (`/admin`) — operational access to manage licenses & view usage. Auth = `ADMIN_SECRET` (Bearer token). This is *not* a feature tier; it's the back-office.
+2. **`admin` feature tier** — an all-access in-app tier (every feature, unlimited PDF pages). It is **not sold via Stripe**. Two ways to obtain it:
+   - **`DEV_LICENSE_KEY`** (env): a single secret that validates as the `admin` tier with no DB row and no Stripe. Paste it into the app's "I have a key" box for instant full access. Off by default; min 24 chars; compared with a constant-time SHA-256 digest in `db.getDevLicense()`. Set `DEV_LICENSE_TIER` to grant a specific tier instead (e.g. `pro`) for testing real paid-tier limits.
+   - **Quick Test Account** button in the admin dashboard ("Create License" page) → `POST /api/admin/test-account` creates a DB-backed `admin`-tier license and returns the key (no email sent).
+
+`VALID_PLANS` in `tiers.js` includes `admin`, so it's creatable via the admin API. Stripe webhook plan validation is separate (`webhook.js` hardcodes pro/school/lifetime) so customers can never self-provision `admin`.
+
+**TEMPORARY — offline admin unlock** (`OFFLINE_ADMIN_HASH` in `license/licenseManager.js`): until the server is deployed, the static site has no backend to validate keys, so a client-side fallback grants the `admin` tier when a key matching the baked SHA-256 hash is entered. `_offlineGrant()` runs at the top of `_validate()` (so it works on activation and on reload) and requires no network. Only the hash is in the bundle (preimage-resistant). **Remove this once the licensing server is live** — the real `DEV_LICENSE_KEY` then provides server-validated full access. To rotate the secret: `node -e "console.log(require('crypto').createHash('sha256').update(SECRET.toUpperCase()).digest('hex'))"` and replace the constant.
 
 ### Stripe plans
 | Plan key | Mode | DB plan | Interval |

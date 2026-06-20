@@ -29,6 +29,21 @@ const LS_CACHE_KEY  = 'puzzleSuiteLicenseCache'; // cached validation result
 const LS_CLIENT_ID  = 'puzzleSuiteClientId';   // anonymous metering id (free tier)
 const CACHE_TTL_MS  = 24 * 60 * 60 * 1000;     // 24 hours
 
+/**
+ * TEMPORARY offline admin unlock.
+ *
+ * Until the licensing server is deployed, the live (static) site has no backend
+ * to validate keys, so everyone falls back to Free. This lets the owner unlock
+ * the full Admin tier entirely client-side: paste the secret into the app's
+ * "I have a key" box and it's recognised locally — no server required.
+ *
+ * Only the SHA-256 *hash* of the secret lives in this (public) bundle. SHA-256
+ * is preimage-resistant, so the long random secret cannot be recovered from it;
+ * reading the source reveals nothing usable. Remove this once the server is live
+ * (the real DEV_LICENSE_KEY then provides full access server-side instead).
+ */
+const OFFLINE_ADMIN_HASH = '0e73359c26c51235ba11711a1dedf63722238932c8e36069ea03fdc9edc17e7a';
+
 // ─── Tier definitions ─────────────────────────────────────────────────────────
 // Offline fallback mirror of server/tiers.js. The server response (info.limits /
 // info.features) always wins when reachable — keep these in sync but treat the
@@ -53,6 +68,11 @@ export const TIERS = {
   lifetime: {
     label: 'Lifetime Pro',
     limits: { words: 50, bulkSets: 25, pdfPagesPerMonth: 2000 },
+    features: { separateCluePages: true, premiumFonts: true, removeWatermark: true },
+  },
+  admin: {
+    label: 'Admin',
+    limits: { words: 200, bulkSets: 100, pdfPagesPerMonth: null },
     features: { separateCluePages: true, premiumFonts: true, removeWatermark: true },
   },
 };
@@ -123,6 +143,14 @@ class LicenseManager {
   // ── Validation (internal) ───────────────────────────────────────────────────
 
   async _validate(key, forceRefresh = false) {
+    // Offline admin unlock — works with no server (temporary; see OFFLINE_ADMIN_HASH).
+    const offline = await this._offlineGrant(key);
+    if (offline) {
+      this._saveCache(key, offline);
+      this._applyValidation(offline);
+      return offline;
+    }
+
     // Check cache first (unless forcing refresh)
     const cachedBeforeFetch = forceRefresh ? null : this._loadCache(key);
     if (cachedBeforeFetch) {
@@ -153,6 +181,32 @@ class LicenseManager {
       }
       return { valid: false, reason: 'Server unreachable' };
     }
+  }
+
+  /**
+   * If `key` matches the offline admin secret, return a synthetic admin-tier
+   * validation result (no server). Otherwise null. Temporary — see header.
+   */
+  async _offlineGrant(key) {
+    if (!key) return null;
+    let hash;
+    try { hash = await this._sha256Hex(key.trim().toUpperCase()); }
+    catch { return null; } // crypto.subtle unavailable (e.g. insecure context)
+    if (hash !== OFFLINE_ADMIN_HASH) return null;
+    return {
+      valid: true,
+      plan: 'admin',
+      email: 'offline-admin',
+      limits: TIERS.admin.limits,
+      features: TIERS.admin.features,
+      usage: { month: '', pagesUsed: 0, pageLimit: null, remaining: null },
+      offline: true,
+    };
+  }
+
+  async _sha256Hex(str) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
   }
 
   _applyValidation(data) {
