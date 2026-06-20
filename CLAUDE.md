@@ -221,6 +221,8 @@ There are two independent access mechanisms — keep them mentally separate:
 
 `VALID_PLANS` in `tiers.js` includes `admin`, so it's creatable via the admin API. Stripe webhook plan validation is separate (`webhook.js` hardcodes pro/school/lifetime) so customers can never self-provision `admin`.
 
+**TEMPORARY — offline admin unlock** (`OFFLINE_ADMIN_HASH` in `license/licenseManager.js`): until the server is deployed, the static site has no backend to validate keys, so a client-side fallback grants the `admin` tier when a key matching the baked SHA-256 hash is entered. `_offlineGrant()` runs at the top of `_validate()` (so it works on activation and on reload) and requires no network. Only the hash is in the bundle (preimage-resistant). **Remove this once the licensing server is live** — the real `DEV_LICENSE_KEY` then provides server-validated full access. To rotate the secret: `node -e "console.log(require('crypto').createHash('sha256').update(SECRET.toUpperCase()).digest('hex'))"` and replace the constant.
+
 ### Stripe plans
 | Plan key | Mode | DB plan | Interval |
 |----------|------|---------|----------|
