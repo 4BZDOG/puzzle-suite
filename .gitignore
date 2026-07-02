@@ -9,6 +9,7 @@ node_modules/
 # Claude metadata (local only — except shared commands/skills)
 .claude/*
 !.claude/commands/
+!.claude/skills/
 
 # Editor
 .vscode/
