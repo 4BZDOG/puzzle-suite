@@ -284,6 +284,20 @@ Price IDs are read from env vars at module load (`PLAN_PRICE_IDS` is a plain con
 
 ---
 
+## Deployment
+GitHub Actions (`.github/workflows/deploy.yml`) auto-deploys on every push to `main`:
+1. `bash build.sh` → stage `dist/` → deploy to GitHub Pages
+2. **Only runtime files are published** (`puzzle-suite.html`, `index.html`,
+   `puzzle-suite.css`, `bundle.js`, `.nojekyll`). Internal docs (`CLAUDE.md`,
+   `memory.md`, `monetisation.md`), `server/`, and `.claude/` are deliberately
+   NOT deployed — when adding a new runtime asset, add it to the "Stage
+   deployable files" step in `deploy.yml`.
+3. `index.html` redirects `/` → `puzzle-suite.html` for a clean entry URL
+
+The payment server (`server/`) is **not** deployed by this workflow — deploy it separately per `DEPLOY.md` (Fly.io, Render, Railway, or a VPS).
+
+---
+
 ## Recent Fixes & Improvements (Session: 2026-03-17 — Payment System)
 
 ### Stripe Payment & License Key System
