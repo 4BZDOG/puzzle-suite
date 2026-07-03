@@ -31,13 +31,12 @@ build.sh                 npx esbuild main.js --bundle --minify → bundle.js
 ## Build & Serve
 
 ```bash
-bash build.sh                          # bundle JS → bundle.js
+bash build.sh                          # bundle JS → bundle.js, stamps cache-bust hash
 python3 -m http.server 8082            # serve at http://localhost:8082/puzzle-suite.html
 ```
 
-**After every JS change**: rebuild, then bump `?v=N` in the last `<script>` tag of
-`puzzle-suite.html` (e.g. `bundle.js?v=42` → `bundle.js?v=43`). Without this the
-browser will serve the old cached bundle silently.
+**After every JS change**: just rerun `bash build.sh` — it stamps a fresh content-hash
+into `<script src="bundle.js?v=…">` automatically. No manual bump needed.
 
 ### Payment server (optional)
 ```bash
@@ -163,7 +162,7 @@ Dark-mode overrides must go in `@layer components` or higher. Adding them to
 
 | Symptom | Root cause | Fix |
 |---------|-----------|-----|
-| JS changes not showing in browser | Cached bundle | Bump `?v=N` in puzzle-suite.html |
+| JS changes not showing in browser | Stale bundle, forgot to rebuild | Rerun `bash build.sh` — it stamps `?v=` automatically |
 | "undefined. [clue]" in Notes before generation | Reading `settings.notesConfig.shuffle` instead of data | Check `'matchLetter' in data[0]` |
 | Clue edit reverts on re-render | Renderer reading stale `puzzleData.notes` | Standard mode must derive from live `state.words` |
 | Slider reads wrong value immediately | 500ms debounce hasn't fired | Call `syncSettingsFromDOM()` first |
@@ -205,8 +204,8 @@ const puzzleData = await generateAllAsync(state.settings);
 ## Example Commands
 
 ```bash
-# Full rebuild + cache-bust (replace 42 with next version number)
-bash build.sh && sed -i 's/bundle\.js?v=[0-9]*/bundle.js?v=42/' puzzle-suite.html
+# Full rebuild + cache-bust (stamps ?v=<hash> automatically)
+bash build.sh
 
 # Check current storage key (useful when schema bumps)
 grep -r 'puzzleSuiteV' core/storage.js

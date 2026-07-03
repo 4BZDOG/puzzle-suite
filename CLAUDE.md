@@ -4,10 +4,11 @@
 
 ### Frontend (puzzle app)
 ```bash
-bash build.sh                  # esbuild bundles main.js → bundle.js
+bash build.sh                  # esbuild bundles main.js → bundle.js, stamps cache-bust hash
 python3 -m http.server 8082    # serve at http://localhost:8082/puzzle-suite.html
 ```
-After any JS change: rebuild, then bump `?v=N` in `<script src="bundle.js?v=N">` (puzzle-suite.html, last `<script>` tag) to bypass browser cache.
+After any JS change just rerun `bash build.sh` — it stamps a fresh content-hash into
+the `<script src="bundle.js?v=…">` tag automatically. No manual bump needed.
 
 ### Payment server (optional — required for license features)
 ```bash
@@ -238,7 +239,7 @@ Price IDs are read from env vars at module load (`PLAN_PRICE_IDS` is a plain con
 ## Common Pitfalls
 
 ### Frontend
-- **Bundle caching**: `http.server` caches aggressively. Always bump `?v=N` after `build.sh`.
+- **Bundle caching**: `http.server` caches aggressively. `build.sh` stamps a fresh content-hash into `<script src="bundle.js?v=…">` automatically — no manual bump needed.
 - **CSS layer priority**: Adding dark-mode overrides to `@layer base` won't work if same selector is in `@layer components`. Put overrides in `@layer components`.
 - **`innerText` vs `textContent`**: `innerText` returns `""` for elements inside collapsed `<details>`. Use `textContent` or call `syncSettingsFromDOM()` which uses `.value` / `.checked` (not innerText).
 - **`updatePageScales()` calls `renderActivePage()`**: it only re-renders the active page. After navigation, `showPage(n)` calls `renderActivePage()` automatically.
