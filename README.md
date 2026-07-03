@@ -17,10 +17,9 @@ bash build.sh
 # Bundles all JS via esbuild → bundle.js (~80 KB minified)
 ```
 
-After rebuilding, bump the cache-bust query param in `puzzle-suite.html`:
-```html
-<script src="bundle.js?v=N"></script>
-```
+`build.sh` also stamps a fresh content-hash into the cache-bust query param in
+`puzzle-suite.html` (`<script src="bundle.js?v=…">`) automatically — no manual
+bump needed.
 
 ## Features
 

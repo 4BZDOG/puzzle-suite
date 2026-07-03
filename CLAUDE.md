@@ -4,10 +4,11 @@
 
 ### Frontend (puzzle app)
 ```bash
-bash build.sh                  # esbuild bundles main.js → bundle.js
+bash build.sh                  # esbuild bundles main.js → bundle.js, stamps cache-bust hash
 python3 -m http.server 8082    # serve at http://localhost:8082/puzzle-suite.html
 ```
-After any JS change: rebuild, then bump `?v=N` in `<script src="bundle.js?v=N">` (puzzle-suite.html, last `<script>` tag) to bypass browser cache.
+After any JS change just rerun `bash build.sh` — it stamps a fresh content-hash into
+the `<script src="bundle.js?v=…">` tag automatically. No manual bump needed.
 
 ### Payment server (optional — required for license features)
 ```bash
@@ -238,7 +239,7 @@ Price IDs are read from env vars at module load (`PLAN_PRICE_IDS` is a plain con
 ## Common Pitfalls
 
 ### Frontend
-- **Bundle caching**: `http.server` caches aggressively. Always bump `?v=N` after `build.sh`.
+- **Bundle caching**: `http.server` caches aggressively. `build.sh` stamps a fresh content-hash into `<script src="bundle.js?v=…">` automatically — no manual bump needed.
 - **CSS layer priority**: Adding dark-mode overrides to `@layer base` won't work if same selector is in `@layer components`. Put overrides in `@layer components`.
 - **`innerText` vs `textContent`**: `innerText` returns `""` for elements inside collapsed `<details>`. Use `textContent` or call `syncSettingsFromDOM()` which uses `.value` / `.checked` (not innerText).
 - **`updatePageScales()` calls `renderActivePage()`**: it only re-renders the active page. After navigation, `showPage(n)` calls `renderActivePage()` automatically.
@@ -281,6 +282,20 @@ Price IDs are read from env vars at module load (`PLAN_PRICE_IDS` is a plain con
 3. Call `showUpgradePrompt(message)` for free-tier users hitting the wall; `showToast(message, 'warning')` for pro users at their (higher) cap
 4. If it affects a DOM control (like `bulkCount`), update `_updateBulkLimit()` or write an equivalent function and register it in the `onChange` callback
 5. To meter usage of a metered resource, record it via the usage endpoint pattern (`POST /api/usage/*`) keyed by `licenseManager.getClientId()` / stored key.
+
+---
+
+## Deployment
+GitHub Actions (`.github/workflows/deploy.yml`) auto-deploys on every push to `main`:
+1. `bash build.sh` → stage `dist/` → deploy to GitHub Pages
+2. **Only runtime files are published** (`puzzle-suite.html`, `index.html`,
+   `puzzle-suite.css`, `bundle.js`, `.nojekyll`). Internal docs (`CLAUDE.md`,
+   `memory.md`, `monetisation.md`), `server/`, and `.claude/` are deliberately
+   NOT deployed — when adding a new runtime asset, add it to the "Stage
+   deployable files" step in `deploy.yml`.
+3. `index.html` redirects `/` → `puzzle-suite.html` for a clean entry URL
+
+The payment server (`server/`) is **not** deployed by this workflow — deploy it separately per `DEPLOY.md` (Fly.io, Render, Railway, or a VPS).
 
 ---
 
