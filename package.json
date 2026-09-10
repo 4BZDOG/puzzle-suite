@@ -5,9 +5,11 @@
   "private": true,
   "scripts": {
     "build": "bash build.sh",
-    "start": "python3 -m http.server 8082"
+    "start": "python3 -m http.server 8082",
+    "test:pdf": "node tests/pdfLayout.test.mjs"
   },
   "devDependencies": {
-    "esbuild": "^0.25.0"
+    "esbuild": "^0.25.0",
+    "jspdf": "^2.5.1"
   }
 }

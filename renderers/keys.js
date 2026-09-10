@@ -2,6 +2,8 @@
 // renderers/keys.js — Page 5: Answer keys preview
 // =============================================================
 
+import { capsuleOverlay } from './wordSearch.js';
+
 const escapeHTML = str => str.replace(/[&<>'"]/g, tag => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
 }[tag]));
@@ -34,10 +36,11 @@ export function renderKeys(container, puzzleData, settings) {
     if (hasWS) {
         let wsHTML = '<div class="split-half"><div class="split-title">WORD SEARCH</div>';
         const ws = puzzleData.ws;
-        const zWS = Math.min(16, Math.floor(availW / ws.size));
+        const zWS = Math.min(20, Math.floor(availW / ws.size));
 
         wsHTML += `<div style="flex:1; display:flex; justify-content:center; align-items:center;">
             <div class="pdf-force-key">
+            <div class="ws-grid-wrap">
             <div class="grid mode-search" style="grid-template-columns: repeat(${ws.size},${zWS}px); grid-template-rows: repeat(${ws.size},${zWS}px);">`;
 
         for (let y = 0; y < ws.size; y++) {
@@ -46,7 +49,9 @@ export function renderKeys(container, puzzleData, settings) {
                 wsHTML += `<div class="cell${isFound}" style="--cell-size: ${zWS}px">${ws.grid[y][x]}</div>`;
             }
         }
-
+        wsHTML += '</div>';
+        // Ring each answer instead of dimming everything around it.
+        wsHTML += capsuleOverlay(ws.wordPositions, zWS, ws.size * zWS, { stroke: '#dc143c', width: 1.4 });
         wsHTML += '</div></div></div></div>';
         htmlStr += wsHTML;
     }
@@ -79,7 +84,8 @@ export function renderKeys(container, puzzleData, settings) {
 
     // Scramble key
     if (hasScr) {
-        let scrHTML = '<div class="split-half"><div class="split-title">WORD SCRAMBLE</div><div class="scramble-solution">';
+        const scrCols = puzzleData.scr.length > 12 ? ' two-col' : '';
+        let scrHTML = `<div class="split-half"><div class="split-title">WORD SCRAMBLE</div><div class="scramble-solution${scrCols}">`;
         puzzleData.scr.forEach(s => {
             scrHTML += `<div class="scr-sol-row"><span>${escapeHTML(s.scrambled)}</span><b>${escapeHTML(s.original)}</b></div>`;
         });
@@ -89,7 +95,8 @@ export function renderKeys(container, puzzleData, settings) {
 
     // Matching key
     if (isMatching && puzzleData.notes) {
-        let notesHTML = '<div class="split-half"><div class="split-title">MATCHING KEY</div><div class="scramble-solution">';
+        const noteCols = puzzleData.notes.length > 12 ? ' two-col' : '';
+        let notesHTML = `<div class="split-half"><div class="split-title">MATCHING KEY</div><div class="scramble-solution${noteCols}">`;
         puzzleData.notes.forEach((n, i) => {
             notesHTML += `<div class="scr-sol-row"><span>${i + 1}. ${escapeHTML(n.term)}</span><b style="color:var(--danger)">${escapeHTML(n.correctLetter)}</b></div>`;
         });

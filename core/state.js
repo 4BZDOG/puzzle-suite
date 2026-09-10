@@ -51,6 +51,7 @@ export const state = {
         cwSeparateClues: false,
         scrShowHint:    false,
         showExample:    true,
+        showLetterCount: true,
         wmOpacity:      0.15,
         titleScale:     1,
         paperSize:      'a4',
@@ -147,6 +148,7 @@ export function syncSettingsFromDOM() {
     s.cwSeparateClues = getChk('cwSeparateClues', s.cwSeparateClues);
     s.scrShowHint    = getChk('scrShowHint', s.scrShowHint);
     s.showExample    = getChk('showExample', s.showExample);
+    s.showLetterCount = getChk('showLetterCount', s.showLetterCount);
     s.titleScale     = parseFloat(getVal('titleScale', s.titleScale));
     s.paperSize      = getVal('paperSize', s.paperSize);
     s.wmOpacity      = parseFloat(
@@ -259,6 +261,7 @@ export function applyStateToDOM(s) {
     setChk('cwSeparateClues', cfg.cwSeparateClues);
     setChk('scrShowHint',    cfg.scrShowHint);
     setChk('showExample',    cfg.showExample);
+    setChk('showLetterCount', cfg.showLetterCount !== false);
     setVal('titleScale',     cfg.titleScale);
     setVal('paperSize',      cfg.paperSize);
 

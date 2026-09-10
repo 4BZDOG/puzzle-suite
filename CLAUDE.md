@@ -10,6 +10,16 @@ python3 -m http.server 8082    # serve at http://localhost:8082/puzzle-suite.htm
 After any JS change just rerun `bash build.sh` — it stamps a fresh content-hash into
 the `<script src="bundle.js?v=…">` tag automatically. No manual bump needed.
 
+```bash
+npm run test:pdf               # PDF layout regression tests (headless, no browser)
+npm run test:pdf -- --write    # …and write sample PDFs to tests/__out__/
+```
+`tests/pdfLayout.test.mjs` drives the real drawers with real generated puzzle
+data and asserts on where things landed: crossword on one page, pages filled
+past 80%, no two text runs overlapping on a baseline, no Times fallback, key
+numbers present, scaffolding toggles honoured. Run it after touching anything
+in `pdf/`.
+
 ### Payment server (optional — required for license features)
 ```bash
 cd server
@@ -79,10 +89,56 @@ The `onChange` listener is registered *before* `init()` is called. When `init()`
 ### PDF Export (`pdf/pdfExport.js`)
 1. Creates jsPDF doc with paper size from `cfg.paperSize`
 2. Loads custom font (Inter/Roboto/Lora/Comic) via `pdfFonts.js`
-3. Builds a `ctx` context object via `buildCtx()` — carries doc, dimensions, scale, pdfFont, drawWatermark
+3. Builds a `ctx` context object via `buildCtx()` — carries doc, dimensions, scale, pdfFont, drawWatermark, plus the scaffolding flags (`showExample`, `showLetterCount`, `cwShowBank`)
 4. Loops over sets (bulk export), then page types in `cfg.pageOrder`
-5. Each page: `drawHeader(ctx, title, sub, instruction, isKey, setIndicator, pScale)` → returns Y where content starts
-6. Passes layout `{ x, y, w, h }` to each `drawXxx()` function
+5. Each page: `drawHeader(ctx, title, sub, instruction, isKey, setIndicator, pScale, { label, accent })` → returns Y where content starts
+6. Passes a layout `{ x, y, w, h }` (`contentBox(sy)`, which reserves `FOOTER_H`) to each `drawXxx()` function
+7. `drawFooter(ctx, pScale, { right })` closes each page with a hairline, the worksheet title and a page number
+
+`PAGE_META` maps each page type to its header chip label and accent colour.
+Usage metering reports `doc.internal.getNumberOfPages()` (actual sheets), not
+the pre-export estimate, because a crossword that has to split costs one more.
+
+### Page budgeting (layout engine)
+Every activity page is *measured before it is drawn* and then fitted, so a
+short word list does not leave a third of the sheet blank and a long one does
+not spill onto a second sheet:
+
+| Page | Strategy |
+|------|----------|
+| Notes | Binary-search a single scale `k` (type size + leading together, 0.72–1.7) for the largest that still fits one page. Term-column width is measured **at the chosen size**. Leftover below 40 mm is centred; above that it becomes a ruled `NOTES` writing area (`drawRuledArea`). |
+| Word search | Word-bank height is computed first, then the grid is sized into what remains (cells up to 11 mm) and the slack centred. |
+| Crossword | `drawCrosswordPage()` — see below. |
+| Scramble | Fewest columns that fit (1 → 2 → 3) so answer lines stay long; rows spread across the full height, capped at 22 mm and centred; dotted leaders bridge word → answer line. |
+| Answer key | Quadrants adapt to how many keys are actually present (1 → full page, 2 → halves, 3–4 → quadrants). |
+
+### Single-page crossword compiler (`pdf/pdfDrawCrossword.js`)
+`drawCrosswordPage(ctx, cwData, layout, pScale, forceSplit)` solves grid cell
+size and clue type size **together** instead of giving the grid a fixed 45% of
+the page. It scans cell sizes from 12 mm down to 4.6 mm and, for each, finds the
+largest clue point size that fits, in two candidate arrangements:
+
+- **below** — clues in two columns under the grid (the familiar worksheet shape)
+- **beside** — clues in one column next to the grid (suits tall, narrow grids and
+  soaks up the whitespace a portrait grid leaves)
+
+Score is `min(pt, IDEAL_PT) * 100 + cellSize`: legibility wins until clues reach
+9.5 pt, after which the grid takes the remaining room. Clue heights are memoised
+per (list, column width, point size), so the scan is cheap.
+
+It returns `{ splitNeeded }`. `true` only when the teacher explicitly asked for
+`cwSeparateClues`, or when the puzzle genuinely cannot fit at minimum size — the
+caller then draws `drawCrosswordClues()` on a following page. **Clues never
+split by accident.**
+
+### Shared PDF primitives (`pdf/pdfHelpers.js`)
+- `PALETTE` — one colour language: `example` (blue) for scaffolding, `key` (crimson) for teacher answers
+- `setFontSafe` / `resolveStyle` / `hasFontStyle` — **never** call `doc.setFont(font, style)` directly. Custom fonts are registered in `normal` and `bold` only; asking jsPDF for a style a font lacks makes it silently fall back to **Times**, which is what used to put a Times-italic subtitle under an Inter title.
+- `drawCapsule` — stadium outline along a word path, built as a real polygon so it can be stroked without painting over grid lines or letters. Used for the student's worked example (blue) and every word-search solution on the key (crimson).
+- `drawExamplePill` / `examplePillWidth` — the single EXAMPLE marker used by all four activities. Always reserve `examplePillWidth()` when wrapping the text it will sit beside.
+- `drawLeader` — dotted leader (scramble answer lines, matching-key answers)
+- `drawRuledArea` — ruled writing space for leftover page height
+- `drawHeader` auto-fits the title and subtitle to the width left by the NAME/DATE block, so a real unit name no longer runs through the rule.
 
 ### Emoji in PDF
 PDF fonts (helvetica + custom loaded fonts) don't support emoji. The canvas fallback in `pdf/pdfHelpers.js`:
@@ -95,7 +151,17 @@ PDF fonts (helvetica + custom loaded fonts) don't support emoji. The canvas fall
 ### Renderers (HTML preview)
 `renderNotes / renderWordSearch / renderCrossword / renderScramble` write to DOM containers directly. They are called by `renderActivePage()` (main.js) which routes to the correct renderer based on `state.activePage`.
 
-The crossword renderer auto-scales clues to fit one page via `_autoScaleCluesToFit()` after DOM insertion.
+The crossword renderer keeps the whole page on one sheet via
+`_fitCrosswordPage()` after DOM insertion: clue type, the word bank **and** the
+grid give way together (the Grid Scale slider becomes a requested maximum
+rather than a hard size). Scaling only the clues used to drive them to 5.5 pt
+while the word bank still hung off the bottom of the page.
+
+The word-search renderer draws highlights as an SVG capsule overlay
+(`capsuleOverlay()`, exported from `renderers/wordSearch.js` and reused by
+`renderers/keys.js`) rather than tinting individual cells — a diagonal or
+backwards word tinted cell-by-cell reads as scattered specks, not a word. The
+overlay needs `z-index: 2` because `.cell` sits at `z-index: 1`.
 
 ### Word List Status Coloring
 `renderWordList()` and `renderStatus()` now accept an `activePage` parameter:
@@ -248,6 +314,9 @@ Price IDs are read from env vars at module load (`PLAN_PRICE_IDS` is a plain con
 - **Matching `isMatching` detection**: ALWAYS check `'matchLetter' in data[0]`, never `settings.notesConfig.shuffle` alone in a renderer. Settings-driven detection causes "undefined." rendering and wrong layout class when puzzle hasn't been generated yet.
 - **`clueTermLength` in matching mode**: when writing any code that displays `(N)` after a definition in matching context, use `w.clueTermLength` not `w.term.length`. They diverge because definitions are shuffled across rows.
 - **Editing clues in matching mode**: `updateWord` patches `puzzleData.notes` in-place via `clueOrigIdx`. If you add new code paths that mutate clues, follow this same pattern or call `debouncedGenerate()`.
+- **Never call `doc.setFont()` directly in PDF code**: use `setFontSafe()`. A missing style (italic, in every custom font) makes jsPDF fall back to Times without warning.
+- **Reserve room for the EXAMPLE pill**: when wrapping text the pill will sit beside, subtract `examplePillWidth()` from the wrap width, in the measuring pass *and* the drawing pass, or the pill lands on the words.
+- **Measure at the size you will draw at**: the notes page picks its type size after measuring, so column widths must be measured at the chosen size, not at a nominal 10 pt.
 - **XSS in renderers**: ALL six renderer files (notes, crossword, wordSearch, scramble, keys, wordList) use `escapeHTML()` on user-controlled strings before innerHTML injection. When adding new renderers or modifying existing ones, always escape term/clue/word data. Input sanitization (A-Z only) is defense layer 1; output escaping is defense layer 2.
 - **Word charset is A-Z only**: `updateWord` strips non-A-Z, `processImport` strips non-A-Z, `applyStateToDOM` sanitizes JSON imports to A-Z. All three paths must stay consistent.
 - **JSON import sanitization**: `applyStateToDOM` validates and sanitizes `s.words` — filters non-objects, strips non-A-Z from terms, coerces types. This prevents stored XSS via crafted config files.
@@ -266,6 +335,17 @@ Price IDs are read from env vars at module load (`PLAN_PRICE_IDS` is a plain con
 - **Stripe webhook secret**: the `STRIPE_WEBHOOK_SECRET` (`whsec_...`) comes from the Stripe dashboard webhook configuration, not the API keys page.
 
 ---
+
+## Difficulty scaffolding toggles
+Three settings control how much help a worksheet gives; all three flow through
+`buildCtx()` into every drawer, and the HTML preview reads them from
+`state.settings` so preview and print agree:
+
+| Setting | Control | Effect |
+|---------|---------|--------|
+| `showExample` | Difficulty & Scaffolding card | One worked example per activity, marked with the shared EXAMPLE pill |
+| `showLetterCount` | Difficulty & Scaffolding card | The `(n)` letter-count hint after definitions, clues and clue-style word banks |
+| `cwShowBank` | Crossword card | Word bank under the crossword clues (**now honoured in the PDF**, not just the preview) |
 
 ## Adding a New Setting
 1. Add default to `state.settings` in `core/state.js`
@@ -358,6 +438,50 @@ Status dots reflect placement in the currently-visible puzzle page.
 
 ### Stale State on Toggle Changes
 `renderActivePage()` calls `syncSettingsFromDOM()` at start so toggles take effect instantly.
+
+---
+
+## Session Fixes (2026-09-10 — Worksheet Layout & Answer Key Review)
+
+Acting on a teacher review of a printed 6-page worksheet.
+
+### Layout engine
+- **Single-page crossword compiler** (`drawCrosswordPage`): grid size and clue
+  type are solved together over two candidate arrangements (clues below, clues
+  beside). Grid and clues no longer split across two sheets unless asked for.
+- **Page budgeting everywhere**: notes scale type+leading to fill the sheet
+  (and turn genuine leftover into ruled writing space); the word search sizes
+  its grid around the word bank; scramble rows spread down the page in as few
+  columns as fit; key quadrants adapt to how many keys exist.
+- **Header auto-fit**: long unit titles no longer run through the NAME rule.
+
+### Answer key
+- **`COORDINATEA` fixed**: the matching key reserves a letter column, trims the
+  term with an ellipsis if needed and joins the two with a dotted leader. Same
+  treatment for the scramble key, whose size is solved from the widest pair.
+- **Word-search key**: crimson capsule rings trace each solution path; filler
+  letters recede to mid-grey instead of near-white.
+- **Crossword key**: clue numbers are drawn alongside the solution letters.
+- The key page now goes through `drawHeader()` instead of duplicating it.
+
+### Consistency & typography
+- **One example language**: a single blue EXAMPLE pill plus a blue capsule /
+  pre-filled answer, in all four activities and in the HTML preview.
+- **Times fallback removed**: `setFontSafe()`/`resolveStyle()` keep every run
+  inside the selected family (the italic subtitle was silently becoming Times).
+- **Ghost cells fixed**: word-search highlights are one connected capsule
+  (vector in the PDF, SVG overlay in the preview), not per-cell tints.
+- Activity chips + a running footer (title, activity, page number) give each
+  page identity and make a printed class set collatable.
+
+### Scaffolding controls
+- New `showLetterCount` toggle for `(n)` hints; `cwShowBank` now reaches the
+  PDF; `showExample` unchanged.
+
+### Tests
+- `tests/pdfLayout.test.mjs` (`npm run test:pdf`) — 25 assertions over real
+  generated puzzles, including a general "no two text runs overlap on a
+  baseline" check that would have caught the answer-key collision.
 
 ---
 

@@ -31,26 +31,6 @@ export function renderNotes(container, puzzleData, words, settings, onUpdateWord
         return;
     }
 
-    // Auto-widen term column so no term wraps to a second line.
-    // Measure terms with a temp canvas using the current resolved font.
-    if (container.offsetWidth > 0) {
-        const cs = getComputedStyle(document.documentElement);
-        const fsBase = parseFloat(cs.getPropertyValue('--notes-font-size') || '14');
-        const gScale = parseFloat(cs.getPropertyValue('--global-font-scale') || '1');
-        const pScale = parseFloat(cs.getPropertyValue('--page-scale') || '1');
-        const fontFamily = (cs.getPropertyValue('--user-font') || 'sans-serif').trim();
-        const fontSize = fsBase * gScale * pScale;
-        const canvas = document.createElement('canvas');
-        const ctx2d = canvas.getContext('2d');
-        ctx2d.font = `bold ${fontSize}px ${fontFamily}`;
-        const maxTermPx = Math.max(...targetData.map(w => ctx2d.measureText(w.term).width));
-        // +20px for padding-right; cap at 70% to preserve definition column space
-        const minPct = Math.min(70, Math.ceil(((maxTermPx + 20) / container.offsetWidth) * 100));
-        if (minPct > settings.notesConfig.termWidth) {
-            document.documentElement.style.setProperty('--notes-term-width', minPct + '%');
-        }
-    }
-
     const isMatching = hasMatchingData;
     let cls = 'notes-table';
     if (!settings.notesConfig.showTerm) cls += ' hide-term';
@@ -64,6 +44,8 @@ export function renderNotes(container, puzzleData, words, settings, onUpdateWord
         </div>`;
 
     const showExample = settings.showExample;
+    const showLetterCount = settings.showLetterCount !== false;
+    const lenHint = (n) => showLetterCount ? `<span class="notes-clue-length">(${n})</span>` : '';
 
     targetData.forEach((w, i) => {
         const isExample = showExample && i === 0;
@@ -81,11 +63,19 @@ export function renderNotes(container, puzzleData, words, settings, onUpdateWord
 
         if (isMatching) {
             htmlStr += `<div class="notes-editable">${escapeHTML(w.matchLetter)}. ${escapeHTML(w.clue)}</div>`;
-            htmlStr += `<span class="notes-clue-length">(${w.clueTermLength ?? w.term.length})</span>`;
+            htmlStr += lenHint(w.clueTermLength ?? w.term.length);
+            if (isExample) htmlStr += '<span class="example-pill">EXAMPLE</span>';
         } else {
             htmlStr += `<div class="notes-editable" contenteditable="true" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}" onblur="window._puzzleApp.updateWord(${i}, 'clue', this.innerText)">${escapeHTML(w.clue)}</div>`;
-            htmlStr += `<span class="notes-clue-length">(${w.term.length})</span>`;
-            if (isExample) htmlStr += `<span class="scramble-example-label" style="margin-left:6px;">★ example: <b>${escapeHTML(w.term)}</b></span>`;
+            htmlStr += lenHint(w.term.length);
+            // The term is already on this row, so the example marker is the
+            // pill alone — unless the term column is hidden (a real task).
+            if (isExample) {
+                if (!settings.notesConfig.showTerm) {
+                    htmlStr += ` <b style="color:#2563eb">${escapeHTML(w.term)}</b>`;
+                }
+                htmlStr += '<span class="example-pill">EXAMPLE</span>';
+            }
         }
 
         htmlStr += '</div></div>';
@@ -93,6 +83,48 @@ export function renderNotes(container, puzzleData, words, settings, onUpdateWord
 
     htmlStr += '</div>';
     container.innerHTML = htmlStr;
+    _widenTermColumn(container, targetData);
+}
+
+/**
+ * Widen the term column until no term wraps to a second line.
+ *
+ * Measured against the *rendered* font (read back off a real cell) rather
+ * than a reconstruction of it from CSS variables — the reconstruction was
+ * a few pixels optimistic, which is how "SUBSTITUTION" ended up broken
+ * across two lines.
+ */
+function _widenTermColumn(container, targetData) {
+    if (!container.offsetWidth || !targetData.length) return;
+    const sample = container.querySelector('.notes-word .notes-editable');
+    const cell = sample && sample.parentElement;
+    if (!cell || !cell.clientWidth) return;
+
+    const cs = getComputedStyle(sample);
+    const canvas = document.createElement('canvas');
+    const ctx2d = canvas.getContext('2d');
+    if (!ctx2d) return;
+    ctx2d.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+    const needed = Math.max(...targetData.map(w => ctx2d.measureText(w.term).width));
+
+    // Compare against the text box itself — the cell and the editable inside
+    // it both carry padding, and measuring the wrong one leaves a long term
+    // a few pixels short of fitting.
+    const innerPad = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+    const availNow = () => sample.clientWidth - innerPad;
+    if (!(availNow() > 0) || needed <= availNow() - 1) return;
+
+    // The column percentage does not map linearly to pixels (the # column and
+    // cell padding sit outside it), so widen by the measured shortfall and
+    // re-check, capped at 70% to keep the definition column usable.
+    const root = document.documentElement;
+    let pct = parseFloat(getComputedStyle(root).getPropertyValue('--notes-term-width')) || 20;
+    for (let i = 0; i < 6 && pct < 70; i++) {
+        const deficit = needed - (availNow() - 1);
+        if (deficit <= 0) return;
+        pct = Math.min(70, pct + Math.max(1, Math.ceil((deficit + 6) / container.offsetWidth * 100)));
+        root.style.setProperty('--notes-term-width', pct + '%');
+    }
 }
 
 /**

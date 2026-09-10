@@ -7,13 +7,25 @@ import { showToast } from '../ui/toast.js';
 import { licenseManager } from '../license/licenseManager.js';
 import { createPuzzleData } from '../core/puzzleDataBuilder.js';
 import { loadJSPDF, loadFontForPDF, FONT_SELECT_MAP } from './pdfFonts.js';
-import { buildCtx, drawHeader } from './pdfHelpers.js';
+import { buildCtx, drawHeader, drawFooter } from './pdfHelpers.js';
 import { drawWordSearch } from './pdfDrawWordSearch.js';
-import { drawCrossword, drawCrosswordClues } from './pdfDrawCrossword.js';
+import { drawCrosswordPage, drawCrosswordClues } from './pdfDrawCrossword.js';
 import { drawScramble } from './pdfDrawScramble.js';
 import { drawNotes, drawMasterKeyPage } from './pdfDrawNotes.js';
 
 let isExporting = false;
+
+// Per-activity identity: a coloured chip in the header instead of five
+// pages of identical grey type. Accents are reused by nothing else.
+const PAGE_META = {
+    notes: { label: 'VOCABULARY',  accent: [99, 102, 241] },
+    ws:    { label: 'WORD SEARCH', accent: [13, 148, 136] },
+    cw:    { label: 'CROSSWORD',   accent: [124, 58, 237] },
+    scr:   { label: 'WORD SCRAMBLE', accent: [217, 119, 6] },
+};
+
+// Room left under the content box for the running footer.
+const FOOTER_H = 10;
 
 // Premium font select values (gated behind the premiumFonts feature flag)
 const PREMIUM_FONT_VALUES = ["'Lora', serif", "'Comic Neue', cursive"];
@@ -170,53 +182,62 @@ export async function exportPDF() {
                 // Yield to main thread so progress bar updates and browser does not crash
                 await new Promise(r => setTimeout(r, 0));
 
+                const meta = PAGE_META[pType];
+                const contentBox = (sy) => ({
+                    x: MARGIN, y: sy,
+                    w: PAGE_WIDTH - 2 * MARGIN,
+                    h: PAGE_HEIGHT - sy - MARGIN - FOOTER_H,
+                });
+
                 if (pType === 'notes') {
                     addPage();
                     const ps = getPScale('notes');
                     const isMatchingMode = cfg.notesConfig?.shuffle;
                     const notesInstruction = isMatchingMode
-                        ? '🃏 VOCABULARY MATCHING - MATCH EACH TERM TO ITS CORRECT DEFINITION.'
-                        : '📋 LIST OF TERMS AND DEFINITIONS.';
-                    const sy = drawHeader(ctx, title, sub, notesInstruction, false, setIndicator, ps);
+                        ? '🃏 Write the letter of the definition that matches each term.'
+                        : '📋 Terms and definitions for this unit.';
+                    const sy = drawHeader(ctx, title, sub, notesInstruction, false, setIndicator, ps, meta);
                     drawNotes(ctx, cpd.notes, sy, ps);
+                    drawFooter(ctx, ps, { right: meta.label });
 
                 } else if (pType === 'ws') {
                     addPage();
                     const ps = getPScale('ws');
-                    const sy = drawHeader(ctx, title, sub, '🔍 WORD SEARCH - HIGHLIGHT THE WORDS LISTED IN THE GRID.', false, setIndicator, ps);
-                    const layout = { x: MARGIN, y: sy, w: PAGE_WIDTH - 2 * MARGIN, h: PAGE_HEIGHT - sy - 30 * ps };
-                    drawWordSearch(ctx, cpd.ws, layout, state.words, cfg.wsUseClues, false, ps);
+                    const sy = drawHeader(ctx, title, sub, '🔍 Find and circle each word from the list in the grid.', false, setIndicator, ps, meta);
+                    drawWordSearch(ctx, cpd.ws, contentBox(sy), state.words, cfg.wsUseClues, false, ps);
+                    drawFooter(ctx, ps, { right: meta.label });
 
                 } else if (pType === 'cw') {
                     const ps = getPScale('cw');
                     const useSeparateClues = cfg.cwSeparateClues;
                     addPage();
                     const cwInstruction = useSeparateClues
-                        ? '✏️ CROSSWORD - USE THE CLUES ON THE FOLLOWING PAGE TO FILL IN THE GRID.'
-                        : '✏️ CROSSWORD - USE THE CLUES PROVIDED TO FILL IN THE GRID.';
-                    const sy = drawHeader(ctx, title, sub, cwInstruction, false, setIndicator, ps);
-                    if (useSeparateClues) {
-                        const layout = { x: MARGIN, y: sy, w: PAGE_WIDTH - 2 * MARGIN, h: PAGE_HEIGHT - sy - MARGIN };
-                        drawCrossword(ctx, cpd.cw, layout, false, ps, true);
+                        ? '✏️ Use the clues on the next page to fill in the grid.'
+                        : '✏️ Use the clues to fill in the grid.';
+                    const sy = drawHeader(ctx, title, sub, cwInstruction, false, setIndicator, ps, meta);
+                    // The compiler keeps grid + clues on one page unless the
+                    // teacher asked for a split (or it is physically impossible).
+                    const res = drawCrosswordPage(ctx, cpd.cw, contentBox(sy), ps, useSeparateClues);
+                    drawFooter(ctx, ps, { right: meta.label });
+                    if (res.splitNeeded) {
                         addPage();
-                        const cluesSy = drawHeader(ctx, title, sub, '✏️ CROSSWORD CLUES', false, setIndicator, ps);
+                        const cluesSy = drawHeader(ctx, title, sub, '✏️ Clues for the grid on the previous page.', false, setIndicator, ps, meta);
                         drawCrosswordClues(ctx, cpd.cw, cluesSy, ps);
-                    } else {
-                        const layout = { x: MARGIN, y: sy, w: PAGE_WIDTH - 2 * MARGIN, h: (PAGE_HEIGHT - sy) * 0.45 };
-                        drawCrossword(ctx, cpd.cw, layout, false, ps);
+                        drawFooter(ctx, ps, { right: 'CROSSWORD CLUES' });
                     }
 
                 } else if (pType === 'scr') {
                     addPage();
                     const ps = getPScale('scr');
-                    const sy = drawHeader(ctx, title, sub, '🔀 WORD SCRAMBLE - UNSCRAMBLE THE LETTERS TO FIND THE WORDS.', false, setIndicator, ps);
-                    const layout = { x: MARGIN, y: sy, w: PAGE_WIDTH - 2 * MARGIN, h: PAGE_HEIGHT - sy - MARGIN };
-                    drawScramble(ctx, cpd.scr, layout, false, scrShowHint, ps);
+                    const sy = drawHeader(ctx, title, sub, '🔀 Unscramble each set of letters and write the word.', false, setIndicator, ps, meta);
+                    drawScramble(ctx, cpd.scr, contentBox(sy), false, scrShowHint, ps);
+                    drawFooter(ctx, ps, { right: meta.label });
 
                 } else if (pType === 'key') {
                     addPage();
                     const ps = getPScale('key');
                     drawMasterKeyPage(ctx, title, sub, cpd, selections, ps);
+                    drawFooter(ctx, ps, { right: 'TEACHER KEY' });
                 }
             }
         }
@@ -226,9 +247,13 @@ export async function exportPDF() {
         await new Promise(r => setTimeout(r, 100));
 
         doc.save(filename + '.pdf');
-        // Record usage for monetisation metering (fire-and-forget, non-blocking)
+        // Record usage for monetisation metering (fire-and-forget, non-blocking).
+        // Report what was actually produced — a crossword that had to split
+        // costs one page more than the pre-export estimate.
+        let actualPages = totalPages;
+        try { actualPages = doc.internal.getNumberOfPages() || totalPages; } catch (_) { }
         licenseManager.recordPdfUsage({
-            pages: totalPages,
+            pages: actualPages,
             sets: count,
             pageTypes: selectedPages.join(','),
         }).catch(() => {});

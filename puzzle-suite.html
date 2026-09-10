@@ -454,12 +454,17 @@
                 </details>
                 <details class="setting-card">
                     <summary>
-                        <div class="card-header-inner"><i class="fas fa-star"></i> Example Answer</div>
+                        <div class="card-header-inner"><i class="fas fa-sliders-h"></i> Difficulty &amp; Scaffolding</div>
                     </summary>
                     <div class="card-content">
                         <div class="toggle-row"><label for="showExample">Show 1 Worked Example</label><label class="switch"><input
                                     type="checkbox" id="showExample" onchange="renderActivePage(); saveState();"><span
                                     class="slider-switch"></span></label></div>
+                        <div class="toggle-row"><label for="showLetterCount">Show Letter Count Hints (n)</label><label class="switch"><input
+                                    type="checkbox" id="showLetterCount" checked onchange="renderActivePage(); saveState();"><span
+                                    class="slider-switch"></span></label></div>
+                        <p class="field-hint" style="margin-top:6px;">Word bank (Crossword / Word Search) and first-letter
+                            hints (Scramble) are in their own cards above.</p>
                     </div>
                 </details>
             </div>
@@ -546,7 +551,7 @@
                             <div class="line"><span>Date:</span></div>
                         </div>
                     </div>
-                    <p class="disp-instruction" id="p1-instruction">📋 LIST OF TERMS AND DEFINITIONS.</p>
+                    <p class="disp-instruction" id="p1-instruction"><span class="activity-chip" style="--chip-accent:#6366f1">Vocabulary</span><span class="disp-instruction-text">📋 Terms and definitions for this unit.</span></p>
                     <div class="puzzle-area" id="p1-notes"
                         style="flex-direction: column; align-items: stretch; justify-content: flex-start; padding: 20px;">
                     </div>
@@ -566,7 +571,7 @@
                             <div class="line"><span>Date:</span></div>
                         </div>
                     </div>
-                    <p class="disp-instruction">🔍 WORD SEARCH - HIGHLIGHT THE WORDS LISTED IN THE GRID.</p>
+                    <p class="disp-instruction"><span class="activity-chip" style="--chip-accent:#0d9488">Word Search</span><span class="disp-instruction-text">🔍 Find and circle each word from the list in the grid.</span></p>
                     <div class="puzzle-area" id="p2-area"></div>
                     <div class="footer-area" id="p2-footer"></div>
                     <img class="watermark-img" src="" alt="">
@@ -585,7 +590,7 @@
                             <div class="line"><span>Date:</span></div>
                         </div>
                     </div>
-                    <p class="disp-instruction">✏️ CROSSWORD - USE THE CLUES PROVIDED TO FILL IN THE GRID.</p>
+                    <p class="disp-instruction"><span class="activity-chip" style="--chip-accent:#7c3aed">Crossword</span><span class="disp-instruction-text">✏️ Use the clues to fill in the grid.</span></p>
                     <div class="puzzle-area" id="p3-area"></div>
                     <div class="footer-area" id="p3-footer"></div>
                     <img class="watermark-img" src="" alt="">
@@ -604,7 +609,7 @@
                             <div class="line"><span>Date:</span></div>
                         </div>
                     </div>
-                    <p class="disp-instruction">🔀 WORD SCRAMBLE - UNSCRAMBLE THE LETTERS TO FIND THE WORDS.</p>
+                    <p class="disp-instruction"><span class="activity-chip" style="--chip-accent:#d97706">Word Scramble</span><span class="disp-instruction-text">🔀 Unscramble each set of letters and write the word.</span></p>
                     <div class="puzzle-area" id="p4-area"
                         style="align-items: flex-start; justify-content: flex-start; padding-top: 30px;"></div>
                     <img class="watermark-img" src="" alt="">
@@ -697,7 +702,7 @@
         </div>
     </div>
 
-    <script src="bundle.js?v=c45222b226"></script>
+    <script src="bundle.js?v=5adfe9ed5e"></script>
 </body>
 
 </html>
