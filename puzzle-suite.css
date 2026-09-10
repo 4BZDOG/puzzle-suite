@@ -1129,21 +1129,41 @@ main {
     letter-spacing: -0.02em;
 }
 
+/* One family, one hierarchy: the subtitle is tracked out rather than
+   italicised, which is what the PDF does now too (an italic here used to
+   pair a geometric sans title with a Times-ish italic subtitle). */
 .title-block p {
     margin: 6px 0 0 0;
-    font-style: italic;
-    color: #555;
-    font-size: calc(1rem * var(--global-font-scale) * var(--page-scale) * var(--title-scale, 1));
+    color: #64748b;
+    letter-spacing: 0.06em;
+    font-size: calc(0.95rem * var(--global-font-scale) * var(--page-scale) * var(--title-scale, 1));
     font-family: var(--user-font);
 }
 
 .disp-instruction {
     margin: 6px 0 16px 0;
-    font-size: calc(0.85rem * var(--global-font-scale) * var(--page-scale));
-    color: #666;
-    font-weight: 600;
-    text-transform: uppercase;
+    font-size: calc(0.82rem * var(--global-font-scale) * var(--page-scale));
+    color: #64748b;
+    font-weight: 500;
     font-family: var(--user-font);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Activity chip — mirrors the coloured chip in the exported PDF header */
+.activity-chip {
+    display: inline-block;
+    background: var(--chip-accent, #64748b);
+    color: #fff;
+    font-weight: 800;
+    font-size: calc(0.62rem * var(--global-font-scale) * var(--page-scale));
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border-radius: 999px;
+    padding: 3px 10px;
+    white-space: nowrap;
     flex-shrink: 0;
 }
 
@@ -1312,16 +1332,26 @@ table.mode-cw td.cell.empty {
     opacity: 0;
 }
 
+/* Rows are laid out on a grid so they can be spread down the whole sheet,
+   the way the PDF now distributes them, instead of bunching at the top of
+   two fixed columns. --scr-cols / --scr-rows are set by the renderer. */
 .scramble-container {
     width: 100%;
-    column-count: 2;
+    height: 100%;
+    min-height: 0;
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-columns: repeat(var(--scr-cols, 2), 1fr);
+    grid-template-rows: repeat(var(--scr-rows, 10), minmax(0, 1fr));
     column-gap: 40px;
 }
 
 .scramble-item {
     display: flex;
     align-items: flex-end;
-    margin-bottom: 24px;
+    /* content height, centred in its grid band — otherwise the example
+       row's highlight stretches into a tall block */
+    align-self: center;
     break-inside: avoid;
     page-break-inside: avoid;
     font-family: var(--user-font);
@@ -1375,17 +1405,30 @@ table.mode-cw td.cell.empty {
 }
 
 .pdf-force-key .mode-search .cell.found {
-    color: var(--danger) !important;
+    color: #0f172a !important;
     font-weight: 900;
 }
 
-.pdf-force-key .mode-search .cell.found::after {
-    content: '';
+/* Filler letters recede, but stay readable — the capsule rings carry
+   the answers, so there is no need to wash the grid out to near-white. */
+.pdf-force-key .mode-search .cell:not(.found) {
+    color: #7c8698 !important;
+}
+
+/* Word-search capsule overlay (student example + teacher key) */
+.ws-grid-wrap {
+    position: relative;
+    display: inline-block;
+    line-height: 0;
+}
+
+.ws-capsules {
     position: absolute;
-    inset: 2px;
-    border: 2px solid var(--danger);
-    border-radius: 50%;
+    left: 0;
+    top: 0;
     pointer-events: none;
+    /* .cell sits at z-index 1, so the ring has to be above it */
+    z-index: 2;
 }
 
 .word-bank-styled {
@@ -1589,11 +1632,54 @@ table.mode-cw td.cell.empty {
     overflow-y: auto;
 }
 
+/* Long key lists flow into columns instead of being clipped by the panel
+   (the PDF key already columnises — the preview now matches it). */
+.scramble-solution.two-col {
+    display: block;
+    column-count: 2;
+    column-gap: 18px;
+    font-size: calc(0.72rem * var(--global-font-scale) * var(--page-scale));
+}
+
+.scramble-solution.two-col .scr-sol-row {
+    break-inside: avoid;
+}
+
 .scr-sol-row {
     display: flex;
     justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
     border-bottom: 1px solid #eee;
     padding: 4px 0;
+}
+
+/* Dotted leader ties a key term to its answer letter (mirrors the PDF) */
+.scr-sol-row > span:first-child {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.scr-sol-row > b { flex: 0 0 auto; }
+
+/* One shared "worked example" marker across every preview page,
+   matching the EXAMPLE pill drawn in the PDF. */
+.example-pill {
+    display: inline-block;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    line-height: 1.5;
+    color: #2563eb;
+    background: #dbeafe;
+    border: 1px solid #2563eb;
+    border-radius: 999px;
+    padding: 0 6px;
+    margin-left: 6px;
+    vertical-align: middle;
+    white-space: nowrap;
 }
 
 #loading-overlay {
@@ -2319,6 +2405,14 @@ table.mode-cw td.cell.empty {
 }
 .bulk-limit-hint a { color: var(--primary); text-decoration: none; }
 .bulk-limit-hint a:hover { text-decoration: underline; }
+
+/* Sidebar helper text under a group of toggles */
+.field-hint {
+    font-size: 0.72rem;
+    line-height: 1.35;
+    color: var(--text-muted);
+    margin: 0;
+}
 
 /* License modal overlay */
 #license-modal-overlay {

@@ -148,9 +148,13 @@ function updateNotesInstruction() {
     const el = document.getElementById('p1-instruction');
     if (!el) return;
     const isMatching = document.getElementById('notesShuffle')?.checked ?? state.settings.notesConfig.shuffle;
-    el.innerText = isMatching
-        ? '🃏 VOCABULARY MATCHING - MATCH EACH TERM TO ITS CORRECT DEFINITION.'
-        : '📋 LIST OF TERMS AND DEFINITIONS.';
+    // Write into the text span so the activity chip beside it survives.
+    const target = el.querySelector('.disp-instruction-text') || el;
+    target.innerText = isMatching
+        ? '🃏 Write the letter of the definition that matches each term.'
+        : '📋 Terms and definitions for this unit.';
+    const chip = el.querySelector('.activity-chip');
+    if (chip) chip.innerText = isMatching ? 'Matching' : 'Vocabulary';
 }
 
 function updateGridStyles() {

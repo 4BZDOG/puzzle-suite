@@ -59,11 +59,13 @@ export function renderCrossword(gridArea, footerArea, cwData, settings, preview 
                     const isEx = exCells.has(`${x},${y}`);
                     const letterIdx = firstAcross ? x - firstAcross.x : -1;
                     const letter = isEx ? firstAcross.word[letterIdx] : '';
-                    htmlStr += `<td class="cell${isEx ? ' cell-example' : ''}" style="width: ${z}px; height: ${z}px;">
+                    // Size comes from --cell-size on the table so the page
+                    // fitter below can rescale the grid in one assignment.
+                    htmlStr += `<td class="cell${isEx ? ' cell-example' : ''}">
                         <span class="cell-num">${v.num || ''}</span>${isEx ? `<span class="cell-example-letter">${letter}</span>` : ''}
                     </td>`;
                 } else {
-                    htmlStr += `<td class="cell empty" style="width: ${z}px; height: ${z}px;"></td>`;
+                    htmlStr += `<td class="cell empty"></td>`;
                 }
             }
             htmlStr += `</tr>`;
@@ -77,10 +79,12 @@ export function renderCrossword(gridArea, footerArea, cwData, settings, preview 
         const dn = cwData.placed.filter(w => w.dir === 'down').sort((a, b) => a.num - b.num);
 
         const exampleNum = firstAcross ? firstAcross.num : -1;
+        const showLetterCount = settings.showLetterCount !== false;
         const makeClueRows = (list) =>
             list.map(w => {
                 const isEx = settings.showExample && w.num === exampleNum && w.dir === 'across';
-                return `<div class="clue-row${isEx ? ' clue-example' : ''}"><span class="clue-num-bold">${isEx ? '★ ' : ''}${w.num}.</span><span>${escapeHTML(w.clue)} <span class="notes-clue-length">(${w.word.length})</span>${isEx ? ` <span class="scramble-example-label">example</span>` : ''}</span></div>`;
+                const len = showLetterCount ? ` <span class="notes-clue-length">(${w.word.length})</span>` : '';
+                return `<div class="clue-row${isEx ? ' clue-example' : ''}"><span class="clue-num-bold">${w.num}.</span><span>${escapeHTML(w.clue)}${len}${isEx ? '<span class="example-pill">EXAMPLE</span>' : ''}</span></div>`;
             }).join('');
 
         const separateClues = settings.cwSeparateClues;
@@ -106,23 +110,46 @@ export function renderCrossword(gridArea, footerArea, cwData, settings, preview 
             </div>`;
         }
         footerArea.innerHTML = html;
-        if (preview) _autoScaleCluesToFit(footerArea);
+        if (preview) _fitCrosswordPage(footerArea, z);
     }
 }
 
-function _autoScaleCluesToFit(footerEl) {
+/**
+ * Keep the whole crossword page on one sheet — the preview counterpart of
+ * the PDF's single-page compiler.
+ *
+ * Clue type, the word bank and the grid all give way together: scaling
+ * only the clues used to drive them to 5.5pt while the word bank still
+ * hung off the bottom of the page. The Grid Scale slider becomes the
+ * requested maximum rather than a hard size.
+ */
+function _fitCrosswordPage(footerEl, z) {
     const pageEl = footerEl.closest('.page');
     if (!pageEl) return;
-    const container = footerEl.querySelector('.clues-two-col');
-    if (!container) return;
-    container.style.fontSize = '';
+    const table = pageEl.querySelector('table.mode-cw');
+    const texts = ['.clues-two-col', '.word-bank-styled']
+        .map(sel => footerEl.querySelector(sel))
+        .filter(Boolean);
+
+    texts.forEach(t => { t.style.fontSize = ''; });
+    if (table) table.style.setProperty('--cell-size', z + 'px');
+
     const minH = parseFloat(getComputedStyle(pageEl).minHeight);
-    if (pageEl.scrollHeight <= minH + 2) return;
-    const curFontPx = parseFloat(getComputedStyle(container).fontSize);
-    const MIN_PT = 5.5;
-    let pt = curFontPx * 0.75;
-    while (pageEl.scrollHeight > minH + 2 && pt > MIN_PT) {
-        pt = Math.max(MIN_PT, pt - 0.25);
-        container.style.fontSize = pt + 'pt';
+    const fits = () => pageEl.scrollHeight <= minH + 2;
+    if (fits()) return;
+
+    const basePx = texts.map(t => parseFloat(getComputedStyle(t).fontSize));
+    const MIN_TEXT = 0.6, MIN_GRID = 0.5;
+    let tf = 1, gf = 1;
+    for (let i = 0; i < 40 && !fits(); i++) {
+        if (tf > MIN_TEXT && (i % 2 === 0 || gf <= MIN_GRID)) {
+            tf -= 0.04;
+            texts.forEach((t, k) => { t.style.fontSize = (basePx[k] * tf).toFixed(2) + 'px'; });
+        } else if (gf > MIN_GRID && table) {
+            gf -= 0.04;
+            table.style.setProperty('--cell-size', (z * gf).toFixed(2) + 'px');
+        } else {
+            break;
+        }
     }
 }
