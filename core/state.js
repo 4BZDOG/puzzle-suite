@@ -48,6 +48,10 @@ export const state = {
         cwOpacity:      1,
         cwLineWidth:    1,
         cwShowBank:     false,
+        // Retired. The compiler fits grid + clues on one sheet at 8-25 words,
+        // and splitting them put the grid and its clues on two different
+        // physical sheets when duplexed — students flipped paper for every
+        // clue. Kept as a field only so saved sessions can be migrated off it.
         cwSeparateClues: false,
         scrShowHint:    false,
         scrShowBank:    true,   // word bank under the scramble (scaffolding)
@@ -151,7 +155,7 @@ export function syncSettingsFromDOM() {
     s.cwOpacity      = parseFloat(getVal('cwOpacity', s.cwOpacity));
     s.cwLineWidth    = parseFloat(getVal('cwLineWidth', s.cwLineWidth));
     s.cwShowBank     = getChk('cwShowBank', s.cwShowBank);
-    s.cwSeparateClues = getChk('cwSeparateClues', s.cwSeparateClues);
+    s.cwSeparateClues = false;   // retired; never read from the DOM
     s.keysAtEnd  = getChk('keysAtEnd',  s.keysAtEnd);
     s.duplexSafe = getChk('duplexSafe', s.duplexSafe);
     s.scrShowHint    = getChk('scrShowHint', s.scrShowHint);
@@ -216,6 +220,9 @@ export function applyStateToDOM(s) {
     if (s.settings || s /* legacy flat format */) {
         const src = s.settings || s; // support both new and legacy saves
         Object.assign(state.settings, src);
+        // A session saved while the retired "clues on a separate page" option
+        // was on would otherwise keep splitting the crossword forever.
+        state.settings.cwSeparateClues = false;
         if (src.scales)      Object.assign(state.settings.scales,      src.scales);
         if (src.opts)        Object.assign(state.settings.opts,        src.opts);
         if (src.notesConfig) Object.assign(state.settings.notesConfig, src.notesConfig);
@@ -267,7 +274,6 @@ export function applyStateToDOM(s) {
     setVal('cwOpacity',      cfg.cwOpacity);
     setVal('cwLineWidth',    cfg.cwLineWidth);
     setChk('cwShowBank',     cfg.cwShowBank);
-    setChk('cwSeparateClues', cfg.cwSeparateClues);
     setChk('keysAtEnd',  cfg.keysAtEnd !== false);
     setChk('duplexSafe', cfg.duplexSafe !== false);
     setChk('scrShowHint',    cfg.scrShowHint);

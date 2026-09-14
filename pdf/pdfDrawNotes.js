@@ -184,20 +184,11 @@ export function drawNotes(ctx, notesList, startY, pScale) {
             doc.setFillColor(...PALETTE.band);
             doc.rect(MARGIN, bandY, availW, r.h, 'F');
         }
-        // The worked example is marked by a blue outline around the half that
-        // carries it, not by a background fill — the outline points at the
-        // example without disturbing the row rhythm.
-        if (isExTerm || isExDef) {
-            doc.setDrawColor(...PALETTE.example);
-            doc.setLineWidth(0.5);
-            if (isExTerm && isExDef) {
-                doc.roundedRect(MARGIN, bandY, availW, r.h, 1.2, 1.2, 'S');
-            } else if (isExTerm) {
-                doc.roundedRect(MARGIN, bandY, defX - MARGIN - 1, r.h, 1.2, 1.2, 'S');
-            } else {
-                doc.roundedRect(defX - 1.5, bandY, MARGIN + availW - defX + 1.5, r.h, 1.2, 1.2, 'S');
-            }
-        }
+        // No bounding box around the example. A fill broke the zebra bands
+        // into a checkerboard and an outline clipped the row number it ran
+        // through. The example is already unmistakable from its own content:
+        // a blue row number, the prefilled blue answer letter, and the
+        // EXAMPLE badge on the definition that answers it.
 
         setFontSafe(doc, pdfFont, 'bold');
         doc.setFontSize(fontPt);

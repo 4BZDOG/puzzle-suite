@@ -430,7 +430,7 @@ export function generateAllAsync(settings, variantSeed) {
             wsBack: s.wsBack ?? true,
             wsHard: s.wsHardFiller || false,
             wsCustomFillers: s.wsCustomFillers || '',
-            cwMaxWords: s.cwSeparateClues ? 999 : 15,
+            cwMaxWords: 15,
             variantSeed,
         });
     });

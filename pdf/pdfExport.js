@@ -48,11 +48,8 @@ const PREMIUM_FONT_VALUES = ["'Lora', serif", "'Comic Neue', cursive"];
  * A crossword with "clues on separate page" produces 2 pages; everything
  * else is 1 page each. This is the unit we meter for PDF monetisation.
  */
-function pagesPerSet(selectedPages, cfg) {
-  return selectedPages.reduce((n, p) => {
-    if (p === 'cw' && cfg.cwSeparateClues) return n + 2;
-    return n + 1;
-  }, 0);
+function pagesPerSet(selectedPages) {
+  return selectedPages.length;
 }
 
 export async function exportPDF() {
@@ -90,9 +87,6 @@ export async function exportPDF() {
 
     // --- Feature gating: block locked features for the current tier ---
     const lockedFeatures = [];
-    if (selections.cw && cfg.cwSeparateClues && !licenseManager.hasFeature('separateCluePages')) {
-        lockedFeatures.push('Crossword clues on a separate page');
-    }
     if (PREMIUM_FONT_VALUES.includes(cfg.font) && !licenseManager.hasFeature('premiumFonts')) {
         lockedFeatures.push('Premium fonts (Classic & Playful)');
     }
@@ -106,7 +100,7 @@ export async function exportPDF() {
     }
 
     // --- Page-quota check: monetise PDF generation by page ---
-    const totalPages = pagesPerSet(selectedPages, cfg) * (Number.isFinite(count) && count > 0 ? count : 1);
+    const totalPages = pagesPerSet(selectedPages) * (Number.isFinite(count) && count > 0 ? count : 1);
     const quota = await licenseManager.canExport(totalPages);
     if (!quota.allowed) {
         const u = quota.usage || {};
@@ -221,7 +215,10 @@ export async function exportPDF() {
                 usedTopologies.add(cpd.cw.signature);
             }
 
-            const setIndicator = count > 1 ? `SET ${i + 1}` : '';
+            // The set identifier is shown on EVERY export, single or bulk.
+            // A teacher holding a marked sheet and an answer key has no other
+            // way to tell which generated set they belong to.
+            const setIndicator = `SET ${i + 1}`;
             let pageInSet = 0;
 
             const addPage = () => {
@@ -235,7 +232,7 @@ export async function exportPDF() {
                 footerQueue.push({
                     page: doc.internal.getNumberOfPages(),
                     setIdx: i, pageInSet, pScale: ps, right,
-                    setLabel: count > 1 ? `Set ${i + 1}` : '',
+                    setLabel: `Set ${i + 1}`,
                 });
             };
 
@@ -272,18 +269,18 @@ export async function exportPDF() {
 
                 } else if (pType === 'cw') {
                     const ps = getPScale('cw');
-                    const useSeparateClues = cfg.cwSeparateClues;
                     const firstOfSet = addPage();
-                    const cwInstruction = useSeparateClues
-                        ? 'Use the clues on the next page to fill in the grid.'
-                        : 'Use the clues to fill in the grid.';
-                    const sy = drawHeader(ctx, title, sub, cwInstruction, false, setIndicator, ps,
-                        { ...meta, firstOfSet });
-                    // The compiler keeps grid + clues on one page unless the
-                    // teacher asked for a split (or it is physically impossible).
-                    const res = drawCrosswordPage(ctx, cpd.cw, contentBox(sy), ps, useSeparateClues);
+                    const sy = drawHeader(ctx, title, sub, 'Use the clues to fill in the grid.',
+                        false, setIndicator, ps, { ...meta, firstOfSet });
+                    // Grid and clues always share one sheet. Splitting them put
+                    // the grid on the back of one sheet and its clues on the
+                    // front of the next, so a student flipped paper for every
+                    // clue; the extra page also made the packet odd-length.
+                    const res = drawCrosswordPage(ctx, cpd.cw, contentBox(sy), ps, false);
                     queueFooter(ps, meta.label);
                     if (res.splitNeeded) {
+                        // Only reachable when a puzzle genuinely cannot fit at
+                        // the minimum cell size — not a teacher-facing option.
                         const cluesFirst = addPage();
                         const cluesSy = drawHeader(ctx, title, sub, 'Clues for the grid on the previous page.',
                             false, setIndicator, ps, { ...meta, firstOfSet: cluesFirst });
@@ -331,15 +328,15 @@ export async function exportPDF() {
             if (!isFirstPage) doc.addPage();
             isFirstPage = false;
             ctx.drawWatermark();
-            const setLabel = count > 1 ? `Set ${entry.setIdx + 1}` : '';
+            const setLabel = `Set ${entry.setIdx + 1}`;
             drawMasterKeyPage(ctx, title, sub, entry.cpd, selections, ps, setLabel);
             footerQueue.push({
                 page: doc.internal.getNumberOfPages(),
                 setIdx: -1, pageInSet: 0, pScale: ps, right: 'TEACHER KEY',
                 setLabel: '',
-                pageText: count > 1
-                    ? `Answer key ${k + 1} of ${keyQueue.length}  ·  Set ${entry.setIdx + 1}`
-                    : 'Answer key',
+                pageText: keyQueue.length > 1
+                    ? `Set ${entry.setIdx + 1} — Answer key ${k + 1} of ${keyQueue.length}`
+                    : `Set ${entry.setIdx + 1} — Answer key`,
             });
         });
 
