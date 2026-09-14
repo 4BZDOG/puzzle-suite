@@ -1,7 +1,10 @@
 // =============================================================
 // pdf/pdfDrawWordSearch.js
 // =============================================================
-import { PALETTE, drawCapsule, drawExamplePill, examplePillWidth, setFontSafe } from './pdfHelpers.js';
+import { PALETTE, drawCapsule, drawExamplePill, examplePillWidth, placeExamplePill, setFontSafe } from './pdfHelpers.js';
+import { pickWSExample } from '../core/exampleModel.js';
+
+export { pickWSExample };
 
 /**
  * Draw a word-search puzzle page (grid + word bank) onto the PDF.
@@ -27,7 +30,7 @@ export function drawWordSearch(ctx, wsData, layout, wordsList, showClues, isKey,
 
     const showLetterCount = ctx.showLetterCount !== false;
     const showExample = ctx.showExample || false;
-    const exWordPos = !isKey && showExample && wsData.wordPositions?.length ? wsData.wordPositions[0] : null;
+    const exWordPos = (!isKey && showExample) ? pickWSExample(wsData) : null;
 
     // ---- Budget the page: size the grid around the word bank it needs ----
     const items = (wsData.placed || []).map(w => {
@@ -46,12 +49,14 @@ export function drawWordSearch(ctx, wsData, layout, wordsList, showClues, isKey,
     const maxCellSize = isKey ? 8.5 : 11;
     const heightForGrid = isKey ? layout.h : Math.max(20, layout.h - bankH);
     const cSize = Math.min(layout.w / wsData.size, heightForGrid / wsData.size, maxCellSize);
-    const gridW = cSize * wsData.size;
+    // One cell size drives both axes: the grid is square by construction, so
+    // a diagonal capsule runs at a true 45 degrees through the cell centres.
+    const gridW = cSize * wsData.size, gridH = cSize * wsData.size;
 
     const ox = layout.x + (layout.w - gridW) / 2;
     // Centre whatever height is left over rather than dumping it at the foot.
-    const slack = Math.max(0, layout.h - bankH - gridW);
-    const oy = isKey ? layout.y + (layout.h - gridW) / 2 : layout.y + slack / 2;
+    const slack = Math.max(0, layout.h - bankH - gridH);
+    const oy = isKey ? layout.y + (layout.h - gridH) / 2 : layout.y + slack / 2;
 
     const fontSizePt = mmToPt(cSize) * 0.60;
     const showInternalGrid = ctx.wsInternalGrid || false;
@@ -135,12 +140,12 @@ export function drawWordSearch(ctx, wsData, layout, wordsList, showClues, isKey,
 
     doc.setDrawColor(...PALETTE.ink);
     doc.setLineWidth(0.5);
-    doc.rect(ox, oy, gridW, gridW, 'S');
+    doc.rect(ox, oy, gridW, gridH, 'S');
 
     if (isKey) return;
 
     // ---- Word bank ----
-    const bankY = oy + gridW + 8 * scale;
+    const bankY = oy + gridH + 8 * scale;
     const bankW = layout.w;
     const bankX = layout.x;
 
@@ -201,8 +206,13 @@ export function drawWordSearch(ctx, wsData, layout, wordsList, showClues, isKey,
             if (idx < lines.length - 1) cy += 4.5 * pScale;
         });
         if (isEx) {
-            const pillW = examplePillWidth(doc, { pScale, pdfFont });
-            drawExamplePill(doc, Math.min(lastX + 2, cx + colWidth - pillW - 2), firstLineY, { pScale, pdfFont });
+            const spot = placeExamplePill(doc, {
+                boxX: cx, boxW: colWidth - 2, textEndX: lastX,
+                baselineY: firstLineY + (lines.length - 1) * 4.5 * pScale,
+                lineH: 4.5 * pScale, pScale, pdfFont,
+            });
+            drawExamplePill(doc, spot.x, spot.y, { pScale, pdfFont });
+            if (spot.ownLine) cy += 4.5 * pScale;
             doc.setTextColor(...PALETTE.ink);
         }
         cy += bankRowH;

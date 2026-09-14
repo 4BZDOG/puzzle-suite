@@ -2,6 +2,10 @@
 // renderers/wordSearch.js — Page 2: Word Search preview
 // =============================================================
 
+import { pickWSExample } from '../core/exampleModel.js';
+
+export { pickWSExample };
+
 const escapeHTML = str => str.replace(/[&<>'"]/g, tag => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
 }[tag]));
@@ -22,14 +26,23 @@ export function calcWSScale(wsData, isPrint = false) {
  * backwards; one continuous ring reads as a word. Outline only, so the
  * letters underneath stay legible. Mirrors drawCapsule() in the PDF.
  */
-export function capsuleOverlay(wordPositions, z, gridPx, { stroke = '#2563eb', width = 1.6 } = {}) {
+export function capsuleOverlay(wordPositions, z, gridPx, { stroke = '#2563eb', width = 1.6, lineW = 0 } = {}) {
     if (!wordPositions?.length) return '';
     const STEPS = 10;
+    // Cells carry a border and a matching negative margin so their borders
+    // collapse, which shifts every cell half a rule left and up of the naive
+    // `x * z` track position. Tracking the naive position skewed a diagonal
+    // capsule off the letters it was meant to ring.
+    const half = (z - lineW) / 2;
+    // Arcs reach a radius beyond the outermost cell centres, so the viewport
+    // is padded — otherwise a word ending at the grid edge had its ring
+    // clipped flat by the SVG viewport.
+    const PAD = Math.ceil(z * 0.5 + 2);
+    const centre = (c) => [c.x * z + half, c.y * z + half];
     const polys = wordPositions.map(wp => {
         if (!wp.cells?.length) return '';
-        const a0 = wp.cells[0], a1 = wp.cells[wp.cells.length - 1];
-        const x1 = a0.x * z + z / 2, y1 = a0.y * z + z / 2;
-        const x2 = a1.x * z + z / 2, y2 = a1.y * z + z / 2;
+        const [x1, y1] = centre(wp.cells[0]);
+        const [x2, y2] = centre(wp.cells[wp.cells.length - 1]);
         const r = z * 0.45;
         const th = Math.atan2(y2 - y1, x2 - x1);
         const pts = [];
@@ -43,7 +56,15 @@ export function capsuleOverlay(wordPositions, z, gridPx, { stroke = '#2563eb', w
         }
         return `<polygon points="${pts.join(' ')}" fill="none" stroke="${stroke}" stroke-width="${width}" stroke-linejoin="round"/>`;
     }).join('');
-    return `<svg class="ws-capsules" width="${gridPx}" height="${gridPx}" viewBox="0 0 ${gridPx} ${gridPx}" aria-hidden="true">${polys}</svg>`;
+    const span = gridPx + PAD * 2;
+    return `<svg class="ws-capsules" style="left:${-PAD}px; top:${-PAD}px;" width="${span}" height="${span}" viewBox="${-PAD} ${-PAD} ${span} ${span}" aria-hidden="true">${polys}</svg>`;
+}
+
+/** Grid rule width in px, as the cell CSS actually renders it. */
+export function wsLineWidth() {
+    if (typeof document === 'undefined') return 0;
+    const v = getComputedStyle(document.documentElement).getPropertyValue('--ws-line-width');
+    return parseFloat(v) || 0;
 }
 
 /**
@@ -65,7 +86,7 @@ export function renderWordSearch(gridArea, footerArea, wsData, words, settings, 
         if (!wsData) { gridArea.innerHTML = '<div style="color:var(--text-muted)">No Data</div>'; return; }
 
         const showGrid = settings.wsInternalGrid;
-        const exWordPos = settings.showExample && wsData.wordPositions?.length ? wsData.wordPositions[0] : null;
+        const exWordPos = settings.showExample ? pickWSExample(wsData) : null;
         const exCells = new Set(exWordPos?.cells ? exWordPos.cells.map(c => `${c.x},${c.y}`) : []);
 
         let htmlStr = `<div class="ws-grid-wrap"><div class="grid mode-search ${showGrid ? 'with-internal-grid' : ''}" style="grid-template-columns: repeat(${wsData.size}, ${z}px); grid-template-rows: repeat(${wsData.size}, ${z}px);">`;
@@ -77,7 +98,10 @@ export function renderWordSearch(gridArea, footerArea, wsData, words, settings, 
             }
         }
         htmlStr += `</div>`;
-        if (exWordPos) htmlStr += capsuleOverlay([exWordPos], z, wsData.size * z);
+        // With the internal hairline grid the rule sits inside the cell box,
+        // so there is no collapsed-border offset to compensate for.
+        if (exWordPos) htmlStr += capsuleOverlay([exWordPos], z, wsData.size * z,
+            { lineW: showGrid ? 0 : wsLineWidth() });
         htmlStr += `</div>`;
         gridArea.innerHTML = htmlStr;
     }
@@ -104,7 +128,8 @@ export function renderWordSearch(gridArea, footerArea, wsData, words, settings, 
         });
 
         const gridPx = wsData.size * z;
-        const exWord = settings.showExample && wsData.wordPositions?.length ? wsData.wordPositions[0].word : null;
+        const exPos = settings.showExample ? pickWSExample(wsData) : null;
+        const exWord = exPos ? exPos.word : null;
         // Distribute items top-to-bottom per column using CSS Grid
         const itemsPerCol = Math.ceil(items.length / cols);
         footerArea.innerHTML = `<div style="width:${gridPx}px; margin:8px auto 0;">

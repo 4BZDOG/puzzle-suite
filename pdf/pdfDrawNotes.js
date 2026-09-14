@@ -1,7 +1,8 @@
 // =============================================================
 // pdf/pdfDrawNotes.js
 // =============================================================
-import { drawHeader, drawExamplePill, examplePillWidth, drawLeader, drawRuledArea, setFontSafe, PALETTE } from './pdfHelpers.js';
+import { drawHeader, drawExamplePill, examplePillWidth, placeExamplePill, drawLeader, drawRuledArea, setFontSafe, PALETTE } from './pdfHelpers.js';
+import { isMatchingNotes, exampleDefIndex, stripLetterCount } from '../core/notesModel.js';
 import { drawWordSearch } from './pdfDrawWordSearch.js';
 import { drawCrossword } from './pdfDrawCrossword.js';
 import { drawScramble } from './pdfDrawScramble.js';
@@ -39,15 +40,30 @@ export function drawNotes(ctx, notesList, startY, pScale) {
     const availW = PAGE_WIDTH - MARGIN * 2;
     const availH = PAGE_HEIGHT - MARGIN - startY;
 
-    const isMatching = notesList[0].matchLetter !== undefined;
+    const isMatching = isMatchingNotes(notesList);
     const showTerm = notesConfig ? notesConfig.showTerm !== false : true;
     const showDef  = notesConfig ? notesConfig.showDef !== false : true;
-    const showLetterCount = ctx.showLetterCount !== false;
+    // A letter count beside a shuffled definition gives the answer away —
+    // only one word in a list has three letters, only one has twelve. The
+    // hint belongs on crossword clues, not on a matching sheet.
+    const showLetterCount = !isMatching && ctx.showLetterCount !== false;
     const showExample = ctx.showExample || false;
 
-    const numColW = isMatching ? 20 : 10;
-    const termFrac = (notesConfig?.termWidth || 20) / 100;
+    // ---- Column geometry -------------------------------------------
+    // Proportional rather than a fixed 20 mm: # gets 5%, the answer box its
+    // own 8% column, then the term column and the definition take the rest.
+    const numW    = Math.max(7, availW * 0.05);
+    const boxColW = isMatching ? Math.max(9, availW * 0.08) : 0;
+    const numColW = numW + boxColW;
+    const termFrac = (notesConfig?.termWidth || 27) / 100;
     const termX = MARGIN + numColW;
+
+    // The term side of the worked example is always row 1. The definition
+    // beside it belongs to a DIFFERENT term once the definitions are
+    // shuffled, so the EXAMPLE badge has to follow the definition that
+    // actually describes term 1 instead of being pinned to row A.
+    const exTermIdx = showExample ? 0 : -1;
+    const exDefIdx  = showExample ? exampleDefIndex(notesList) : -1;
 
     // The term column has to be measured at the size the row will actually
     // be drawn at — the vertical fit below can grow the type, and a column
@@ -63,7 +79,7 @@ export function drawNotes(ctx, notesList, startY, pScale) {
 
     // Row text, per candidate scale k
     const rowText = (w) => {
-        const clueBody = sanitizePDFText(w.clue);
+        const clueBody = stripLetterCount(sanitizePDFText(w.clue));
         const letterCount = isMatching ? (w.clueTermLength ?? w.term.length) : w.term.length;
         return {
             prefix: isMatching ? `${w.matchLetter}. ` : '',
@@ -78,24 +94,42 @@ export function drawNotes(ctx, notesList, startY, pScale) {
         const termColW = termColWFor(fontPt);
         const defX = termX + termColW;
         const defW = availW - numColW - termColW;
+        const pillW = examplePillWidth(doc, { pScale, pdfFont });
         let total = 8 * pScale * k;   // header row
         const rows = notesList.map((w, i) => {
             setFontSafe(doc, pdfFont, 'bold');
             doc.setFontSize(fontPt);
             const tLines = showTerm ? doc.splitTextToSize(w.term, termColW - 4) : [];
+            const isExDef = i === exDefIdx;
+            // A hidden term column means the example row spells the answer
+            // out beside its definition; that echo needs reserving too, or
+            // the pill gets pushed past the margin and clamped onto the text.
+            const echoW = (isExDef && !showTerm && !isMatching)
+                ? doc.getTextWidth(w.term) + 2 : 0;
+
             setFontSafe(doc, pdfFont, 'normal');
             doc.setFontSize(fontPt);
             const t = rowText(w);
             const prefixW = t.prefix ? doc.getTextWidth(t.prefix) : 0;
-            const isExample = showExample && i === 0;
-            const reserve = isExample ? examplePillWidth(doc, { pScale, pdfFont }) + 2 : 0;
+            const reserve = isExDef ? pillW + 2 + echoW : 0;
             const dLines = showDef
                 ? doc.splitTextToSize(t.body, Math.max(20, defW - prefixW - reserve))
                 : [];
+
+            // Where the last line of the definition ends, so the pill can be
+            // placed against it (and measured for) identically in both passes.
+            let lastLineW = 0;
+            if (dLines.length) {
+                lastLineW = doc.getTextWidth(dLines[dLines.length - 1]) +
+                    (dLines.length === 1 ? prefixW : 0);
+            }
+            const pillOwnLine = isExDef && showDef &&
+                (lastLineW + echoW + 2 + pillW > defW);
+
             const maxLines = Math.max(tLines.length, dLines.length, 1);
-            const h = maxLines * lineH + pad;
+            const h = maxLines * lineH + pad + (pillOwnLine ? lineH : 0);
             total += h;
-            return { tLines, dLines, maxLines, h, prefixW, ...t };
+            return { tLines, dLines, maxLines, h, prefixW, lastLineW, echoW, pillOwnLine, ...t };
         });
         return { rows, total, fontPt, lineH, pad, k, termColW, defX, defW };
     };
@@ -113,7 +147,7 @@ export function drawNotes(ctx, notesList, startY, pScale) {
         }
     }
     const { rows, fontPt, lineH, pad, k, defX, defW } = best;
-    const ruleGap = 1.5 * pScale * k;   // text baseline → hairline rule
+    const ruleGap = 1.5 * pScale * k;   // text baseline -> hairline rule
     // Any leftover goes half above the table, so it reads as margin.
     let cy = startY + Math.max(0, Math.min(14 * pScale, (availH - best.total) / 2));
 
@@ -132,7 +166,8 @@ export function drawNotes(ctx, notesList, startY, pScale) {
     // ---- Rows ----
     notesList.forEach((w, i) => {
         const r = rows[i];
-        const isExample = showExample && i === 0;
+        const isExTerm = i === exTermIdx;
+        const isExDef  = i === exDefIdx;
 
         if (cy + r.h > PAGE_HEIGHT - MARGIN) {
             doc.addPage();
@@ -140,25 +175,37 @@ export function drawNotes(ctx, notesList, startY, pScale) {
             cy = MARGIN + 10 * pScale;
         }
 
-        if (isExample) {
-            doc.setFillColor(...PALETTE.exampleBg);
-            doc.rect(MARGIN, cy - pad + 1, availW, r.h, 'F');
-        } else if (i % 2 === 1) {
+        const bandY = cy - pad + 1;
+        if (i % 2 === 1) {
             doc.setFillColor(...PALETTE.band);
-            doc.rect(MARGIN, cy - pad + 1, availW, r.h, 'F');
+            doc.rect(MARGIN, bandY, availW, r.h, 'F');
+        }
+        // The example tint follows the two halves of the example: the term
+        // side on row 1, the definition side wherever its definition landed.
+        doc.setFillColor(...PALETTE.exampleBg);
+        if (isExTerm && isExDef) {
+            doc.rect(MARGIN, bandY, availW, r.h, 'F');
+        } else {
+            if (isExTerm) doc.rect(MARGIN, bandY, defX - MARGIN, r.h, 'F');
+            if (isExDef)  doc.rect(defX, bandY, MARGIN + availW - defX, r.h, 'F');
         }
 
         setFontSafe(doc, pdfFont, 'bold');
         doc.setFontSize(fontPt);
-        doc.setTextColor(...(isExample ? PALETTE.example : PALETTE.muted));
+        doc.setTextColor(...(isExTerm ? PALETTE.example : PALETTE.muted));
         const numStr = `${i + 1}.`;
         doc.text(numStr, MARGIN, cy);
 
         if (isMatching) {
-            const boxX = MARGIN + doc.getTextWidth(numStr) + 2;
-            const boxW = 8, boxH = 4.5 * pScale;
-            const boxY = cy - boxH + 1.2 * pScale;
-            if (isExample) {
+            // Centred on the row's whole text block rather than pinned to
+            // the first baseline, so a two-line definition does not leave
+            // its answer box floating up beside the first line.
+            const boxH = 4.5 * pScale, boxW = Math.min(8, boxColW - 2);
+            const blockTop = cy - lineH * 0.72;
+            const blockH = (r.maxLines - 1) * lineH + lineH * 0.94;
+            const boxY = blockTop + (blockH - boxH) / 2;
+            const boxX = MARGIN + numW;
+            if (isExTerm) {
                 doc.setFillColor(...PALETTE.exampleBg);
                 doc.setDrawColor(...PALETTE.example);
                 doc.setLineWidth(0.4);
@@ -166,7 +213,7 @@ export function drawNotes(ctx, notesList, startY, pScale) {
                 setFontSafe(doc, pdfFont, 'bold');
                 doc.setFontSize(fontPt);
                 doc.setTextColor(...PALETTE.example);
-                doc.text(w.correctLetter, boxX + boxW / 2, cy, { align: 'center' });
+                doc.text(w.correctLetter, boxX + boxW / 2, boxY + boxH * 0.78, { align: 'center' });
             } else {
                 doc.setDrawColor(...PALETTE.muted);
                 doc.setLineWidth(0.3);
@@ -182,7 +229,6 @@ export function drawNotes(ctx, notesList, startY, pScale) {
         }
 
         if (showDef) {
-            let lastLineW = 0;
             if (r.prefix) {
                 setFontSafe(doc, pdfFont, 'bold');
                 doc.setFontSize(fontPt);
@@ -194,26 +240,29 @@ export function drawNotes(ctx, notesList, startY, pScale) {
             doc.setTextColor(...PALETTE.body);
             r.dLines.forEach((line, idx) => {
                 doc.text(line, defX + (idx === 0 ? r.prefixW : 0), cy + idx * lineH);
-                if (idx === r.dLines.length - 1) lastLineW = doc.getTextWidth(line) + (idx === 0 ? r.prefixW : 0);
             });
 
-            if (isExample) {
+            if (isExDef) {
                 const lastY = cy + Math.max(0, r.dLines.length - 1) * lineH;
+                let endX = defX + r.lastLineW;
                 // Only spell out the answer when the term column is hidden —
                 // otherwise the term is already sitting on the same row.
-                let pillX = defX + lastLineW + 2;
                 if (!showTerm && !isMatching) {
                     setFontSafe(doc, pdfFont, 'bold');
+                    doc.setFontSize(fontPt);
                     doc.setTextColor(...PALETTE.example);
-                    doc.text(w.term, pillX, lastY);
-                    pillX += doc.getTextWidth(w.term) + 2;
+                    doc.text(w.term, endX + 2, lastY);
+                    endX += 2 + doc.getTextWidth(w.term);
                 }
-                const pillW = examplePillWidth(doc, { pScale, pdfFont });
-                drawExamplePill(doc, Math.min(pillX, MARGIN + availW - pillW), lastY, { pScale, pdfFont });
+                const spot = placeExamplePill(doc, {
+                    boxX: defX, boxW: defW, textEndX: endX,
+                    baselineY: lastY, lineH, pScale, pdfFont,
+                });
+                drawExamplePill(doc, spot.x, spot.y, { pScale, pdfFont });
             }
         }
 
-        cy += r.maxLines * lineH + ruleGap;
+        cy += r.maxLines * lineH + (r.pillOwnLine ? lineH : 0) + ruleGap;
         doc.setDrawColor(...PALETTE.rule);
         doc.setLineWidth(0.2);
         doc.line(MARGIN, cy - 1 * pScale, PAGE_WIDTH - MARGIN, cy - 1 * pScale);
@@ -242,7 +291,7 @@ export function drawMasterKeyPage(ctx, fullTitle, subText, currentPuzzleData, se
     const startY = drawHeader(ctx, fullTitle, subText, 'Solutions for every activity in this set.',
         true, '', pScale, { label: 'ANSWER KEY', accent: PALETTE.key });
 
-    const isMatching = currentPuzzleData.notes?.length > 0 && currentPuzzleData.notes[0].matchLetter !== undefined;
+    const isMatching = isMatchingNotes(currentPuzzleData.notes);
     const availW = PAGE_WIDTH - 2 * MARGIN, availH = PAGE_HEIGHT - startY - MARGIN - 6;
 
     const panels = [];

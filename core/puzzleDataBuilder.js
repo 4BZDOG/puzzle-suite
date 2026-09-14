@@ -10,8 +10,14 @@ export const getLetter = (i) => {
     return res;
 };
 
-export async function createPuzzleData() {
-    const pData = await generateAllAsync(state.settings);
+/**
+ * Build one complete puzzle set.
+ *
+ * @param {number} [variantSeed] - distinct per student set, so bulk exports
+ *        stop producing the same crossword topology over and over.
+ */
+export async function createPuzzleData(variantSeed) {
+    const pData = await generateAllAsync(state.settings, variantSeed);
     if (!pData) return null;
     const isMatching = state.settings.notesConfig.shuffle;
     let notesData = state.words.map((w, i) => ({ term: w.word, clue: w.clue, origIdx: i }));
@@ -25,6 +31,17 @@ export async function createPuzzleData() {
             clueTermLength: clues[i].term.length,
         }));
     }
+    // Bind the worked example to the data rather than to a row position:
+    // the term side is term 1, the definition side is whichever row ended up
+    // holding term 1's definition after the shuffle.
+    const exampleOrigIdx = notesData.length ? notesData[0].origIdx : -1;
+    notesData.forEach(n => {
+        n.isExampleTerm = n.origIdx === exampleOrigIdx;
+        n.isExampleDef = isMatching
+            ? n.clueOrigIdx === exampleOrigIdx
+            : n.origIdx === exampleOrigIdx;
+    });
+
     pData.notes = notesData;
     return pData;
 }
