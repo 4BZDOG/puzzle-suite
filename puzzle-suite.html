@@ -447,6 +447,9 @@
                         <div class="card-header-inner"><i class="fas fa-random"></i> Word Scramble</div>
                     </summary>
                     <div class="card-content">
+                        <div class="toggle-row"><label for="scrShowBank">Show Word Bank</label><label class="switch"><input
+                                    type="checkbox" id="scrShowBank" checked onchange="focusPage(4); renderActivePage(); saveState();"><span
+                                    class="slider"></span></label></div>
                         <div class="toggle-row"><label for="scrShowHint">Show First Letter Hint</label><label class="switch"><input
                                     type="checkbox" id="scrShowHint" onchange="focusPage(4); renderActivePage(); saveState();"><span
                                     class="slider-switch"></span></label></div>
@@ -499,6 +502,14 @@
                                 onchange="saveState()"><span>Answer Keys</span>
                         </div>
                     </div>
+                    <div class="toggle-row" style="margin-top:14px;"><label for="keysAtEnd">Answer keys at end of
+                            document</label><label class="switch"><input type="checkbox" id="keysAtEnd" checked
+                                onchange="saveState()"><span class="slider"></span></label></div>
+                    <div class="toggle-row"><label for="duplexSafe">Duplex-safe (each set starts a new
+                            sheet)</label><label class="switch"><input type="checkbox" id="duplexSafe" checked
+                                onchange="saveState()"><span class="slider"></span></label></div>
+                    <div class="field-hint">Keeps the teacher key off the back of a student page, and stops one sheet
+                        carrying two students' work when printing double-sided.</div>
                     <div class="bulk-export-row">
                         <input type="number" id="bulkCount" value="1" min="1" max="3" class="input-large-center">
                         <span class="text-bold-small">Unique Copies (Bulk)</span>
@@ -546,11 +557,11 @@
                             <h1 class="disp-title">Title</h1>
                             <p class="disp-sub">Unit Review</p>
                         </div>
-                        <div class="meta-block">
-                            <div class="line"><span>Name:</span></div>
-                            <div class="line line-date"><span>Date:</span></div>
-                            <div class="line line-class"><span>Class:</span></div>
-                        </div>
+                    </div>
+                    <div class="meta-block">
+                        <div class="line"><span>Name:</span><i class="rule"></i></div>
+                        <div class="line line-date"><span>Date:</span><i class="rule"></i></div>
+                        <div class="line line-class"><span>Class:</span><i class="rule"></i></div>
                     </div>
                     <p class="disp-instruction" id="p1-instruction"><span class="activity-chip" style="--chip-accent:#6366f1">Vocabulary</span><span class="disp-instruction-text"><svg class="instr-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><rect x="3" y="2.6" width="10" height="11.8" rx="1.5" stroke="currentColor" fill="none" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><rect x="6" y="1" width="4" height="2.6" rx="0.8" fill="currentColor" stroke="none"/><path d="M5.6 7h4.8M5.6 9.6h4.8M5.6 12.2h3" stroke="currentColor" fill="none" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Terms and definitions for this unit.</span></p>
                     <div class="puzzle-area" id="p1-notes"
@@ -567,11 +578,11 @@
                             <h1 class="disp-title">Title</h1>
                             <p class="disp-sub">Sub</p>
                         </div>
-                        <div class="meta-block">
-                            <div class="line"><span>Name:</span></div>
-                            <div class="line line-date"><span>Date:</span></div>
-                            <div class="line line-class"><span>Class:</span></div>
-                        </div>
+                    </div>
+                    <div class="meta-block">
+                        <div class="line"><span>Name:</span><i class="rule"></i></div>
+                        <div class="line line-date"><span>Date:</span><i class="rule"></i></div>
+                        <div class="line line-class"><span>Class:</span><i class="rule"></i></div>
                     </div>
                     <p class="disp-instruction"><span class="activity-chip" style="--chip-accent:#0d9488">Word Search</span><span class="disp-instruction-text"><svg class="instr-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><circle cx="6.8" cy="6.8" r="4.3" stroke="currentColor" fill="none" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 10l4 4" stroke="currentColor" fill="none" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Find and circle each word from the list in the grid.</span></p>
                     <div class="puzzle-area" id="p2-area"></div>
@@ -587,11 +598,11 @@
                             <h1 class="disp-title">Title</h1>
                             <p class="disp-sub">Sub</p>
                         </div>
-                        <div class="meta-block">
-                            <div class="line"><span>Name:</span></div>
-                            <div class="line line-date"><span>Date:</span></div>
-                            <div class="line line-class"><span>Class:</span></div>
-                        </div>
+                    </div>
+                    <div class="meta-block">
+                        <div class="line"><span>Name:</span><i class="rule"></i></div>
+                        <div class="line line-date"><span>Date:</span><i class="rule"></i></div>
+                        <div class="line line-class"><span>Class:</span><i class="rule"></i></div>
                     </div>
                     <p class="disp-instruction"><span class="activity-chip" style="--chip-accent:#7c3aed">Crossword</span><span class="disp-instruction-text"><svg class="instr-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M2 14l1-3.2 7.3-7.3 2.2 2.2L5.2 13 2 14z" stroke="currentColor" fill="none" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.5 4.3l2.2 2.2" stroke="currentColor" fill="none" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Use the clues to fill in the grid.</span></p>
                     <div class="puzzle-area" id="p3-area"></div>
@@ -607,11 +618,11 @@
                             <h1 class="disp-title">Title</h1>
                             <p class="disp-sub">Sub</p>
                         </div>
-                        <div class="meta-block">
-                            <div class="line"><span>Name:</span></div>
-                            <div class="line line-date"><span>Date:</span></div>
-                            <div class="line line-class"><span>Class:</span></div>
-                        </div>
+                    </div>
+                    <div class="meta-block">
+                        <div class="line"><span>Name:</span><i class="rule"></i></div>
+                        <div class="line line-date"><span>Date:</span><i class="rule"></i></div>
+                        <div class="line line-class"><span>Class:</span><i class="rule"></i></div>
                     </div>
                     <p class="disp-instruction"><span class="activity-chip" style="--chip-accent:#d97706">Word Scramble</span><span class="disp-instruction-text"><svg class="instr-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M1.6 4.6h9.8M1.6 11.4h9.8" stroke="currentColor" fill="none" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.2 2.3l2.3 2.3-2.3 2.3M9.2 9.1l2.3 2.3-2.3 2.3" stroke="currentColor" fill="none" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Unscramble each set of letters and write the word.</span></p>
                     <div class="puzzle-area" id="p4-area"
@@ -627,10 +638,8 @@
                             <h1 class="disp-title">Title</h1>
                             <p class="disp-sub">Unit Review</p>
                         </div>
-                        <div class="meta-block" style="text-align:right; width:auto;">
-                            <span style="font-size:calc(0.75rem * var(--global-font-scale) * var(--page-scale)); font-weight:800; color:#dc143c; text-transform:uppercase; letter-spacing:0.06em;">Teacher Answer Key</span>
-                        </div>
                     </div>
+                    <div class="key-banner">Teacher Answer Key</div>
                     <div id="key-container" class="split-page"></div>
                 </div>
             </div>
@@ -706,7 +715,7 @@
         </div>
     </div>
 
-    <script src="bundle.js?v=15054c7392"></script>
+    <script src="bundle.js?v=e578bea778"></script>
 </body>
 
 </html>

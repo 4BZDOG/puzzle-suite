@@ -40,12 +40,28 @@ export function renderScramble(container, scrData, settings) {
     });
 
     htmlStr += '</div>';
+
+    // Word bank: the PDF's counterpart, same scaffolding on screen. A 12-letter
+    // anagram with no bank at all is a memory test, not a vocabulary exercise.
+    if (settings.scrShowBank !== false) {
+        const bank = items.map(x => x.original).sort();
+        const widest = bank.reduce((m, w) => Math.max(m, w.length), 0);
+        const bankCols = widest > 12 ? 3 : 4;
+        htmlStr += `<div class="scr-word-bank">
+            <div class="scr-word-bank-title">Word Bank</div>
+            <div class="scr-word-bank-list" style="column-count:${bankCols}">
+                ${bank.map(w => `<span>${escapeHTML(w)}</span>`).join('')}
+            </div>
+        </div>`;
+    }
+
     container.innerHTML = htmlStr;
 
     // Cap how tall a row may grow, then centre the leftover — a six-word
     // scramble should not stretch to six 100px bands.
     const el = container.querySelector('.scramble-container');
-    const avail = container.clientHeight;
+    const bankEl = container.querySelector('.scr-word-bank');
+    const avail = container.clientHeight - (bankEl ? bankEl.offsetHeight + 14 : 0);
     if (el && avail > 0) {
         const MAX_ROW_PX = 86;
         const rowPx = Math.min(avail / rows, MAX_ROW_PX);

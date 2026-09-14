@@ -249,6 +249,7 @@ export function buildCtx(doc, pdfFont, wmImg, scale, { PAGE_WIDTH, PAGE_HEIGHT, 
         // Difficulty scaffolding toggles
         showLetterCount: settings.showLetterCount !== false,
         cwShowBank: settings.cwShowBank || false,
+        scrShowBank: settings.scrShowBank !== false,
         title: settings.title || '',
     };
 }
@@ -364,35 +365,55 @@ export { drawText };
 // =============================================================
 
 /**
- * One labelled form line: "NAME: ______________".
+ * A row of labelled rules — "NAME: ______  DATE: ______  CLASS: ______".
  *
- * The rule starts at a column shared by every field on the page rather than
- * immediately after each label, so NAME and DATE no longer sit above rules
- * of visibly different lengths, and it runs to a given end rather than being
- * built out of underscore characters.
+ * Each field gets an equal share of the row and its rule runs from just after
+ * its own label to the end of that share, so the underlines are the same
+ * length whatever the labels are. Rules, not underscore characters, so they
+ * stay flush at any type size.
  */
-function _formLine(ctx, label, labelX, ruleX, endX, y, pScale) {
+function _formRow(ctx, labels, x, width, y, pScale) {
     const { doc, pdfFont } = ctx;
+    const GAP = 6;
+    const cell = (width - GAP * (labels.length - 1)) / labels.length;
     setFontSafe(doc, pdfFont, 'bold');
     doc.setFontSize(9.5 * pScale);
-    doc.setTextColor(...PALETTE.muted);
-    doc.text(label, labelX, y);
-    doc.setDrawColor(180);
-    doc.setLineWidth(0.4);
-    doc.line(ruleX, y + 1, endX, y + 1);
+    // Every rule starts the same distance into its cell, measured from the
+    // widest label, so all three come out exactly the same length. Starting
+    // each rule straight after its own label is what left NAME and DATE
+    // sitting above visibly different underlines.
+    const labelColW = labels.reduce((m, l) => Math.max(m, doc.getTextWidth(l)), 0) + 2.5;
+    labels.forEach((label, i) => {
+        const lx = x + i * (cell + GAP);
+        setFontSafe(doc, pdfFont, 'bold');
+        doc.setFontSize(9.5 * pScale);
+        doc.setTextColor(...PALETTE.muted);
+        doc.text(label, lx, y);
+        doc.setDrawColor(180);
+        doc.setLineWidth(0.4);
+        doc.line(lx + labelColW, y + 1, lx + cell, y + 1);
+    });
 }
 
 /**
- * Draw the standard page header (title, subtitle, divider, activity chip,
- * instructions, name/date lines).
+ * Draw the standard page header.
+ *
+ * Every page uses the same two-tier grid, so nothing jumps position when a
+ * student turns the sheet over:
+ *
+ *   LINEAR RELATIONSHIPS                                   SET 3
+ *   Year 8 Mathematics — Unit 4
+ *   ────────────────────────────────────────────────────────────
+ *   NAME: ________  DATE: ________  CLASS: ________
+ *   [CROSSWORD] Use the clues to fill in the grid.
+ *
+ * Sheet one of a set carries all three fields; the rest of the packet gets a
+ * single full-width NAME rule (a student fills the block in once per packet),
+ * and the answer key gets a bold accent banner instead.
  *
  * Typography is deliberately single-family: the title, subtitle and
  * instruction all resolve through resolveStyle() so a custom font with no
  * italic face can no longer drag the subtitle into Times.
- *
- * Sheet one of a set carries the full NAME / DATE / CLASS block. The rest of
- * the set gets a slim running header — a student writes their name once per
- * packet, not four times, and the space goes to the activity instead.
  *
  * @param {Object} opts - { label, accent, icon, firstOfSet }
  * @returns {number} Y position where content should start (below header)
@@ -404,15 +425,19 @@ export function drawHeader(ctx, fullTitle, subText, instructions, isKey, setIndi
     const accent = opts.accent || PALETTE.ink;
     const firstOfSet = opts.firstOfSet !== false;
     const slim = !isKey && !firstOfSet;
+    const contentW = PAGE_WIDTH - 2 * MARGIN;
+    const endX = PAGE_WIDTH - MARGIN;
 
-    // The right-hand block (NAME/DATE, or the key stamp) owns fixed space,
-    // so the title has to be fitted to what is left — a real unit name like
-    // "Linear Relationships & Coordinate Geometry" used to run straight
-    // through the NAME rule at a hardcoded 28pt.
-    const keyStampW = isKey
-        ? measureTextMm(doc, 'TEACHER ANSWER KEY', { fontSizePt: 12 * pScale, bold: true, pdfFont }) + 6
-        : (slim ? 76 : 92);
-    const headW = Math.max(40, PAGE_WIDTH - MARGIN - keyStampW - MARGIN * 0.2);
+    // The set badge sits at the far right of the title line on EVERY page,
+    // including the key — it used to hide in the top margin on some pages and
+    // inside the NAME row on others, so the eye lost it when turning over.
+    const badge = isKey ? 'TEACHER ANSWER KEY' : setIndicator;
+    const badgeFs = isKey ? 11 * pScale : 9 * pScale;
+    let badgeW = 0;
+    if (badge) {
+        badgeW = measureTextMm(doc, badge, { fontSizePt: badgeFs, bold: true, pdfFont }) + 5;
+    }
+    const headW = Math.max(40, contentW - badgeW);
 
     const fitPt = (text, startPt, minPt, bold) => {
         const w = measureTextMm(doc, text, { fontSizePt: startPt, bold, pdfFont });
@@ -420,21 +445,26 @@ export function drawHeader(ctx, fullTitle, subText, instructions, isKey, setIndi
         return Math.max(minPt, startPt * (headW / w));
     };
 
-    // Title
+    // ---- Tier 1: title, subtitle, set badge ----
+    const titleY = MARGIN + (slim ? 6 : 9) * pScale;
     const titleText = fullTitle.toUpperCase();
-    const titleY = MARGIN + (slim ? 6 : 10) * pScale;
     drawText(doc, titleText, MARGIN, titleY, {
-        fontSizePt: fitPt(titleText, (slim ? 13 : 28) * pScale * titleScale, (slim ? 9 : 13) * pScale, true),
+        fontSizePt: fitPt(titleText, (slim ? 13 : 26) * pScale * titleScale, (slim ? 9 : 13) * pScale, true),
         bold: true,
         color: PALETTE.ink,
         pdfFont,
     });
+    if (badge) {
+        setFontSafe(doc, pdfFont, 'bold');
+        doc.setFontSize(badgeFs);
+        doc.setTextColor(...(isKey ? PALETTE.key : [99, 102, 241]));
+        doc.text(badge, endX, titleY, { align: 'right' });
+    }
 
-    // Subtitle — same family, tracked out slightly instead of italicised.
-    // The running header drops it: it is already on sheet one of the set.
+    // The running header drops the subtitle: it is already on sheet one.
     if (!slim) {
         doc.setCharSpace(0.25);
-        drawText(doc, subText, MARGIN, MARGIN + 18 * pScale, {
+        drawText(doc, subText, MARGIN, MARGIN + 15 * pScale, {
             fontSizePt: fitPt(subText, 10.5 * pScale * titleScale, 7.5 * pScale, false),
             color: PALETTE.muted,
             pdfFont,
@@ -442,53 +472,29 @@ export function drawHeader(ctx, fullTitle, subText, instructions, isKey, setIndi
         doc.setCharSpace(0);
     }
 
-    // Right-side metadata
-    const endX = PAGE_WIDTH - MARGIN;
-    if (isKey) {
-        setFontSafe(doc, pdfFont, 'bold');
-        doc.setFontSize(12 * pScale);
-        doc.setTextColor(...PALETTE.key);
-        doc.text('TEACHER ANSWER KEY', endX, MARGIN + 10 * pScale, { align: 'right' });
-    } else if (slim) {
-        // Slim running header: the set, then one short name rule.
-        const labelX = PAGE_WIDTH - 74;
-        setFontSafe(doc, pdfFont, 'bold');
-        doc.setFontSize(9.5 * pScale);
-        const ruleX = labelX + doc.getTextWidth('NAME:') + 3;
-        if (setIndicator) {
-            doc.setTextColor(99, 102, 241);
-            doc.text(setIndicator, endX, MARGIN + 1.5 * pScale, { align: 'right' });
-        }
-        _formLine(ctx, 'NAME:', labelX, ruleX, endX, MARGIN + 6 * pScale, pScale);
-    } else {
-        if (setIndicator) {
-            setFontSafe(doc, pdfFont, 'bold');
-            doc.setFontSize(9 * pScale);
-            doc.setTextColor(99, 102, 241);
-            doc.text(setIndicator, endX, MARGIN + 4 * pScale, { align: 'right' });
-        }
-        // All three labels share one rule column and one end, so all three
-        // rules come out exactly the same length — NAME and DATE used to sit
-        // above visibly different underlines because the rule started
-        // straight after each label.
-        const labelX = PAGE_WIDTH - 90;
-        setFontSafe(doc, pdfFont, 'bold');
-        doc.setFontSize(9.5 * pScale);
-        const ruleX = labelX + Math.max(
-            doc.getTextWidth('NAME:'), doc.getTextWidth('DATE:'), doc.getTextWidth('CLASS:')) + 3;
-        ['NAME:', 'DATE:', 'CLASS:'].forEach((lab, i) => {
-            _formLine(ctx, lab, labelX, ruleX, endX, MARGIN + (4.5 + i * 7.5) * pScale, pScale);
-        });
-    }
-
-    // Divider line (above the instructions)
-    const dividerY = MARGIN + (slim ? 10 : 22) * pScale;
+    // ---- Divider ----
+    const dividerY = MARGIN + (slim ? 10 : 19) * pScale;
     doc.setDrawColor(...PALETTE.ink);
     doc.setLineWidth(0.4);
-    doc.line(MARGIN, dividerY, PAGE_WIDTH - MARGIN, dividerY);
+    doc.line(MARGIN, dividerY, endX, dividerY);
 
-    // Activity chip + instruction sentence
-    const instrY = dividerY + 7 * pScale;
+    // ---- Tier 2: the student input row, below the rule on every page ----
+    const formY = dividerY + 7 * pScale;
+    if (isKey) {
+        setFontSafe(doc, pdfFont, 'bold');
+        doc.setFontSize(10 * pScale);
+        doc.setTextColor(...PALETTE.key);
+        doc.text(setIndicator
+            ? `TEACHER ANSWER KEY — ${setIndicator.toUpperCase()}`
+            : 'TEACHER ANSWER KEY', MARGIN, formY);
+    } else if (slim) {
+        _formRow(ctx, ['NAME:'], MARGIN, contentW, formY, pScale);
+    } else {
+        _formRow(ctx, ['NAME:', 'DATE:', 'CLASS:'], MARGIN, contentW, formY, pScale);
+    }
+
+    // ---- Activity chip + instruction ----
+    const instrY = formY + 9 * pScale;
     let textX = MARGIN;
     if (opts.label) {
         const chipFs = Math.max(6.5, 8 * pScale);
@@ -519,6 +525,21 @@ export function drawHeader(ctx, fullTitle, subText, instructions, isKey, setIndi
 }
 
 /**
+ * The back of a duplex sheet that would otherwise carry the next student's
+ * first page (or a teacher key). Deliberately almost empty, and deliberately
+ * labelled: a silently blank sheet reads as a printer fault.
+ */
+export function drawBlankFiller(ctx, pScale) {
+    const { doc, PAGE_WIDTH, PAGE_HEIGHT, pdfFont } = ctx;
+    setFontSafe(doc, pdfFont, 'normal');
+    doc.setFontSize(Math.max(7, 8 * (pScale || 1)));
+    doc.setTextColor(...PALETTE.rule);
+    doc.text('This page is intentionally blank.', PAGE_WIDTH / 2, PAGE_HEIGHT / 2,
+        { align: 'center' });
+    doc.setTextColor(...PALETTE.ink);
+}
+
+/**
  * Thin running footer — lets a teacher collate a printed class set.
  *
  * Pagination is per set, not per document. A teacher printing 25 sets used
@@ -528,7 +549,9 @@ export function drawHeader(ctx, fullTitle, subText, instructions, isKey, setIndi
  *
  * @param {Object} opts - { right, setLabel, pageInSet, pagesInSet }
  */
-export function drawFooter(ctx, pScale, { right = '', setLabel = '', pageInSet = 0, pagesInSet = 0 } = {}) {
+export function drawFooter(ctx, pScale, {
+    right = '', setLabel = '', pageInSet = 0, pagesInSet = 0, pageText = '',
+} = {}) {
     const { doc, PAGE_WIDTH, PAGE_HEIGHT, MARGIN, pdfFont, title } = ctx;
     const y = PAGE_HEIGHT - MARGIN + 6;
     doc.setDrawColor(...PALETTE.rule);
@@ -540,7 +563,10 @@ export function drawFooter(ctx, pScale, { right = '', setLabel = '', pageInSet =
     if (title) doc.text(String(title), MARGIN, y);
 
     let pageNo = '';
-    if (pageInSet > 0 && pagesInSet > 0) {
+    if (pageText) {
+        // An appendix page belongs to no student packet, so it names itself.
+        pageNo = pageText;
+    } else if (pageInSet > 0 && pagesInSet > 0) {
         pageNo = `Page ${pageInSet} of ${pagesInSet}`;
         if (setLabel) pageNo = `${setLabel} — ${pageNo}`;
     } else {

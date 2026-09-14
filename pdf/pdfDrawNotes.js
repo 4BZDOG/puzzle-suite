@@ -175,19 +175,28 @@ export function drawNotes(ctx, notesList, startY, pScale) {
             cy = MARGIN + 10 * pScale;
         }
 
+        // Zebra striping stays uniform across the whole table. Tinting only
+        // the left half of row 1 and only the right half of row 16 broke the
+        // alternating bands into a checkerboard, which read as a rendering
+        // fault rather than as emphasis.
         const bandY = cy - pad + 1;
         if (i % 2 === 1) {
             doc.setFillColor(...PALETTE.band);
             doc.rect(MARGIN, bandY, availW, r.h, 'F');
         }
-        // The example tint follows the two halves of the example: the term
-        // side on row 1, the definition side wherever its definition landed.
-        doc.setFillColor(...PALETTE.exampleBg);
-        if (isExTerm && isExDef) {
-            doc.rect(MARGIN, bandY, availW, r.h, 'F');
-        } else {
-            if (isExTerm) doc.rect(MARGIN, bandY, defX - MARGIN, r.h, 'F');
-            if (isExDef)  doc.rect(defX, bandY, MARGIN + availW - defX, r.h, 'F');
+        // The worked example is marked by a blue outline around the half that
+        // carries it, not by a background fill — the outline points at the
+        // example without disturbing the row rhythm.
+        if (isExTerm || isExDef) {
+            doc.setDrawColor(...PALETTE.example);
+            doc.setLineWidth(0.5);
+            if (isExTerm && isExDef) {
+                doc.roundedRect(MARGIN, bandY, availW, r.h, 1.2, 1.2, 'S');
+            } else if (isExTerm) {
+                doc.roundedRect(MARGIN, bandY, defX - MARGIN - 1, r.h, 1.2, 1.2, 'S');
+            } else {
+                doc.roundedRect(defX - 1.5, bandY, MARGIN + availW - defX + 1.5, r.h, 1.2, 1.2, 'S');
+            }
         }
 
         setFontSafe(doc, pdfFont, 'bold');
@@ -284,12 +293,15 @@ export function drawNotes(ctx, notesList, startY, pScale) {
  * The quadrant grid adapts to how many keys are actually on it, so two
  * keys get half a page each rather than a quarter each.
  */
-export function drawMasterKeyPage(ctx, fullTitle, subText, currentPuzzleData, selections, pScale) {
+export function drawMasterKeyPage(ctx, fullTitle, subText, currentPuzzleData, selections, pScale, setLabel = '') {
     const { doc, PAGE_WIDTH, PAGE_HEIGHT, MARGIN, scale, pdfFont } = ctx;
     pScale = pScale || scale;
 
+    // The key names its set in the header banner, not just the footer: in an
+    // appendix of 25 keys the teacher needs to see which one they are holding.
     const startY = drawHeader(ctx, fullTitle, subText, 'Solutions for every activity in this set.',
-        true, '', pScale, { label: 'ANSWER KEY', accent: PALETTE.key });
+        true, setLabel ? setLabel.toUpperCase() : '', pScale,
+        { label: 'ANSWER KEY', accent: PALETTE.key });
 
     const isMatching = isMatchingNotes(currentPuzzleData.notes);
     const availW = PAGE_WIDTH - 2 * MARGIN, availH = PAGE_HEIGHT - startY - MARGIN - 6;
