@@ -1178,6 +1178,44 @@ main {
     flex-shrink: 0;
 }
 
+/* The set badge rides at the right of the title line on every sheet, and the
+   running footer closes it — both mirror drawHeader()/drawFooter() in the PDF.
+   The preview used to show neither, so a teacher checking a set on screen had
+   no way to see what the printed sheet would say. */
+.set-badge {
+    font-size: calc(0.78rem * var(--global-font-scale) * var(--page-scale));
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #6366f1;
+    font-family: var(--user-font);
+    white-space: nowrap;
+    align-self: flex-start;
+    flex-shrink: 0;
+}
+
+#page5 .set-badge {
+    color: #dc143c;
+}
+
+.page-footer {
+    margin-top: auto;
+    padding-top: 6px;
+    border-top: 1px solid #cbd5e1;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    flex-shrink: 0;
+    font-family: var(--user-font);
+    font-size: calc(0.62rem * var(--global-font-scale) * var(--page-scale));
+    color: #64748b;
+}
+
+.page-footer-right {
+    text-align: right;
+    white-space: nowrap;
+}
+
 /* The student input row sits BELOW the divider, full width, on every page —
    it used to sit beside the title, which made the whole header shift when a
    student turned from sheet one to sheet two of the same packet. */
@@ -1203,19 +1241,6 @@ main {
     /* Wide enough for the longest label, so every rule starts at the same
        offset and all three come out the same length. */
     min-width: 4.4em;
-}
-
-/* The key's counterpart of the student input row: same position under the
-   divider, so the answer key reads as the same document. */
-.key-banner {
-    margin: 10px 0 2px;
-    font-size: calc(0.8rem * var(--global-font-scale) * var(--page-scale));
-    font-weight: 800;
-    color: #dc143c;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-family: var(--user-font);
-    flex-shrink: 0;
 }
 
 .meta-block .line .rule {
@@ -1269,9 +1294,6 @@ main {
 }
 
 /* ---- Dark mode: word bank ---- */
-[data-theme="dark"] .wb-item {
-    border-bottom-color: #334155;
-}
 [data-theme="dark"] .wb-check {
     border-color: #475569;
     background: #1e293b;
@@ -1481,17 +1503,32 @@ table.mode-cw td.cell.empty {
     font-size: calc(1.3rem * var(--global-font-scale) * var(--page-scale));
     font-weight: 700;
     letter-spacing: 0.05em;
-    margin-right: 15px;
-    min-width: 80px;
-    max-width: 200px;
+    /* One fixed prompt column, so every answer line starts at the same x.
+       A content-sized column gave a three-letter word twice the writing line
+       of a twelve-letter one. The PDF solves this with a shared `splitX`. */
+    flex: 0 0 var(--scr-prompt-w, 190px);
+    width: var(--scr-prompt-w, 190px);
     text-align: left;
     font-family: monospace;
-    flex-shrink: 0;
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
     word-break: break-all;
 }
 
+/* Dotted leader bridging the word to its answer line, as drawLeader() does. */
+.scramble-text::after {
+    content: '';
+    flex: 1 1 auto;
+    min-width: 8px;
+    border-bottom: 2px dotted #cbd5e1;
+    margin-bottom: 3px;
+}
+
 .scramble-line {
-    flex: 1;
+    flex: 1 1 auto;
+    /* Capped like the PDF's 52 mm: a writing line only has to fit a word. */
+    max-width: 200px;
     border-bottom: 2px solid #000;
     height: 10px;
     min-width: 50px;
@@ -1550,12 +1587,13 @@ table.mode-cw td.cell.empty {
     /* display:grid applied via inline style for column distribution */
 }
 
+/* No rule under each entry. The PDF word bank is a checkbox and a word; the
+   border here made the preview look like a ruled table that does not print. */
 .wb-item {
     display: flex;
     align-items: center;
     gap: 10px;
     padding: 4px 6px 5px 0;
-    border-bottom: 1.5px solid #cbd5e1;
     min-height: 26px;
 }
 
@@ -1603,11 +1641,15 @@ table.mode-cw td.cell.empty {
     padding: 0 1px;
     border-radius: 2px;
 }
+/* The worked answer sits on the same line geometry as the blank rows, so the
+   example does not look like a different layout. */
 .scramble-answer-filled {
     font-weight: bold;
     color: #2563eb;
     font-family: var(--user-font);
     font-size: calc(1rem * var(--global-font-scale) * var(--page-scale));
+    flex: 1 1 auto;
+    max-width: 200px;
     min-width: 60px;
     border-bottom: 2px solid #2563eb;
     padding: 0 4px;

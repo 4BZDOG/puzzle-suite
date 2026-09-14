@@ -19,6 +19,7 @@ import { exportPDF } from './pdf/pdfExport.js';
 
 import { showToast } from './ui/toast.js';
 import { svgIcon } from './ui/icons.js';
+import { metaFor, instructionFor, toHex } from './core/pageMeta.js';
 import { AI_PROVIDERS, generateWords, loadSavedKeys, saveKey } from './ai/aiGenerate.js';
 import { openModal, closeModal } from './ui/modal.js';
 import { setupSidebarResize, toggleSidebar, switchTab } from './ui/sidebar.js';
@@ -108,7 +109,7 @@ function autoFit(t, silent = false) {
 // =============================================================
 function renderActivePage() {
     syncSettingsFromDOM();   // always sync DOM → state before rendering so toggles take effect immediately
-    _updateMetaBlocks();     // page order / selection decides which sheet is first in the set
+    _updatePageChrome();     // chip, badge, metadata row and footer, from the live settings
     const d = state.puzzleData, s = state.settings, w = state.words;
 
     renderNotes(
@@ -147,17 +148,9 @@ function updateUI() {
 }
 
 function updateNotesInstruction() {
-    const el = document.getElementById('p1-instruction');
-    if (!el) return;
-    const isMatching = document.getElementById('notesShuffle')?.checked ?? state.settings.notesConfig.shuffle;
-    // Write into the text span so the activity chip beside it survives.
-    const target = el.querySelector('.disp-instruction-text') || el;
-    // Vector icon + plain text: a system emoji here printed as a soft bitmap.
-    target.innerHTML = isMatching
-        ? svgIcon('matching') + 'Write the letter of the definition that matches each term.'
-        : svgIcon('notes') + 'Terms and definitions for this unit.';
-    const chip = el.querySelector('.activity-chip');
-    if (chip) chip.innerText = isMatching ? 'Matching' : 'Vocabulary';
+    // Kept for the window API; the chip, icon and instruction are all part of
+    // the page chrome now so preview and print cannot drift apart.
+    _updatePageChrome();
 }
 
 function updateGridStyles() {
@@ -228,21 +221,67 @@ function updatePageScales() {
 }
 
 /**
- * The metadata block belongs to sheet one of a set, matching the PDF.
+ * Everything around the activity itself: chip, instruction, set badge, the
+ * metadata row and the running footer.
  *
- * Which sheet that is depends on the page order and which pages are
- * selected, so it is worked out from the live settings rather than being
- * pinned to the notes page.
+ * The preview is meant to show what prints, so all of it is derived from the
+ * same page order, settings and `core/pageMeta.js` the PDF uses. Keeping a
+ * second copy on screen is what let page one say "Matching" in the preview
+ * while the PDF printed "VOCABULARY", and what left the preview with no set
+ * badge and no footer at all.
  */
-function _updateMetaBlocks() {
-    const idxOf = { notes: 1, ws: 2, cw: 3, scr: 4, key: 5 };
-    const order = state.settings.pageOrder || ['notes', 'ws', 'cw', 'scr', 'key'];
-    const opts = state.settings.opts || {};
-    const firstSelected = order.find(p => opts[p]) || order[0];
-    const firstPage = idxOf[firstSelected] || 1;
-    Object.entries(idxOf).forEach(([, n]) => {
-        const block = document.querySelector(`#page${n} .meta-block`);
+const _PAGE_INDEX = { notes: 1, ws: 2, cw: 3, scr: 4, key: 5 };
+
+function _updatePageChrome() {
+    const cfg = state.settings;
+    const isMatching = !!cfg.notesConfig?.shuffle;
+    const order = cfg.pageOrder || ['notes', 'ws', 'cw', 'scr', 'key'];
+    const opts = cfg.opts || {};
+
+    // Student pages in print order; the key is an appendix, not part of the
+    // packet, exactly as pdfExport.js lays it out.
+    const studentPages = order.filter(p => opts[p] && p !== 'key');
+    const firstPage = _PAGE_INDEX[studentPages[0]] || _PAGE_INDEX[order[0]] || 1;
+    const total = studentPages.length;
+    const title = cfg.title || 'Puzzle';
+
+    Object.entries(_PAGE_INDEX).forEach(([type, n]) => {
+        const pageEl = document.getElementById('page' + n);
+        if (!pageEl) return;
+        const meta = metaFor(type, isMatching);
+        const isKey = type === 'key';
+
+        // Activity chip + instruction
+        const chip = pageEl.querySelector('.activity-chip');
+        if (chip) {
+            chip.innerText = meta.label;
+            chip.style.setProperty('--chip-accent', toHex(meta.accent));
+        }
+        const instr = pageEl.querySelector('.disp-instruction-text');
+        if (instr) {
+            instr.innerHTML = svgIcon(meta.icon) + escapeHTML(instructionFor(type, isMatching));
+        }
+
+        // Set badge — shown on every page, as it now is in the PDF
+        const badge = pageEl.querySelector('.set-badge');
+        if (badge) badge.innerText = isKey ? 'TEACHER ANSWER KEY — SET 1' : 'SET 1';
+
+        // Metadata row: full on sheet one of the set, slim after
+        const block = pageEl.querySelector('.meta-block');
         if (block) block.classList.toggle('meta-slim', n !== firstPage);
+
+        // Running footer
+        const footer = pageEl.querySelector('.page-footer');
+        if (footer) {
+            const pos = studentPages.indexOf(type);
+            const right = isKey
+                ? 'TEACHER KEY  ·  Set 1 — Answer key'
+                : (pos >= 0
+                    ? `${meta.label}  ·  Set 1 — Page ${pos + 1} of ${total}`
+                    : meta.label);
+            footer.querySelector('.page-footer-left').innerText = title;
+            footer.querySelector('.page-footer-right').innerText = right;
+        }
     });
 }
 

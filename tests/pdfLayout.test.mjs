@@ -27,6 +27,7 @@ import { drawNotes, drawMasterKeyPage } from '../pdf/pdfDrawNotes.js';
 import { exampleDefIndex } from '../core/notesModel.js';
 import { pickWSExample } from '../pdf/pdfDrawWordSearch.js';
 import { pickCrosswordExample } from '../pdf/pdfDrawCrossword.js';
+import { metaFor, instructionFor, toHex } from '../core/pageMeta.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const WRITE = process.argv.includes('--write');
@@ -186,34 +187,34 @@ function exportRun({
         const setIndicator = `SET ${si + 1}`;
 
         let fos = addPage();
-        let sy = drawHeader(ctx, title, sub, 'Terms and definitions.', false, setIndicator, 1,
-            { label: 'VOCABULARY', accent: [99, 102, 241], icon: matching ? 'matching' : 'notes', firstOfSet: fos });
+        let sy = drawHeader(ctx, title, sub, instructionFor('notes', matching), false, setIndicator, 1,
+            { ...metaFor('notes', matching), firstOfSet: fos });
         drawNotes(ctx, cpd.notes, sy, 1);
         queueFooter('VOCABULARY');
 
         fos = addPage();
-        sy = drawHeader(ctx, title, sub, 'Find each word.', false, setIndicator, 1,
-            { label: 'WORD SEARCH', accent: [13, 148, 136], icon: 'search', firstOfSet: fos });
+        sy = drawHeader(ctx, title, sub, instructionFor('ws'), false, setIndicator, 1,
+            { ...metaFor('ws'), firstOfSet: fos });
         drawWordSearch(ctx, cpd.ws, box(sy), words, false, false, 1);
         queueFooter('WORD SEARCH');
 
         fos = addPage();
-        sy = drawHeader(ctx, title, sub, 'Fill in the grid.', false, setIndicator, 1,
-            { label: 'CROSSWORD', accent: [124, 58, 237], icon: 'crossword', firstOfSet: fos });
+        sy = drawHeader(ctx, title, sub, instructionFor('cw'), false, setIndicator, 1,
+            { ...metaFor('cw'), firstOfSet: fos });
         const res = drawCrosswordPage(ctx, cpd.cw, box(sy), 1, forceSplitFallback);
         queueFooter('CROSSWORD');
         if (res.splitNeeded) {
             splitNeeded = true;
             const cf = addPage();
-            const cluesSy = drawHeader(ctx, title, sub, 'Clues.', false, setIndicator, 1,
-                { label: 'CROSSWORD', accent: [124, 58, 237], icon: 'crossword', firstOfSet: cf });
+            const cluesSy = drawHeader(ctx, title, sub, 'Clues for the grid on the previous page.',
+                false, setIndicator, 1, { ...metaFor('cw'), firstOfSet: cf });
             drawCrosswordClues(ctx, cpd.cw, cluesSy, 1);
             queueFooter('CROSSWORD CLUES');
         }
 
         fos = addPage();
-        sy = drawHeader(ctx, title, sub, 'Unscramble.', false, setIndicator, 1,
-            { label: 'WORD SCRAMBLE', accent: [217, 119, 6], icon: 'scramble', firstOfSet: fos });
+        sy = drawHeader(ctx, title, sub, instructionFor('scr'), false, setIndicator, 1,
+            { ...metaFor('scr'), firstOfSet: fos });
         drawScramble(ctx, cpd.scr, box(sy), false, false, 1);
         queueFooter('WORD SCRAMBLE');
 
@@ -855,6 +856,53 @@ function pillCollisions(log) {
     // The example is still findable from its own content.
     check('the example is still marked by its badge',
         notesPage.some(l => l.kind === 'text' && l.text === 'EXAMPLE'));
+}
+
+
+// =============================================================
+// v4 review
+// =============================================================
+
+// --- BUG-XWD-08: clue columns carry roughly equal weight ---
+// Nine across against six down used to leave a column of dead space, because
+// each section owned a column and the flowed fallback split greedily to a
+// target rather than minimising the tallest column.
+{
+    let worst = 0, totalImb = 0, measured = 0, worstSeed = -1;
+    for (let i = 0; i < 12; i++) {
+        const r = exportRun({ label: `v4-balance-${i}` });
+        const nums = r.log.filter(l => l.kind === 'text' && l.page === 3 && /^\d+\. $/.test(l.text));
+        const cols = {};
+        nums.forEach(n => { (cols[Math.round(n.x)] = cols[Math.round(n.x)] || []).push(n.y); });
+        const spans = Object.values(cols).map(ys => Math.max(...ys) - Math.min(...ys));
+        if (spans.length < 2) continue;           // single-column layout, nothing to balance
+        const imb = Math.max(...spans) - Math.min(...spans);
+        totalImb += imb; measured++;
+        if (imb > worst) { worst = imb; worstSeed = i; }
+    }
+    check('clue columns are within 15mm of each other in height',
+        measured > 0 && worst <= 15, `worst ${worst.toFixed(1)}mm (run ${worstSeed}), mean ${(totalImb / Math.max(1, measured)).toFixed(1)}mm`);
+}
+
+// --- BUG-UI-01: one source of truth for chip identity ---
+{
+    const plain = exportRun({ matching: false, label: 'v4-chip-plain' });
+    const match = exportRun({ matching: true, label: 'v4-chip-match' });
+    const chipOn = (run, page) => run.log
+        .filter(l => l.kind === 'text' && l.page === page && /^[A-Z ]{4,}$/.test(l.text))
+        .map(l => l.text);
+    check('a plain notes page is labelled VOCABULARY',
+        chipOn(plain, 1).includes('VOCABULARY'), chipOn(plain, 1).slice(0, 3).join(' | '));
+    check('a shuffled notes page is labelled MATCHING',
+        chipOn(match, 1).includes('MATCHING'), chipOn(match, 1).slice(0, 3).join(' | '));
+    check('the shuffled page is not still labelled VOCABULARY',
+        !chipOn(match, 1).includes('VOCABULARY'));
+    // Labels and accents come from the shared module, so the preview cannot
+    // drift from the PDF the way it did.
+    check('the shared module agrees with what was drawn',
+        metaFor('notes', true).label === 'MATCHING' &&
+        metaFor('notes', false).label === 'VOCABULARY' &&
+        toHex(metaFor('notes', false).accent) === '#6366f1');
 }
 
 console.log(failed ? `\n${failed} failing check(s)` : '\nAll checks passed');
