@@ -8,7 +8,7 @@ import { licenseManager } from '../license/licenseManager.js';
 import { createPuzzleData } from '../core/puzzleDataBuilder.js';
 import { loadJSPDF, loadFontForPDF, FONT_SELECT_MAP } from './pdfFonts.js';
 import { buildCtx, drawHeader, drawFooter, drawBlankFiller } from './pdfHelpers.js';
-import { PAGE_ICONS } from './pdfIcons.js';
+import { metaFor, instructionFor } from '../core/pageMeta.js';
 import { transposeCrossword } from '../workers/workerBridge.js';
 import { drawWordSearch } from './pdfDrawWordSearch.js';
 import { drawCrosswordPage, drawCrosswordClues } from './pdfDrawCrossword.js';
@@ -16,15 +16,6 @@ import { drawScramble } from './pdfDrawScramble.js';
 import { drawNotes, drawMasterKeyPage } from './pdfDrawNotes.js';
 
 let isExporting = false;
-
-// Per-activity identity: a coloured chip in the header instead of five
-// pages of identical grey type. Accents are reused by nothing else.
-const PAGE_META = {
-    notes: { label: 'VOCABULARY',  accent: [99, 102, 241], icon: PAGE_ICONS.notes },
-    ws:    { label: 'WORD SEARCH', accent: [13, 148, 136], icon: PAGE_ICONS.ws },
-    cw:    { label: 'CROSSWORD',   accent: [124, 58, 237], icon: PAGE_ICONS.cw },
-    scr:   { label: 'WORD SCRAMBLE', accent: [217, 119, 6], icon: PAGE_ICONS.scr },
-};
 
 // Room left under the content box for the running footer.
 const FOOTER_H = 10;
@@ -240,7 +231,8 @@ export async function exportPDF() {
                 // Yield to main thread so progress bar updates and browser does not crash
                 await new Promise(r => setTimeout(r, 0));
 
-                const meta = PAGE_META[pType];
+                const isMatchingMode = !!cfg.notesConfig?.shuffle;
+                const meta = metaFor(pType, isMatchingMode);
                 const contentBox = (sy) => ({
                     x: MARGIN, y: sy,
                     w: PAGE_WIDTH - 2 * MARGIN,
@@ -250,19 +242,15 @@ export async function exportPDF() {
                 if (pType === 'notes') {
                     const ps = getPScale('notes');
                     const firstOfSet = addPage();
-                    const isMatchingMode = cfg.notesConfig?.shuffle;
-                    const notesInstruction = isMatchingMode
-                        ? 'Write the letter of the definition that matches each term.'
-                        : 'Terms and definitions for this unit.';
-                    const sy = drawHeader(ctx, title, sub, notesInstruction, false, setIndicator, ps,
-                        { ...meta, icon: isMatchingMode ? PAGE_ICONS.matching : meta.icon, firstOfSet });
+                    const sy = drawHeader(ctx, title, sub, instructionFor('notes', isMatchingMode),
+                        false, setIndicator, ps, { ...meta, firstOfSet });
                     drawNotes(ctx, cpd.notes, sy, ps);
                     queueFooter(ps, meta.label);
 
                 } else if (pType === 'ws') {
                     const ps = getPScale('ws');
                     const firstOfSet = addPage();
-                    const sy = drawHeader(ctx, title, sub, 'Find and circle each word from the list in the grid.',
+                    const sy = drawHeader(ctx, title, sub, instructionFor('ws'),
                         false, setIndicator, ps, { ...meta, firstOfSet });
                     drawWordSearch(ctx, cpd.ws, contentBox(sy), state.words, cfg.wsUseClues, false, ps);
                     queueFooter(ps, meta.label);
@@ -270,7 +258,7 @@ export async function exportPDF() {
                 } else if (pType === 'cw') {
                     const ps = getPScale('cw');
                     const firstOfSet = addPage();
-                    const sy = drawHeader(ctx, title, sub, 'Use the clues to fill in the grid.',
+                    const sy = drawHeader(ctx, title, sub, instructionFor('cw'),
                         false, setIndicator, ps, { ...meta, firstOfSet });
                     // Grid and clues always share one sheet. Splitting them put
                     // the grid on the back of one sheet and its clues on the
@@ -291,7 +279,7 @@ export async function exportPDF() {
                 } else if (pType === 'scr') {
                     const ps = getPScale('scr');
                     const firstOfSet = addPage();
-                    const sy = drawHeader(ctx, title, sub, 'Unscramble each set of letters and write the word.',
+                    const sy = drawHeader(ctx, title, sub, instructionFor('scr'),
                         false, setIndicator, ps, { ...meta, firstOfSet });
                     drawScramble(ctx, cpd.scr, contentBox(sy), false, scrShowHint, ps);
                     queueFooter(ps, meta.label);

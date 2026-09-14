@@ -115,7 +115,12 @@ footers carry a `pageText` override (`Answer key 2 of 5 · Set 2`) because they
 belong to no student packet. **Never draw a key inside the student page loop
 when `keysAtEnd` is on**, and never make a packet odd-length.
 
-`PAGE_META` maps each page type to its header chip label and accent colour.
+Chip identity comes from **`core/pageMeta.js`** (`metaFor`, `instructionFor`,
+`toHex`) — the single place a label, accent or icon name is written down. The
+preview and the PDF each used to keep their own copy, which drifted: page one
+said "Matching" on screen and "VOCABULARY" in print for the same worksheet.
+Page one changes identity with the shuffle toggle (VOCABULARY -> MATCHING), so
+neither renderer may decide that for itself.
 Usage metering reports `doc.internal.getNumberOfPages()` (actual sheets), not
 the pre-export estimate, because a crossword that has to split costs one more.
 
@@ -140,10 +145,15 @@ largest clue point size that fits, in two candidate arrangements:
 
 - **below** — clues in two columns under the grid, ACROSS then DOWN (the
   familiar worksheet shape)
-- **below3** — the same clues flowed down *three* columns (`_flowClues` /
+- **flow** — the same clues flowed down *two or three* columns (`_clueItems` /
   `_distribute`), breaking only between clues and never orphaning a section
-  heading. Three shorter columns need far less height than two, which is what
-  keeps a twenty-word puzzle off a second sheet
+  heading. Shorter columns need far less height, which is what keeps a
+  twenty-word puzzle off a second sheet, and flowing both sections together
+  fills every column: nine across against six down left a column of dead space
+  when each section owned one. `_distribute` solves the order-preserving
+  linear partition — binary-search the smallest ceiling that fits in `cols`
+  columns — rather than filling greedily to `total / cols`, which left the
+  first column visibly short (4, 5 and 6 clues in three columns)
 - **beside** — clues in one column next to the grid (suits tall, narrow grids and
   soaks up the whitespace a portrait grid leaves)
 
@@ -200,6 +210,13 @@ PDF fonts (helvetica + custom loaded fonts) don't support emoji. The canvas fall
 
 ### Renderers (HTML preview)
 `renderNotes / renderWordSearch / renderCrossword / renderScramble` write to DOM containers directly. They are called by `renderActivePage()` (main.js) which routes to the correct renderer based on `state.activePage`.
+
+**The preview must show what prints.** `_updatePageChrome()` (main.js) fills the
+activity chip, instruction, `SET N` badge, metadata row and running footer for
+every page from the same settings, page order and `core/pageMeta.js` the PDF
+uses — it runs from `renderActivePage()`, so any settings change refreshes it.
+The preview previously had no set badge and no footer at all, and drew its chip
+labels from hardcoded HTML.
 
 The crossword renderer keeps the whole page on one sheet via
 `_fitCrosswordPage()` after DOM insertion: clue type, the word bank **and** the
@@ -414,6 +431,9 @@ Price IDs are read from env vars at module load (`PLAN_PRICE_IDS` is a plain con
 - **The worked example carries no bounding box at all**: a background fill breaks the table's alternating bands into a checkerboard, and an outline clips the row number it runs through. Both were tried and both were rejected. The example is legible from its own content — a blue row number, the prefilled blue answer letter, and the EXAMPLE badge on the definition that answers it.
 - **The set identifier shows on every export, single or bulk**: header badge, footer, and answer key. It was suppressed for single-set exports from the very first commit, which left a teacher unable to pair a marked sheet with its key.
 - **`roundedRect` needs its own instrumentation in the test harness**: jsPDF draws it through `lines()`, which loses width and height, so a box drawn with it is invisible to any assertion filtering on `kind: 'rect'` unless the harness wraps it explicitly.
+- **Never hardcode a chip label, accent or icon**: ask `metaFor(pageType, isMatching)` in `core/pageMeta.js`. Two copies is how the preview came to say MATCHING while the PDF said VOCABULARY. The test harness calls it too, so an assertion cannot pass against a label the app never draws.
+- **Preview chrome is not decoration**: the `SET N` badge and the running footer exist on screen because the teacher checks the preview before printing. If you add a page, give it `.set-badge` and `.page-footer` elements — `_updatePageChrome()` fills them.
+- **Scramble answer lines need a fixed prompt column**: `.scramble-text` is `flex: 0 0 var(--scr-prompt-w)`, so every line starts at the same x and they all come out the same length. Sizing the prompt to its content gave a three-letter word twice the writing line of a twelve-letter one (the PDF solves the same problem with a shared `splitX`).
 - **Word-search cell geometry is load-bearing**: `.mode-search .cell` states `width`/`height` as `--cell-size + --ws-line-width` (the negative margin collapses the rule into the neighbour). `capsuleOverlay()` measures cell centres from exactly that geometry via its `lineW` option — change one and you must change the other, or highlights drift off the letters.
 - **`clueTermLength` in matching mode**: when writing any code that displays `(N)` after a definition in matching context, use `w.clueTermLength` not `w.term.length`. They diverge because definitions are shuffled across rows.
 - **Editing clues in matching mode**: `updateWord` patches `puzzleData.notes` in-place via `clueOrigIdx`. If you add new code paths that mutate clues, follow this same pattern or call `debouncedGenerate()`.
@@ -541,6 +561,38 @@ Status dots reflect placement in the currently-visible puzzle page.
 
 ### Stale State on Toggle Changes
 `renderActivePage()` calls `syncSettingsFromDOM()` at start so toggles take effect instantly.
+
+---
+
+## Session Fixes (2026-09-14d — Layout Review v4)
+
+Fourth round, and the first about the **web preview** rather than the PDF. The
+preview had quietly become a second implementation: it kept its own chip
+labels, had no set badge or footer at all, and styled two activities
+differently from print. `npm run test:pdf` now runs 97 checks.
+
+### Preview / print parity
+- **`BUG-PRV-01`**: the preview showed no `SET N` and no footer. Both now come
+  from `_updatePageChrome()`, driven by the same page order and settings as the
+  PDF, including the key's `TEACHER ANSWER KEY — SET 1` banner and the
+  appendix-style `Set 1 — Answer key` footer.
+- **`BUG-PRV-02`**: `.wb-item` carried a `border-bottom`, so the word-search
+  bank looked like a ruled table on screen and a plain checklist in print.
+- **`BUG-PRV-03`**: `.scramble-text` was sized to its content, so the answer
+  line started wherever the word happened to end — a three-letter word got
+  twice the writing line of a twelve-letter one. It is now a fixed prompt
+  column with a dotted leader, mirroring the PDF's shared `splitX`.
+- **`BUG-UI-01`**: chip labels lived in two places and drifted. `core/pageMeta.js`
+  is now the only one. (The accents never actually differed — `#6366f1` in the
+  CSS is the same colour as `[99, 102, 241]` in the PDF.)
+
+### `BUG-XWD-08` — clue column balance
+Flowing the clues across two columns is now a candidate arrangement, not just
+three, and `_distribute` minimises the tallest column (order-preserving linear
+partition) instead of filling greedily to an average. Over 20 generated
+puzzles the mean column imbalance fell from 20.9 mm to 8.9 mm and the worst
+case from 29.6 mm to 9.2 mm; three-column layouts now split 5/5/5 where they
+used to split 4/5/6.
 
 ---
 

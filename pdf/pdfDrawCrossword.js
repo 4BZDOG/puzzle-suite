@@ -286,17 +286,46 @@ function _clueItems(ctx, ac, dn, colW, fontPt, exampleNum, pScale) {
     return items;
 }
 
-/** Greedy balanced split of clue items into `cols` columns. */
+/**
+ * Split clue items into `cols` columns, minimising the TALLEST column.
+ *
+ * Order is preserved (a clue list read out of order is useless), so this is
+ * the classic linear-partition problem: binary-search the smallest ceiling
+ * that still fits in `cols` columns, then fill to it. A plain greedy fill to
+ * `total / cols` left the first column visibly short — 4, 5 and 6 clues in
+ * three columns — because one early heading forced a break.
+ */
 function _distribute(items, cols) {
+    if (cols <= 1 || !items.length) return [items.slice()];
     const total = items.reduce((s, it) => s + it.h, 0);
-    const target = total / cols;
+    const tallest = items.reduce((m, it) => Math.max(m, it.h), 0);
+
+    /** Can every item fit in `cols` columns, none taller than `H`? */
+    const fits = (H) => {
+        let c = 1, used = 0;
+        for (const it of items) {
+            if (used > 0 && used + it.h > H + 1e-6) {
+                c++; used = 0;
+                if (c > cols) return false;
+            }
+            used += it.h;
+        }
+        return true;
+    };
+
+    let lo = Math.max(tallest, total / cols), hi = total, ceiling = hi;
+    for (let i = 0; i < 40; i++) {
+        const mid = (lo + hi) / 2;
+        if (fits(mid)) { ceiling = mid; hi = mid; } else { lo = mid; }
+    }
+
     const out = Array.from({ length: cols }, () => []);
     let c = 0, used = 0;
     items.forEach((it, i) => {
         // A heading is never left stranded at the foot of a column.
         const headOrphan = it.type === 'head' && used > 0 &&
-            used + it.h + (items[i + 1]?.h || 0) > target * 1.05;
-        if (c < cols - 1 && used > 0 && (used + it.h > target * 1.05 || headOrphan)) {
+            used + it.h + (items[i + 1]?.h || 0) > ceiling + 1e-6;
+        if (c < cols - 1 && used > 0 && (used + it.h > ceiling + 1e-6 || headOrphan)) {
             c++; used = 0;
         }
         out[c].push(it);
@@ -380,7 +409,7 @@ export function drawCrosswordPage(ctx, cwData, layout, pScale, forceSplit = fals
         const gridW = cSize * cwData.cols, gridH = cSize * cwData.rows;
         if (gridW > layout.w || gridH > layout.h) continue;
 
-        // (a) clues below the grid, two columns
+        // (a) clues below the grid, one section per column
         {
             const colW = layout.w / 2;
             const availH = layout.h - gridH - GUTTER - bankHBelow;
@@ -391,26 +420,26 @@ export function drawCrosswordPage(ctx, cwData, layout, pScale, forceSplit = fals
             }
         }
 
-        // (a2) clues below the grid, flowed down three columns. Three
-        // shorter columns need far less height than two, which is what
-        // keeps a twenty-word puzzle off a second sheet.
-        {
+        // (a2) / (a3) clues below the grid, FLOWED down two or three columns
+        // rather than one column per section. A lopsided puzzle — nine across
+        // against six down — leaves a column of dead space when each section
+        // owns a column; flowing them fills both evenly and needs less height,
+        // which buys either bigger type or a bigger grid.
+        [2, 3].forEach(cols => {
             const gut = 6;
-            const colW = (layout.w - gut * 2) / 3;
-            if (colW >= MIN_COL_W) {
-                const availH = layout.h - gridH - GUTTER - bankHBelow;
-                const pt = _bestPt(
-                    p => _flowHeight(ctx, ac, dn, colW, p, 3, exampleNum, pScale), availH, pScale);
-                if (pt) {
-                    // A hair behind the classic two-column shape at equal
-                    // legibility, so it only wins when it genuinely helps.
-                    const score = Math.min(pt / pScale, IDEAL_PT) * 100 + cSize - 0.2;
-                    if (!best || score > best.score) {
-                        best = { mode: 'below3', cSize, pt, colW, gut, score, gridW, gridH };
-                    }
-                }
+            const colW = (layout.w - gut * (cols - 1)) / cols;
+            if (colW < MIN_COL_W) return;
+            const availH = layout.h - gridH - GUTTER - bankHBelow;
+            const pt = _bestPt(
+                p => _flowHeight(ctx, ac, dn, colW, p, cols, exampleNum, pScale), availH, pScale);
+            if (!pt) return;
+            // A hair behind the classic section-per-column shape at equal
+            // legibility, so it only wins when it genuinely helps.
+            const score = Math.min(pt / pScale, IDEAL_PT) * 100 + cSize - 0.2;
+            if (!best || score > best.score) {
+                best = { mode: 'flow', cols, cSize, pt, colW, gut, score, gridW, gridH };
             }
-        }
+        });
 
         // (b) clues beside the grid, one column (good for tall grids)
         {
@@ -439,11 +468,11 @@ export function drawCrosswordPage(ctx, cwData, layout, pScale, forceSplit = fals
     }
 
     // ---- Draw the winning arrangement ----
-    if (best.mode === 'below' || best.mode === 'below3') {
-        const flowed = best.mode === 'below3';
+    if (best.mode === 'below' || best.mode === 'flow') {
+        const flowed = best.mode === 'flow';
         const ox = layout.x + (layout.w - best.gridW) / 2;
         const clueBlockH = flowed
-            ? _flowHeight(ctx, ac, dn, best.colW, best.pt, 3, exampleNum, pScale)
+            ? _flowHeight(ctx, ac, dn, best.colW, best.pt, best.cols, exampleNum, pScale)
             : Math.max(
                 measure(ac, 'ac', best.colW, best.pt),
                 measure(dn, 'dn', best.colW, best.pt));
@@ -455,7 +484,8 @@ export function drawCrosswordPage(ctx, cwData, layout, pScale, forceSplit = fals
         _drawGrid(ctx, cwData, ox, oy, best.cSize, false, exCells, exWord);
         const y0 = oy + best.gridH + GUTTER + _lineH(best.pt);
         if (flowed) {
-            _drawFlow(ctx, ac, dn, layout.x, y0, best.colW, best.gut, best.pt, 3, exampleNum, pScale);
+            _drawFlow(ctx, ac, dn, layout.x, y0, best.colW, best.gut, best.pt, best.cols,
+                exampleNum, pScale);
         } else {
             _drawClueSection(ctx, 'ACROSS', ac, layout.x, y0, best.colW, best.pt, pScale, exampleNum);
             _drawClueSection(ctx, 'DOWN', dn, layout.x + best.colW, y0, best.colW, best.pt, pScale, null);
