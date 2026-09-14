@@ -2,6 +2,8 @@
 // renderers/notes.js — Page 1: Notes/vocabulary page preview
 // =============================================================
 
+import { isMatchingNotes, exampleDefIndex, stripLetterCount } from '../core/notesModel.js';
+
 const escapeHTML = str => str.replace(/[&<>'"]/g, tag => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
 }[tag]));
@@ -20,8 +22,7 @@ export function renderNotes(container, puzzleData, words, settings, onUpdateWord
     // Use puzzleData.notes only in matching mode — it carries shuffle/matchLetter data.
     // In standard mode always derive from live words so inline clue edits are reflected
     // immediately without waiting for a full re-generate.
-    const hasMatchingData = settings.notesConfig.shuffle &&
-        puzzleData.notes?.length > 0 && 'matchLetter' in puzzleData.notes[0];
+    const hasMatchingData = !!settings.notesConfig.shuffle && isMatchingNotes(puzzleData.notes);
     const targetData = hasMatchingData
         ? puzzleData.notes
         : words.map(w => ({ term: w.word, clue: w.clue }));
@@ -38,39 +39,47 @@ export function renderNotes(container, puzzleData, words, settings, onUpdateWord
 
     let htmlStr = `<div class="${cls}">
         <div class="notes-header">
-            <span class="notes-num" style="${isMatching ? 'width:60px' : ''}">#</span>
+            <span class="notes-num">#</span>
+            ${isMatching ? '<span class="notes-box"></span>' : ''}
             <span class="notes-word-header">TERM</span>
-            <span class="notes-clue-header">DEFINITION</span>
+            <span class="notes-clue-header">${isMatching ? 'DEFINITIONS (IN A DIFFERENT ORDER)' : 'DEFINITION'}</span>
         </div>`;
 
     const showExample = settings.showExample;
-    const showLetterCount = settings.showLetterCount !== false;
+    // A letter count next to a shuffled definition leaks the answer, so it
+    // is a crossword-only hint. Mirrors drawNotes() in the PDF.
+    const showLetterCount = !isMatching && settings.showLetterCount !== false;
     const lenHint = (n) => showLetterCount ? `<span class="notes-clue-length">(${n})</span>` : '';
 
+    // Term side of the example is row 1; the definition side follows the
+    // shuffle to whichever row actually describes term 1.
+    const exTermIdx = showExample ? 0 : -1;
+    const exDefIdx  = showExample ? exampleDefIndex(targetData) : -1;
+
     targetData.forEach((w, i) => {
-        const isExample = showExample && i === 0;
-        htmlStr += `<div class="notes-row${isExample ? ' notes-row-example' : ''}">`;
+        const isExTerm = i === exTermIdx;
+        const isExDef  = i === exDefIdx;
+        const isExample = isExTerm || isExDef;
+        htmlStr += `<div class="notes-row${isExample ? ' notes-row-example' : ''}${isExTerm ? ' ex-term' : ''}${isExDef ? ' ex-def' : ''}">`;
+        htmlStr += `<span class="notes-num">${i + 1}.</span>`;
         if (isMatching) {
-            const boxContent = isExample
-                ? `<span class="match-answer-box match-answer-filled">${w.correctLetter}</span>`
+            const boxContent = isExTerm
+                ? `<span class="match-answer-box match-answer-filled">${escapeHTML(w.correctLetter)}</span>`
                 : `<span class="match-answer-box"></span>`;
-            htmlStr += `<span class="notes-num" style="width:60px">${i + 1}. ${boxContent}</span>`;
-        } else {
-            htmlStr += `<span class="notes-num">${i + 1}.</span>`;
+            htmlStr += `<span class="notes-box">${boxContent}</span>`;
         }
         htmlStr += `<div class="notes-word"><div class="notes-editable" ${!isMatching ? 'contenteditable="true"' : ''} ${!isMatching ? `onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}" onblur="window._puzzleApp.updateWord(${i}, 'word', this.innerText)"` : ''}>${escapeHTML(w.term)}</div></div>`;
         htmlStr += '<div class="notes-clue">';
 
         if (isMatching) {
-            htmlStr += `<div class="notes-editable">${escapeHTML(w.matchLetter)}. ${escapeHTML(w.clue)}</div>`;
-            htmlStr += lenHint(w.clueTermLength ?? w.term.length);
-            if (isExample) htmlStr += '<span class="example-pill">EXAMPLE</span>';
+            htmlStr += `<div class="notes-editable">${escapeHTML(w.matchLetter)}. ${escapeHTML(stripLetterCount(w.clue))}</div>`;
+            if (isExDef) htmlStr += '<span class="example-pill">EXAMPLE</span>';
         } else {
             htmlStr += `<div class="notes-editable" contenteditable="true" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}" onblur="window._puzzleApp.updateWord(${i}, 'clue', this.innerText)">${escapeHTML(w.clue)}</div>`;
             htmlStr += lenHint(w.term.length);
             // The term is already on this row, so the example marker is the
             // pill alone — unless the term column is hidden (a real task).
-            if (isExample) {
+            if (isExDef) {
                 if (!settings.notesConfig.showTerm) {
                     htmlStr += ` <b style="color:#2563eb">${escapeHTML(w.term)}</b>`;
                 }
@@ -118,7 +127,7 @@ function _widenTermColumn(container, targetData) {
     // cell padding sit outside it), so widen by the measured shortfall and
     // re-check, capped at 70% to keep the definition column usable.
     const root = document.documentElement;
-    let pct = parseFloat(getComputedStyle(root).getPropertyValue('--notes-term-width')) || 20;
+    let pct = parseFloat(getComputedStyle(root).getPropertyValue('--notes-term-width')) || 27;
     for (let i = 0; i < 6 && pct < 70; i++) {
         const deficit = needed - (availNow() - 1);
         if (deficit <= 0) return;

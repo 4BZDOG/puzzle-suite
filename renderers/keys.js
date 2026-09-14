@@ -2,7 +2,8 @@
 // renderers/keys.js — Page 5: Answer keys preview
 // =============================================================
 
-import { capsuleOverlay } from './wordSearch.js';
+import { capsuleOverlay, wsLineWidth } from './wordSearch.js';
+import { isMatchingNotes } from '../core/notesModel.js';
 
 const escapeHTML = str => str.replace(/[&<>'"]/g, tag => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
@@ -19,7 +20,7 @@ export function renderKeys(container, puzzleData, settings) {
     const hasWS = puzzleData.ws?.placed?.length > 0;
     const hasCW = puzzleData.cw?.placed?.length > 0;
     const hasScr = puzzleData.scr?.length > 0;
-    const isMatching = !!(settings.notesConfig?.shuffle && puzzleData.notes?.length > 0 && puzzleData.notes[0]?.matchLetter !== undefined);
+    const isMatching = !!settings.notesConfig?.shuffle && isMatchingNotes(puzzleData.notes);
 
     const activeCount = (hasWS ? 1 : 0) + (hasCW ? 1 : 0) + (hasScr ? 1 : 0) + (isMatching ? 1 : 0);
 
@@ -51,7 +52,8 @@ export function renderKeys(container, puzzleData, settings) {
         }
         wsHTML += '</div>';
         // Ring each answer instead of dimming everything around it.
-        wsHTML += capsuleOverlay(ws.wordPositions, zWS, ws.size * zWS, { stroke: '#dc143c', width: 1.4 });
+        wsHTML += capsuleOverlay(ws.wordPositions, zWS, ws.size * zWS,
+            { stroke: '#dc143c', width: 1.4, lineW: wsLineWidth() });
         wsHTML += '</div></div></div></div>';
         htmlStr += wsHTML;
     }

@@ -2,6 +2,8 @@
 // renderers/crossword.js — Page 3: Crossword preview
 // =============================================================
 
+import { pickCrosswordExample } from '../core/exampleModel.js';
+
 const escapeHTML = str => str.replace(/[&<>'"]/g, tag => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
 }[tag]));
@@ -28,8 +30,9 @@ export function renderCrossword(gridArea, footerArea, cwData, settings, preview 
         : calcCWScale(cwData);
 
     // Compute example word at function level so both grid and clue blocks can use it
+    // Same picker as the PDF, so preview and print prefill the same word.
     const firstAcross = settings.showExample && cwData?.placed?.length
-        ? (cwData.placed.filter(w => w.dir === 'across').sort((a, b) => a.num - b.num)[0] || null)
+        ? pickCrosswordExample(cwData.placed.filter(w => w.dir === 'across').sort((a, b) => a.num - b.num))
         : null;
 
     if (gridArea) {

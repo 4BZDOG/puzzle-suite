@@ -91,9 +91,9 @@ The `onChange` listener is registered *before* `init()` is called. When `init()`
 2. Loads custom font (Inter/Roboto/Lora/Comic) via `pdfFonts.js`
 3. Builds a `ctx` context object via `buildCtx()` — carries doc, dimensions, scale, pdfFont, drawWatermark, plus the scaffolding flags (`showExample`, `showLetterCount`, `cwShowBank`)
 4. Loops over sets (bulk export), then page types in `cfg.pageOrder`
-5. Each page: `drawHeader(ctx, title, sub, instruction, isKey, setIndicator, pScale, { label, accent })` → returns Y where content starts
+5. Each page: `drawHeader(ctx, title, sub, instruction, isKey, setIndicator, pScale, { label, accent, icon, firstOfSet })` → returns Y where content starts. `firstOfSet: false` draws a **slim running header** (small title, no subtitle, one NAME rule); sheet one of each set gets the full NAME / DATE / CLASS block, whose three rules share a start column so they come out the same length
 6. Passes a layout `{ x, y, w, h }` (`contentBox(sy)`, which reserves `FOOTER_H`) to each `drawXxx()` function
-7. `drawFooter(ctx, pScale, { right })` closes each page with a hairline, the worksheet title and a page number
+7. `drawFooter(ctx, pScale, { right, setLabel, pageInSet, pagesInSet })` closes each page with a hairline, the worksheet title and **per-set** pagination (`Set 10 — Page 1 of 4`). Footers are drawn in a **second pass** after every set is laid out, because a set's page count is not known until it is drawn (a crossword that splits costs one sheet more); `pdfExport.js` collects a `footerQueue` and replays it with `doc.setPage()`. Never restore a document-wide `getNumberOfPages()` counter to a student-facing footer
 
 `PAGE_META` maps each page type to its header chip label and accent colour.
 Usage metering reports `doc.internal.getNumberOfPages()` (actual sheets), not
@@ -118,7 +118,12 @@ size and clue type size **together** instead of giving the grid a fixed 45% of
 the page. It scans cell sizes from 12 mm down to 4.6 mm and, for each, finds the
 largest clue point size that fits, in two candidate arrangements:
 
-- **below** — clues in two columns under the grid (the familiar worksheet shape)
+- **below** — clues in two columns under the grid, ACROSS then DOWN (the
+  familiar worksheet shape)
+- **below3** — the same clues flowed down *three* columns (`_flowClues` /
+  `_distribute`), breaking only between clues and never orphaning a section
+  heading. Three shorter columns need far less height than two, which is what
+  keeps a twenty-word puzzle off a second sheet
 - **beside** — clues in one column next to the grid (suits tall, narrow grids and
   soaks up the whitespace a portrait grid leaves)
 
@@ -139,6 +144,13 @@ split by accident.**
 - `drawLeader` — dotted leader (scramble answer lines, matching-key answers)
 - `drawRuledArea` — ruled writing space for leftover page height
 - `drawHeader` auto-fits the title and subtitle to the width left by the NAME/DATE block, so a real unit name no longer runs through the rule.
+
+### Vector icons (`pdf/pdfIcons.js`, `ui/icons.js`)
+Activity icons are drawn with jsPDF vector primitives (`drawIcon(doc, name, x,
+y, size, color)`) and, on screen, as inline SVG (`svgIcon(name)`). They print
+sharp at 600 dpi; the system emoji they replaced went through the canvas raster
+fallback and printed soft. `PAGE_ICONS` maps page type → icon name. Do **not**
+put emoji back into header instruction strings.
 
 ### Emoji in PDF
 PDF fonts (helvetica + custom loaded fonts) don't support emoji. The canvas fallback in `pdf/pdfHelpers.js`:
@@ -205,8 +217,47 @@ Sequencing: each call increments `_msgId`; only the latest message id is retaine
 
 The crossword attempts up to 5 different seed words and picks the layout with the best score (fewest unplaced × 10000 + area + aspect). 1500 ms hard timeout per attempt.
 
+**Seeded generation**: `generateAllAsync(settings, variantSeed)` drives every
+random choice from a `mulberry32` PRNG, so a seed reproduces a puzzle exactly
+and two seeds diverge. Three things make topologies actually differ:
+1. a real Fisher-Yates shuffle before the (stable) length sort
+2. the seed word starts across **or** down, chosen by the PRNG
+3. placement takes a random move from a narrow near-best score band rather than
+   always the single global optimum
+
+Each result carries `cw.signature` (a sorted word@x,y+dir string). `pdfExport.js`
+keeps a `usedTopologies` set, re-rolls a duplicate up to 3 times, and finally
+falls back to `transposeCrossword(cw)`. **Transpose is the only rigid transform
+available** — a rotation or mirror would leave every word reading backwards.
+
+`generateWS` places the worked example **first and forwards** (`dir [1,0]`),
+marked `isExample: true`, and picks a moderate 5–7 letter word for it.
+
 ### Puzzle Data Builder (`core/puzzleDataBuilder.js`)
-Shared module exporting `getLetter(i)` and `createPuzzleData()`. Used by both `main.js` (live preview) and `pdf/pdfExport.js` (PDF generation). Avoids code duplication.
+Shared module exporting `getLetter(i)` and `createPuzzleData(variantSeed)`. Used by both `main.js` (live preview) and `pdf/pdfExport.js` (PDF generation). Avoids code duplication.
+
+`createPuzzleData(variantSeed)` forwards the seed to the worker. Bulk export
+passes a **distinct seed per set** (`_setSeed(i, attempt)` in `pdfExport.js`) so
+two students never get the same crossword; it also flags `isExampleTerm` /
+`isExampleDef` on each note.
+
+### Dependency-free shared models (`core/notesModel.js`, `core/exampleModel.js`)
+Both are imported by the HTML renderers, the PDF drawers **and** the Node test
+harness, so they must never touch the DOM, the worker, or app state.
+
+| Export | Module | Purpose |
+|--------|--------|---------|
+| `isMatchingNotes(notes)` | notesModel | matching mode is a property of the DATA, never of settings |
+| `exampleDefIndex(notes)` | notesModel | row carrying the EXAMPLE badge on the **definition** side |
+| `stripLetterCount(clue)` | notesModel | drops a trailing `(12)` from a definition |
+| `pickCrosswordExample(across)` | exampleModel | 5–7 letters preferred, else nearest to 6 |
+| `pickWSExample(wsData)` | exampleModel | the word the generator marked, placed left-to-right |
+
+**The two-sided worked example (CRITICAL)**: in matching mode the example spans
+*two different rows*. The term side (prefilled answer box) is always row 0. The
+definition side (EXAMPLE badge) is `exampleDefIndex(notes)` — the row whose
+definition describes term 1. Pinning the badge to row 0 marks a definition that
+is **not** the answer to the example. Never use `i === 0` for the badge.
 
 ### Undo/Redo (`core/history.js`)
 `pushHistory()` must be called BEFORE mutating `state.words`. Max 50 entries. Word reorder, add, and delete operations push history; clue/term inline edits do not. Undo saves the current post-mutation state for redo before restoring. A `_mutatedSinceSnap` flag prevents duplicate history entries when undoing from a mid-history position.
@@ -311,7 +362,12 @@ Price IDs are read from env vars at module load (`PLAN_PRICE_IDS` is a plain con
 - **`updatePageScales()` calls `renderActivePage()`**: it only re-renders the active page. After navigation, `showPage(n)` calls `renderActivePage()` automatically.
 - **`saveState()` is debounced 500 ms**: for sliders that need to immediately read state (e.g., `updateNotesStyles()`), always call `syncSettingsFromDOM()` first.
 - **Stale state on toggle changes**: `renderActivePage()` calls `syncSettingsFromDOM()` at the start so toggle/checkbox changes take effect immediately without waiting for the 500ms debounce.
-- **Matching `isMatching` detection**: ALWAYS check `'matchLetter' in data[0]`, never `settings.notesConfig.shuffle` alone in a renderer. Settings-driven detection causes "undefined." rendering and wrong layout class when puzzle hasn't been generated yet.
+- **Matching `isMatching` detection**: ALWAYS use `isMatchingNotes(data)` from `core/notesModel.js`, never `settings.notesConfig.shuffle` alone in a renderer. Settings-driven detection causes "undefined." rendering and wrong layout class when puzzle hasn't been generated yet.
+- **The EXAMPLE badge is not row 0 in matching mode**: use `exampleDefIndex(notes)` for the badge and `0` for the prefilled answer box. They are different rows because definitions are shuffled. Pinning the badge to row 0 marks the wrong definition — the P0 defect of the Sept 2026 review.
+- **No `(n)` letter counts on a matching sheet**: the count identifies the answer outright (only one word has three letters). `showLetterCount` is forced off when `isMatching`, and clue text goes through `stripLetterCount()`. Crossword clues keep the count.
+- **Never clamp the EXAMPLE pill back over its text**: use `placeExamplePill()`, which drops the pill onto its own line when it cannot fit after the last line, and add that line's height in the measuring pass too.
+- **Draw grid letters before clue numbers**: `_drawGrid` paints the prefilled/key letter first, then the number over a knockout chip in the cell's own fill colour. Reversing that order buries the number under the example letter.
+- **Word-search cell geometry is load-bearing**: `.mode-search .cell` states `width`/`height` as `--cell-size + --ws-line-width` (the negative margin collapses the rule into the neighbour). `capsuleOverlay()` measures cell centres from exactly that geometry via its `lineW` option — change one and you must change the other, or highlights drift off the letters.
 - **`clueTermLength` in matching mode**: when writing any code that displays `(N)` after a definition in matching context, use `w.clueTermLength` not `w.term.length`. They diverge because definitions are shuffled across rows.
 - **Editing clues in matching mode**: `updateWord` patches `puzzleData.notes` in-place via `clueOrigIdx`. If you add new code paths that mutate clues, follow this same pattern or call `debouncedGenerate()`.
 - **Never call `doc.setFont()` directly in PDF code**: use `setFontSafe()`. A missing style (italic, in every custom font) makes jsPDF fall back to Times without warning.
@@ -482,6 +538,60 @@ Acting on a teacher review of a printed 6-page worksheet.
 - `tests/pdfLayout.test.mjs` (`npm run test:pdf`) — 25 assertions over real
   generated puzzles, including a general "no two text runs overlap on a
   baseline" check that would have caught the answer-key collision.
+
+---
+
+## Session Fixes (2026-09-14 — Layout Review Punch List)
+
+Acting on a bug & layout review of a printed 25-set class pack (Year 8
+Mathematics: Linear Relationships). All thirteen items closed; the review's
+verification plan is now part of `npm run test:pdf` (46 checks).
+
+### Vocabulary (P0s)
+- **`BUG-VOC-01` example badge followed the shuffle**: the `[EXAMPLE]` badge was
+  pinned to definition row A while the prefilled answer box was on term row 1.
+  In ~95% of shuffles row A belongs to a different term, so the one worked
+  example taught the wrong pairing. `exampleDefIndex()` now binds the badge to
+  the definition describing term 1; the example tint splits across the two rows.
+- **`BUG-VOC-02` badge overlapped definition text**: `placeExamplePill()` gives
+  the badge a guaranteed slot, dropping it to its own line rather than clamping
+  it back over the words. The preview's `.notes-clue` is a wrapping flex row
+  with `flex-shrink: 0` on the pill.
+- **`BUG-VOC-03` letter counts leaked the answers**: `(3)`, `(12)` after a
+  shuffled definition identify the term outright. Counts are now suppressed on
+  matching sheets (and stripped from clue text) while crossword clues keep them.
+- **`BUG-VOC-04` column widths and box alignment**: proportional columns
+  (# 5%, answer box 8%, term, definition) and the answer box centred on the
+  row's whole text block instead of its first baseline. Default term width
+  20% → 27%.
+
+### Crossword
+- **`BUG-XWD-01`**: added the three-column clue flow; grid + clues now fit one
+  page at 8/12/15/20/25 words. A dedicated clue page (teacher's explicit
+  choice) fills its leftover with a ruled WORKING OUT area.
+- **`BUG-XWD-02`**: letters are drawn before numbers, and the number sits on a
+  knockout chip; a letter sharing its cell with a number is set 10% smaller and
+  nudged down.
+- **`BUG-XWD-03`**: seeded generation plus randomised near-best placement and a
+  per-set signature check. 25 sets now produce 25 distinct topologies (they
+  previously collapsed onto a handful — sets 2, 6, 7 and 23 were identical).
+- **`BUG-XWD-04`**: `pickCrosswordExample()` prefers a 5–7 letter across word,
+  so no set prefills a 12-letter SUBSTITUTION.
+
+### Word search
+- **`BUG-WSR-01`**: cell width/height are stated explicitly (strict 1:1) and
+  `capsuleOverlay()` tracks true cell centres with a padded viewport, so
+  diagonal capsules stop skewing off the letters.
+- **`BUG-WSR-02`**: the generator places the example word first, forwards
+  left-to-right, and marks it `isExample`.
+
+### Base layout
+- **`BUG-DOC-01`**: footers paginate per set (`Set 10 — Page 1 of 4`) via a
+  deferred footer pass.
+- **`BUG-DOC-02`**: full NAME / DATE / CLASS block on sheet one of a set, a slim
+  running header after; all three rules share a start column and an end, so
+  they are exactly the same length.
+- **`BUG-DOC-03`**: vector icons replace system emoji in both PDF and preview.
 
 ---
 

@@ -56,7 +56,7 @@ export const state = {
         titleScale:     1,
         paperSize:      'a4',
         notesConfig: {
-            termWidth:  20,
+            termWidth:  27,
             showTerm:   true,
             showDef:    true,
             shuffle:    false,

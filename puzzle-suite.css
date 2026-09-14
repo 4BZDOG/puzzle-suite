@@ -53,7 +53,7 @@
     --cw-neg-margin: -1px;
 
     --notes-font-size: 14px;
-    --notes-term-width: 20%;
+    --notes-term-width: 27%;
 }
 
 /* Dark Mode Variables & Overrides */
@@ -1140,6 +1140,17 @@ main {
     font-family: var(--user-font);
 }
 
+/* Instruction icons are inline SVG, sized to the text they sit beside, so
+   they print sharp instead of as a platform emoji bitmap. */
+.instr-icon {
+    width: 1.15em;
+    height: 1.15em;
+    flex-shrink: 0;
+    vertical-align: -0.15em;
+    margin-right: 0.35em;
+    color: inherit;
+}
+
 .disp-instruction {
     margin: 6px 0 16px 0;
     font-size: calc(0.82rem * var(--global-font-scale) * var(--page-scale));
@@ -1172,6 +1183,14 @@ main {
     font-size: calc(0.9rem * var(--global-font-scale) * var(--page-scale));
     font-family: var(--user-font);
     width: 220px;
+}
+
+/* Sheet one of a set carries Name / Date / Class; the rest of the packet
+   gets a slim single Name line. A student fills the block in once per
+   packet, not once per sheet, and the space goes back to the activity. */
+.meta-block.meta-slim .line-date,
+.meta-block.meta-slim .line-class {
+    display: none;
 }
 
 .line {
@@ -1230,6 +1249,12 @@ main {
 [data-theme="dark"] .notes-row-example {
     background: #1e3a5f;
 }
+[data-theme="dark"] .notes-row.ex-term:not(.ex-def) .notes-num,
+[data-theme="dark"] .notes-row.ex-term:not(.ex-def) .notes-box,
+[data-theme="dark"] .notes-row.ex-term:not(.ex-def) .notes-word,
+[data-theme="dark"] .notes-row.ex-def:not(.ex-term) .notes-clue {
+    background: #1e3a5f;
+}
 
 /* ---- Dark mode: word-delete button hover ---- */
 [data-theme="dark"] .wm-btn:hover {
@@ -1270,17 +1295,29 @@ main {
     background-color: var(--ws-bg-color);
 }
 
-/* Bind grid text size smoothly to cell slider size */
+/* Bind grid text size smoothly to cell slider size.
+   Width and height are stated rather than left to grid stretch, so the 1:1
+   cell aspect ratio is an invariant of the CSS and not a coincidence of the
+   track sizes: a cell is one slider step plus the rule that its negative
+   margin then collapses into its neighbour. The highlight overlay measures
+   cell centres from exactly this geometry (see capsuleOverlay). */
 .mode-search .cell {
     font-size: calc(var(--cell-size) * 0.6);
     background-color: var(--ws-bg-color);
     border: var(--ws-line-width) solid #000;
+    width: calc(var(--cell-size) + var(--ws-line-width));
+    height: calc(var(--cell-size) + var(--ws-line-width));
+    aspect-ratio: 1 / 1;
     margin-top: var(--ws-neg-margin);
     margin-left: var(--ws-neg-margin);
 }
 
+/* No collapsing here — the hairline sits inside the cell box, so the cell
+   is exactly one slider step square. */
 .mode-search.with-internal-grid .cell {
     border: 1px solid rgba(0, 0, 0, 0.15);
+    width: var(--cell-size);
+    height: var(--cell-size);
     margin: 0;
 }
 
@@ -1318,10 +1355,14 @@ table.mode-cw td.cell.empty {
     z-index: 0;
 }
 
+/* The clue number sits above the prefilled example letter, not under it:
+   a Down word starting inside the example word used to have its number
+   painted over by the big blue letter. */
 .cell-num {
     position: absolute;
     top: 1px;
     left: 2px;
+    z-index: 3;
     font-size: 0.32em;
     line-height: 1;
     font-family: sans-serif;
@@ -1474,13 +1515,23 @@ table.mode-cw td.cell.empty {
 .cell-example .cell-example-letter {
     position: absolute;
     inset: 0;
+    z-index: 2;
     display: flex;
     align-items: center;
     justify-content: center;
+    /* Nudged clear of the number's corner, mirroring the PDF grid. */
+    padding-top: 14%;
     font-weight: bold;
     color: #2563eb;
-    font-size: 0.85em;
+    font-size: 0.8em;
     pointer-events: none;
+}
+
+/* Knockout behind the number so it reads against the example tint. */
+.cell-example .cell-num {
+    background: #dbeafe;
+    padding: 0 1px;
+    border-radius: 2px;
 }
 .scramble-answer-filled {
     font-weight: bold;
@@ -1520,6 +1571,21 @@ table.mode-cw td.cell.empty {
 .notes-row-example {
     background: #eff6ff;
     border-radius: 4px;
+}
+
+/* In matching mode the worked example spans two rows: the prefilled answer
+   box on row 1, and the EXAMPLE badge on whichever row holds that term's
+   definition. Tint only the half that carries it, so the highlight points
+   at the example rather than washing two whole rows. */
+.notes-row.ex-term:not(.ex-def),
+.notes-row.ex-def:not(.ex-term) {
+    background: none;
+}
+.notes-row.ex-term:not(.ex-def) .notes-num,
+.notes-row.ex-term:not(.ex-def) .notes-box,
+.notes-row.ex-term:not(.ex-def) .notes-word,
+.notes-row.ex-def:not(.ex-term) .notes-clue {
+    background: #eff6ff;
 }
 
 .cw-separate-clues-badge {
@@ -1668,6 +1734,8 @@ table.mode-cw td.cell.empty {
    matching the EXAMPLE pill drawn in the PDF. */
 .example-pill {
     display: inline-block;
+    flex: 0 0 auto;
+    align-self: flex-end;
     font-size: 0.62rem;
     font-weight: 700;
     letter-spacing: 0.04em;
@@ -2023,11 +2091,14 @@ table.mode-cw td.cell.empty {
     font-size: calc(var(--notes-font-size) * var(--global-font-scale) * var(--page-scale));
 }
 
+/* Explicit column widths: # 5%, answer box 8%, term (slider), definition.
+   `stretch` lets the answer-box cell centre its box against the whole row
+   rather than pinning it to the first line of a wrapped definition. */
 .notes-row {
     display: flex;
     border-bottom: 1px solid #cbd5e1;
     padding: 8px 0;
-    align-items: flex-start;
+    align-items: stretch;
 }
 
 .notes-row:last-child {
@@ -2035,17 +2106,28 @@ table.mode-cw td.cell.empty {
 }
 
 .notes-num {
-    width: 30px;
+    width: 5%;
+    min-width: 26px;
     font-weight: 700;
     color: #666;
     flex-shrink: 0;
     padding-top: 2px;
 }
 
+.notes-box {
+    width: 8%;
+    min-width: 30px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+}
+
 .match-answer-box {
     display: inline-block;
     width: 20px;
     height: 18px;
+    flex-shrink: 0;
     border: 1.5px solid #94a3b8;
     border-radius: 3px;
     text-align: center;
@@ -2072,12 +2154,17 @@ table.mode-cw td.cell.empty {
     word-break: break-word;
 }
 
+/* The badge is a flex sibling of the text, never an overlay: it keeps its
+   own width (flex-shrink:0) and wraps onto its own line when the definition
+   runs the full width, instead of being painted over the words. */
 .notes-clue {
     flex: 1;
     min-width: 0;
     display: flex;
+    flex-wrap: wrap;
     align-items: flex-start;
-    gap: 4px;
+    justify-content: space-between;
+    gap: 4px 8px;
 }
 
 .notes-clue .notes-editable {
@@ -2136,6 +2223,12 @@ table.mode-cw td.cell.empty {
     padding-bottom: 8px;
     border-bottom: 2px solid #000;
     margin-bottom: 0;
+}
+
+.notes-header .notes-box {
+    width: 8%;
+    min-width: 30px;
+    flex-shrink: 0;
 }
 
 .notes-word-header {

@@ -8,6 +8,8 @@ import { licenseManager } from '../license/licenseManager.js';
 import { createPuzzleData } from '../core/puzzleDataBuilder.js';
 import { loadJSPDF, loadFontForPDF, FONT_SELECT_MAP } from './pdfFonts.js';
 import { buildCtx, drawHeader, drawFooter } from './pdfHelpers.js';
+import { PAGE_ICONS } from './pdfIcons.js';
+import { transposeCrossword } from '../workers/workerBridge.js';
 import { drawWordSearch } from './pdfDrawWordSearch.js';
 import { drawCrosswordPage, drawCrosswordClues } from './pdfDrawCrossword.js';
 import { drawScramble } from './pdfDrawScramble.js';
@@ -18,14 +20,25 @@ let isExporting = false;
 // Per-activity identity: a coloured chip in the header instead of five
 // pages of identical grey type. Accents are reused by nothing else.
 const PAGE_META = {
-    notes: { label: 'VOCABULARY',  accent: [99, 102, 241] },
-    ws:    { label: 'WORD SEARCH', accent: [13, 148, 136] },
-    cw:    { label: 'CROSSWORD',   accent: [124, 58, 237] },
-    scr:   { label: 'WORD SCRAMBLE', accent: [217, 119, 6] },
+    notes: { label: 'VOCABULARY',  accent: [99, 102, 241], icon: PAGE_ICONS.notes },
+    ws:    { label: 'WORD SEARCH', accent: [13, 148, 136], icon: PAGE_ICONS.ws },
+    cw:    { label: 'CROSSWORD',   accent: [124, 58, 237], icon: PAGE_ICONS.cw },
+    scr:   { label: 'WORD SCRAMBLE', accent: [217, 119, 6], icon: PAGE_ICONS.scr },
 };
 
 // Room left under the content box for the running footer.
 const FOOTER_H = 10;
+
+/**
+ * A distinct generation seed per set (and per retry within a set).
+ *
+ * Knuth's multiplicative constant spreads consecutive set indices across the
+ * 32-bit range, so set 2 and set 23 no longer start from neighbouring states
+ * and produce the same crossword.
+ */
+function _setSeed(setIndex, attempt) {
+    return (Math.imul(setIndex * 64 + attempt + 1, 2654435761) ^ Date.now()) >>> 0;
+}
 
 // Premium font select values (gated behind the premiumFonts feature flag)
 const PREMIUM_FONT_VALUES = ["'Lora', serif", "'Comic Neue', cursive"];
@@ -160,22 +173,61 @@ export async function exportPDF() {
         ctx = buildCtx(doc, pdfFont, wmImg, scale, { PAGE_WIDTH, PAGE_HEIGHT, MARGIN }, cfg);
 
         let isFirstPage = true;
+        // Footers are drawn after every set is laid out, because a set's page
+        // count is not known until it has been drawn (a crossword that has to
+        // split costs one sheet more). Each entry records the sheet it belongs
+        // to and which set it came from; see the footer pass below.
+        const footerQueue = [];
+        // Crossword topologies already used, so two students in the same class
+        // set never get the identical grid.
+        const usedTopologies = new Set();
 
         for (let i = 0; i < count; i++) {
             if (T) T.innerText = `Generating Set ${i + 1}/${count}`;
             if (B) B.style.width = Math.round((i / count) * 100) + '%';
             await new Promise(r => setTimeout(r, 10));
 
+            // A distinct seed per set is what makes the sets differ at all;
+            // re-rolling on a repeat is the safety net behind it.
             let cpd = null, attempts = 0;
-            while (!cpd && attempts++ < 3) cpd = await createPuzzleData();
+            while (!cpd && attempts < 3) {
+                cpd = await createPuzzleData(_setSeed(i, attempts));
+                attempts++;
+            }
             if (!cpd) { showToast('Puzzle generation failed. Try again.', 'error'); break; }
 
+            if (cpd.cw?.signature) {
+                let reroll = 0;
+                while (usedTopologies.has(cpd.cw.signature) && reroll < 3) {
+                    const retry = await createPuzzleData(_setSeed(i, 10 + reroll));
+                    if (!retry) break;
+                    cpd = retry;
+                    reroll++;
+                }
+                // Still a repeat: transpose it. Across becomes down, which is
+                // the only rigid transform that leaves every word readable.
+                if (usedTopologies.has(cpd.cw.signature)) {
+                    cpd.cw = transposeCrossword(cpd.cw);
+                }
+                usedTopologies.add(cpd.cw.signature);
+            }
+
             const setIndicator = count > 1 ? `SET ${i + 1}` : '';
+            let pageInSet = 0;
 
             const addPage = () => {
                 if (!isFirstPage) doc.addPage();
                 isFirstPage = false;
                 ctx.drawWatermark();
+                pageInSet++;
+                return pageInSet === 1;
+            };
+            const queueFooter = (ps, right) => {
+                footerQueue.push({
+                    page: doc.internal.getNumberOfPages(),
+                    setIdx: i, pageInSet, pScale: ps, right,
+                    setLabel: count > 1 ? `Set ${i + 1}` : '',
+                });
             };
 
             for (const pType of selectedPages) {
@@ -190,57 +242,75 @@ export async function exportPDF() {
                 });
 
                 if (pType === 'notes') {
-                    addPage();
                     const ps = getPScale('notes');
+                    const firstOfSet = addPage();
                     const isMatchingMode = cfg.notesConfig?.shuffle;
                     const notesInstruction = isMatchingMode
-                        ? '🃏 Write the letter of the definition that matches each term.'
-                        : '📋 Terms and definitions for this unit.';
-                    const sy = drawHeader(ctx, title, sub, notesInstruction, false, setIndicator, ps, meta);
+                        ? 'Write the letter of the definition that matches each term.'
+                        : 'Terms and definitions for this unit.';
+                    const sy = drawHeader(ctx, title, sub, notesInstruction, false, setIndicator, ps,
+                        { ...meta, icon: isMatchingMode ? PAGE_ICONS.matching : meta.icon, firstOfSet });
                     drawNotes(ctx, cpd.notes, sy, ps);
-                    drawFooter(ctx, ps, { right: meta.label });
+                    queueFooter(ps, meta.label);
 
                 } else if (pType === 'ws') {
-                    addPage();
                     const ps = getPScale('ws');
-                    const sy = drawHeader(ctx, title, sub, '🔍 Find and circle each word from the list in the grid.', false, setIndicator, ps, meta);
+                    const firstOfSet = addPage();
+                    const sy = drawHeader(ctx, title, sub, 'Find and circle each word from the list in the grid.',
+                        false, setIndicator, ps, { ...meta, firstOfSet });
                     drawWordSearch(ctx, cpd.ws, contentBox(sy), state.words, cfg.wsUseClues, false, ps);
-                    drawFooter(ctx, ps, { right: meta.label });
+                    queueFooter(ps, meta.label);
 
                 } else if (pType === 'cw') {
                     const ps = getPScale('cw');
                     const useSeparateClues = cfg.cwSeparateClues;
-                    addPage();
+                    const firstOfSet = addPage();
                     const cwInstruction = useSeparateClues
-                        ? '✏️ Use the clues on the next page to fill in the grid.'
-                        : '✏️ Use the clues to fill in the grid.';
-                    const sy = drawHeader(ctx, title, sub, cwInstruction, false, setIndicator, ps, meta);
+                        ? 'Use the clues on the next page to fill in the grid.'
+                        : 'Use the clues to fill in the grid.';
+                    const sy = drawHeader(ctx, title, sub, cwInstruction, false, setIndicator, ps,
+                        { ...meta, firstOfSet });
                     // The compiler keeps grid + clues on one page unless the
                     // teacher asked for a split (or it is physically impossible).
                     const res = drawCrosswordPage(ctx, cpd.cw, contentBox(sy), ps, useSeparateClues);
-                    drawFooter(ctx, ps, { right: meta.label });
+                    queueFooter(ps, meta.label);
                     if (res.splitNeeded) {
-                        addPage();
-                        const cluesSy = drawHeader(ctx, title, sub, '✏️ Clues for the grid on the previous page.', false, setIndicator, ps, meta);
+                        const cluesFirst = addPage();
+                        const cluesSy = drawHeader(ctx, title, sub, 'Clues for the grid on the previous page.',
+                            false, setIndicator, ps, { ...meta, firstOfSet: cluesFirst });
                         drawCrosswordClues(ctx, cpd.cw, cluesSy, ps);
-                        drawFooter(ctx, ps, { right: 'CROSSWORD CLUES' });
+                        queueFooter(ps, 'CROSSWORD CLUES');
                     }
 
                 } else if (pType === 'scr') {
-                    addPage();
                     const ps = getPScale('scr');
-                    const sy = drawHeader(ctx, title, sub, '🔀 Unscramble each set of letters and write the word.', false, setIndicator, ps, meta);
+                    const firstOfSet = addPage();
+                    const sy = drawHeader(ctx, title, sub, 'Unscramble each set of letters and write the word.',
+                        false, setIndicator, ps, { ...meta, firstOfSet });
                     drawScramble(ctx, cpd.scr, contentBox(sy), false, scrShowHint, ps);
-                    drawFooter(ctx, ps, { right: meta.label });
+                    queueFooter(ps, meta.label);
 
                 } else if (pType === 'key') {
-                    addPage();
                     const ps = getPScale('key');
+                    addPage();
                     drawMasterKeyPage(ctx, title, sub, cpd, selections, ps);
-                    drawFooter(ctx, ps, { right: 'TEACHER KEY' });
+                    queueFooter(ps, 'TEACHER KEY');
                 }
             }
         }
+
+        // ---- Footer pass: now every set's true page count is known ----
+        const setTotals = footerQueue.reduce((acc, f) => {
+            acc[f.setIdx] = Math.max(acc[f.setIdx] || 0, f.pageInSet);
+            return acc;
+        }, {});
+        footerQueue.forEach(f => {
+            doc.setPage(f.page);
+            drawFooter(ctx, f.pScale, {
+                right: f.right, setLabel: f.setLabel,
+                pageInSet: f.pageInSet, pagesInSet: setTotals[f.setIdx],
+            });
+        });
 
         if (T) T.innerText = 'Saving Vector PDF...';
         if (B) B.style.width = '100%';

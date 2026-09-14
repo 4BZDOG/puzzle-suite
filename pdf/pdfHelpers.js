@@ -1,6 +1,7 @@
 // =============================================================
 // pdf/pdfHelpers.js — Shared helpers used by all PDF draw modules
 // =============================================================
+import { drawIcon } from './pdfIcons.js';
 // These functions are called with a bound `ctx` object that
 // carries { doc, PAGE_WIDTH, PAGE_HEIGHT, MARGIN, scale,
 //           mmToPt, pdfFont, wmImg, drawWatermark }
@@ -133,6 +134,33 @@ export function examplePillWidth(doc, { pScale = 1, pdfFont = 'helvetica', label
     setFontSafe(doc, pdfFont, 'bold');
     doc.setFontSize(fs);
     return doc.getTextWidth(label) + 3.2;
+}
+
+/**
+ * Where the EXAMPLE pill can sit without landing on the text it annotates.
+ *
+ * Callers reserve `examplePillWidth()` when they wrap, which normally leaves
+ * room at the end of the last line. When it does not — a long unbroken word,
+ * or a row that also echoes its term — the pill drops onto a line of its own
+ * rather than being clamped back over the words, which is what produced
+ * "mathemat[EXAMPLE]ene Descartes".
+ *
+ * @param {number} boxX,boxW    - the text column the pill must stay inside
+ * @param {number} textEndX     - right edge of the last line of text
+ * @param {number} baselineY    - baseline of that last line
+ * @param {number} lineH        - one line of leading, for the fallback
+ * @returns {{x:number, y:number, ownLine:boolean, w:number}}
+ */
+export function placeExamplePill(doc, {
+    boxX, boxW, textEndX, baselineY, lineH,
+    pScale = 1, pdfFont = 'helvetica', gap = 2,
+} = {}) {
+    const w = examplePillWidth(doc, { pScale, pdfFont });
+    const inlineX = textEndX + gap;
+    if (inlineX + w <= boxX + boxW + 0.01) {
+        return { x: inlineX, y: baselineY, ownLine: false, w };
+    }
+    return { x: boxX, y: baselineY + lineH, ownLine: true, w };
 }
 
 /** Dotted leader between two x positions — ties a term to its answer. */
@@ -336,6 +364,25 @@ export { drawText };
 // =============================================================
 
 /**
+ * One labelled form line: "NAME: ______________".
+ *
+ * The rule starts at a column shared by every field on the page rather than
+ * immediately after each label, so NAME and DATE no longer sit above rules
+ * of visibly different lengths, and it runs to a given end rather than being
+ * built out of underscore characters.
+ */
+function _formLine(ctx, label, labelX, ruleX, endX, y, pScale) {
+    const { doc, pdfFont } = ctx;
+    setFontSafe(doc, pdfFont, 'bold');
+    doc.setFontSize(9.5 * pScale);
+    doc.setTextColor(...PALETTE.muted);
+    doc.text(label, labelX, y);
+    doc.setDrawColor(180);
+    doc.setLineWidth(0.4);
+    doc.line(ruleX, y + 1, endX, y + 1);
+}
+
+/**
  * Draw the standard page header (title, subtitle, divider, activity chip,
  * instructions, name/date lines).
  *
@@ -343,7 +390,11 @@ export { drawText };
  * instruction all resolve through resolveStyle() so a custom font with no
  * italic face can no longer drag the subtitle into Times.
  *
- * @param {Object} opts - { label, accent } activity chip content
+ * Sheet one of a set carries the full NAME / DATE / CLASS block. The rest of
+ * the set gets a slim running header — a student writes their name once per
+ * packet, not four times, and the space goes to the activity instead.
+ *
+ * @param {Object} opts - { label, accent, icon, firstOfSet }
  * @returns {number} Y position where content should start (below header)
  */
 export function drawHeader(ctx, fullTitle, subText, instructions, isKey, setIndicator = '', pScale, opts = {}) {
@@ -351,6 +402,8 @@ export function drawHeader(ctx, fullTitle, subText, instructions, isKey, setIndi
     pScale = pScale || scale;
     const titleScale = ctx.titleScale || 1;
     const accent = opts.accent || PALETTE.ink;
+    const firstOfSet = opts.firstOfSet !== false;
+    const slim = !isKey && !firstOfSet;
 
     // The right-hand block (NAME/DATE, or the key stamp) owns fixed space,
     // so the title has to be fitted to what is left — a real unit name like
@@ -358,7 +411,7 @@ export function drawHeader(ctx, fullTitle, subText, instructions, isKey, setIndi
     // through the NAME rule at a hardcoded 28pt.
     const keyStampW = isKey
         ? measureTextMm(doc, 'TEACHER ANSWER KEY', { fontSizePt: 12 * pScale, bold: true, pdfFont }) + 6
-        : 92;
+        : (slim ? 76 : 92);
     const headW = Math.max(40, PAGE_WIDTH - MARGIN - keyStampW - MARGIN * 0.2);
 
     const fitPt = (text, startPt, minPt, bold) => {
@@ -369,55 +422,73 @@ export function drawHeader(ctx, fullTitle, subText, instructions, isKey, setIndi
 
     // Title
     const titleText = fullTitle.toUpperCase();
-    drawText(doc, titleText, MARGIN, MARGIN + 10 * pScale, {
-        fontSizePt: fitPt(titleText, 28 * pScale * titleScale, 13 * pScale, true),
+    const titleY = MARGIN + (slim ? 6 : 10) * pScale;
+    drawText(doc, titleText, MARGIN, titleY, {
+        fontSizePt: fitPt(titleText, (slim ? 13 : 28) * pScale * titleScale, (slim ? 9 : 13) * pScale, true),
         bold: true,
         color: PALETTE.ink,
         pdfFont,
     });
 
-    // Subtitle — same family, tracked out slightly instead of italicised
-    doc.setCharSpace(0.25);
-    drawText(doc, subText, MARGIN, MARGIN + 18 * pScale, {
-        fontSizePt: fitPt(subText, 10.5 * pScale * titleScale, 7.5 * pScale, false),
-        color: PALETTE.muted,
-        pdfFont,
-    });
-    doc.setCharSpace(0);
+    // Subtitle — same family, tracked out slightly instead of italicised.
+    // The running header drops it: it is already on sheet one of the set.
+    if (!slim) {
+        doc.setCharSpace(0.25);
+        drawText(doc, subText, MARGIN, MARGIN + 18 * pScale, {
+            fontSizePt: fitPt(subText, 10.5 * pScale * titleScale, 7.5 * pScale, false),
+            color: PALETTE.muted,
+            pdfFont,
+        });
+        doc.setCharSpace(0);
+    }
 
     // Right-side metadata
+    const endX = PAGE_WIDTH - MARGIN;
     if (isKey) {
         setFontSafe(doc, pdfFont, 'bold');
         doc.setFontSize(12 * pScale);
         doc.setTextColor(...PALETTE.key);
-        doc.text('TEACHER ANSWER KEY', PAGE_WIDTH - MARGIN, MARGIN + 10 * pScale, { align: 'right' });
+        doc.text('TEACHER ANSWER KEY', endX, MARGIN + 10 * pScale, { align: 'right' });
+    } else if (slim) {
+        // Slim running header: the set, then one short name rule.
+        const labelX = PAGE_WIDTH - 74;
+        setFontSafe(doc, pdfFont, 'bold');
+        doc.setFontSize(9.5 * pScale);
+        const ruleX = labelX + doc.getTextWidth('NAME:') + 3;
+        if (setIndicator) {
+            doc.setTextColor(99, 102, 241);
+            doc.text(setIndicator, endX, MARGIN + 1.5 * pScale, { align: 'right' });
+        }
+        _formLine(ctx, 'NAME:', labelX, ruleX, endX, MARGIN + 6 * pScale, pScale);
     } else {
         if (setIndicator) {
             setFontSafe(doc, pdfFont, 'bold');
             doc.setFontSize(9 * pScale);
             doc.setTextColor(99, 102, 241);
-            doc.text(setIndicator, PAGE_WIDTH - MARGIN, MARGIN + 4 * pScale, { align: 'right' });
+            doc.text(setIndicator, endX, MARGIN + 4 * pScale, { align: 'right' });
         }
-        const fieldLabelX = PAGE_WIDTH - 90;
-        const fieldLineStart = PAGE_WIDTH - 72;
+        // All three labels share one rule column and one end, so all three
+        // rules come out exactly the same length — NAME and DATE used to sit
+        // above visibly different underlines because the rule started
+        // straight after each label.
+        const labelX = PAGE_WIDTH - 90;
         setFontSafe(doc, pdfFont, 'bold');
-        doc.setFontSize(10 * pScale);
-        doc.setTextColor(...PALETTE.muted);
-        doc.text('NAME:', fieldLabelX, MARGIN + 8 * pScale);
-        doc.setDrawColor(180);
-        doc.setLineWidth(0.4);
-        doc.line(fieldLineStart, MARGIN + 9 * pScale, PAGE_WIDTH - MARGIN, MARGIN + 9 * pScale);
-        doc.text('DATE:', fieldLabelX, MARGIN + 18 * pScale);
-        doc.line(fieldLineStart, MARGIN + 19 * pScale, PAGE_WIDTH - MARGIN, MARGIN + 19 * pScale);
+        doc.setFontSize(9.5 * pScale);
+        const ruleX = labelX + Math.max(
+            doc.getTextWidth('NAME:'), doc.getTextWidth('DATE:'), doc.getTextWidth('CLASS:')) + 3;
+        ['NAME:', 'DATE:', 'CLASS:'].forEach((lab, i) => {
+            _formLine(ctx, lab, labelX, ruleX, endX, MARGIN + (4.5 + i * 7.5) * pScale, pScale);
+        });
     }
 
     // Divider line (above the instructions)
+    const dividerY = MARGIN + (slim ? 10 : 22) * pScale;
     doc.setDrawColor(...PALETTE.ink);
     doc.setLineWidth(0.4);
-    doc.line(MARGIN, MARGIN + 22 * pScale, PAGE_WIDTH - MARGIN, MARGIN + 22 * pScale);
+    doc.line(MARGIN, dividerY, PAGE_WIDTH - MARGIN, dividerY);
 
     // Activity chip + instruction sentence
-    const instrY = MARGIN + 29 * pScale;
+    const instrY = dividerY + 7 * pScale;
     let textX = MARGIN;
     if (opts.label) {
         const chipFs = Math.max(6.5, 8 * pScale);
@@ -432,19 +503,32 @@ export function drawHeader(ctx, fullTitle, subText, instructions, isKey, setIndi
         });
         textX = MARGIN + chipW + 3;
     }
+    // A vector icon instead of a system emoji: sharp at any print resolution.
+    if (opts.icon) {
+        const iconSize = 3.6 * pScale;
+        const drawn = drawIcon(doc, opts.icon, textX, instrY, iconSize, accent);
+        if (drawn) textX += drawn + 1.8;
+    }
     drawText(doc, instructions, textX, instrY, {
         fontSizePt: 9.5 * pScale,
         color: PALETTE.muted,
         pdfFont,
     });
 
-    return MARGIN + 38 * pScale;
+    return instrY + 9 * pScale;
 }
 
 /**
  * Thin running footer — lets a teacher collate a printed class set.
+ *
+ * Pagination is per set, not per document. A teacher printing 25 sets used
+ * to hand the tenth student sheets numbered "Page 37" to "Page 40"; the
+ * numbers now restart with every set, so a packet reads "Set 10 — Page 1 of
+ * 4" and a student can tell at a glance whether their packet is complete.
+ *
+ * @param {Object} opts - { right, setLabel, pageInSet, pagesInSet }
  */
-export function drawFooter(ctx, pScale, { right = '' } = {}) {
+export function drawFooter(ctx, pScale, { right = '', setLabel = '', pageInSet = 0, pagesInSet = 0 } = {}) {
     const { doc, PAGE_WIDTH, PAGE_HEIGHT, MARGIN, pdfFont, title } = ctx;
     const y = PAGE_HEIGHT - MARGIN + 6;
     doc.setDrawColor(...PALETTE.rule);
@@ -454,8 +538,16 @@ export function drawFooter(ctx, pScale, { right = '' } = {}) {
     doc.setFontSize(Math.max(6, 7 * (pScale || 1)));
     doc.setTextColor(...PALETTE.muted);
     if (title) doc.text(String(title), MARGIN, y);
+
     let pageNo = '';
-    try { pageNo = `Page ${doc.internal.getNumberOfPages()}`; } catch (_) { }
+    if (pageInSet > 0 && pagesInSet > 0) {
+        pageNo = `Page ${pageInSet} of ${pagesInSet}`;
+        if (setLabel) pageNo = `${setLabel} — ${pageNo}`;
+    } else {
+        // No set context supplied (a one-off page): fall back to the sheet
+        // number, which is at least honest about being document-wide.
+        try { pageNo = `Page ${doc.internal.getNumberOfPages()}`; } catch (_) { }
+    }
     const rightText = [right, pageNo].filter(Boolean).join('  ·  ');
     if (rightText) doc.text(rightText, PAGE_WIDTH - MARGIN, y, { align: 'right' });
 }

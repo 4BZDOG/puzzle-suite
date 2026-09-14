@@ -18,6 +18,7 @@ import { renderKeys } from './renderers/keys.js';
 import { exportPDF } from './pdf/pdfExport.js';
 
 import { showToast } from './ui/toast.js';
+import { svgIcon } from './ui/icons.js';
 import { AI_PROVIDERS, generateWords, loadSavedKeys, saveKey } from './ai/aiGenerate.js';
 import { openModal, closeModal } from './ui/modal.js';
 import { setupSidebarResize, toggleSidebar, switchTab } from './ui/sidebar.js';
@@ -107,6 +108,7 @@ function autoFit(t, silent = false) {
 // =============================================================
 function renderActivePage() {
     syncSettingsFromDOM();   // always sync DOM → state before rendering so toggles take effect immediately
+    _updateMetaBlocks();     // page order / selection decides which sheet is first in the set
     const d = state.puzzleData, s = state.settings, w = state.words;
 
     renderNotes(
@@ -150,9 +152,10 @@ function updateNotesInstruction() {
     const isMatching = document.getElementById('notesShuffle')?.checked ?? state.settings.notesConfig.shuffle;
     // Write into the text span so the activity chip beside it survives.
     const target = el.querySelector('.disp-instruction-text') || el;
-    target.innerText = isMatching
-        ? '🃏 Write the letter of the definition that matches each term.'
-        : '📋 Terms and definitions for this unit.';
+    // Vector icon + plain text: a system emoji here printed as a soft bitmap.
+    target.innerHTML = isMatching
+        ? svgIcon('matching') + 'Write the letter of the definition that matches each term.'
+        : svgIcon('notes') + 'Terms and definitions for this unit.';
     const chip = el.querySelector('.activity-chip');
     if (chip) chip.innerText = isMatching ? 'Matching' : 'Vocabulary';
 }
@@ -222,6 +225,25 @@ function updatePageScales() {
     });
     saveState();
     renderActivePage();
+}
+
+/**
+ * The metadata block belongs to sheet one of a set, matching the PDF.
+ *
+ * Which sheet that is depends on the page order and which pages are
+ * selected, so it is worked out from the live settings rather than being
+ * pinned to the notes page.
+ */
+function _updateMetaBlocks() {
+    const idxOf = { notes: 1, ws: 2, cw: 3, scr: 4, key: 5 };
+    const order = state.settings.pageOrder || ['notes', 'ws', 'cw', 'scr', 'key'];
+    const opts = state.settings.opts || {};
+    const firstSelected = order.find(p => opts[p]) || order[0];
+    const firstPage = idxOf[firstSelected] || 1;
+    Object.entries(idxOf).forEach(([, n]) => {
+        const block = document.querySelector(`#page${n} .meta-block`);
+        if (block) block.classList.toggle('meta-slim', n !== firstPage);
+    });
 }
 
 function showPage(n) {
