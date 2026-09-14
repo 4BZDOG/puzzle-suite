@@ -6,7 +6,7 @@
 // always land on ONE page, and so that a short puzzle grows to fill
 // the sheet instead of floating in the top half of it.
 // =============================================================
-import { PALETTE, drawExamplePill, examplePillWidth, setFontSafe, drawRuledArea } from './pdfHelpers.js';
+import { PALETTE, drawExamplePill, examplePillWidth, setFontSafe } from './pdfHelpers.js';
 import { pickCrosswordExample } from '../core/exampleModel.js';
 
 export { pickCrosswordExample };
@@ -118,25 +118,55 @@ function _drawBank(ctx, cwData, x, y, w, pScale) {
 // ---- drawing ----
 
 /**
- * Draw the grid. Clue numbers are drawn in BOTH student and key mode —
- * a teacher fielding "where's 12 Down?" needs them on the key too.
+ * Smallest key-thumbnail cell that can carry a legible clue number.
  *
- * Letters go down first and the number last, over a knockout chip in the
- * cell's own fill colour. A prefilled example letter used to be painted
- * over the top-left number of any Down word starting in the same cell,
- * which left students hunting for a clue number that had been swallowed by
- * the scaffolding meant to help them.
+ * A four-up answer key squeezes the crossword into a quadrant, where a
+ * two-digit number and a centred solution letter cannot both fit in ~4 mm
+ * without one sitting on the other. Below this size the numbers are dropped:
+ * a teacher checking a key needs the letters and the word shapes, and the
+ * clue numbers are on the student's own sheet at full size.
+ */
+const KEY_NUM_MIN_CELL = 6;   // mm
+
+/**
+ * Draw the grid.
+ *
+ * The clue number owns a reserved zone in the top-left corner and the
+ * letter is placed strictly below it, so the two can never share space.
+ * Both are sized to their zone rather than to the cell, which is what a
+ * two-digit number needs: "10" set at the one-digit size ran straight into
+ * the upright of a prefilled L.
+ *
+ * Clue numbers are drawn on the student grid and on a full-size key, but
+ * suppressed on a cramped key thumbnail (see KEY_NUM_MIN_CELL).
  */
 function _drawGrid(ctx, cwData, ox, oy, cSize, isKey, exCells, exWord) {
     const { doc, mmToPt, pdfFont } = ctx;
     doc.setDrawColor(...PALETTE.ink);
     doc.setLineWidth(0.4);
 
-    const numPt = Math.max(5.5, mmToPt(cSize) * (isKey ? 0.30 : 0.38));
-    // A letter sharing its cell with a clue number is set a little smaller
-    // and lower, so its glyph box stays clear of the number's corner.
-    const charPtPlain   = mmToPt(cSize) * (isKey ? 0.50 : 0.62);
-    const charPtNumbered = charPtPlain * 0.90;
+    const showNumbers = !isKey || cSize >= KEY_NUM_MIN_CELL;
+
+    // The number's reserved corner, as fractions of the cell.
+    const ZONE_W = 0.42, ZONE_H = 0.32, ZONE_X = 0.07, ZONE_Y = 0.05;
+    // Letters clear that zone by sitting on a low baseline; an unnumbered
+    // cell keeps its letter optically centred instead.
+    const BASE_NUMBERED = 0.80, BASE_PLAIN = 0.72;
+
+    const charPtPlain = mmToPt(cSize) * (isKey ? 0.50 : 0.62);
+    const charPtNumbered = charPtPlain * 0.92;
+
+    /** Largest point size at which `label` fits inside the number zone. */
+    const numPtFor = (label) => {
+        let pt = Math.max(4.4, mmToPt(cSize * ZONE_H) * 0.86);
+        setFontSafe(doc, pdfFont, 'bold');
+        for (let i = 0; i < 8; i++) {
+            doc.setFontSize(pt);
+            if (doc.getTextWidth(label) <= cSize * ZONE_W) break;
+            pt *= 0.9;
+        }
+        return Math.max(4.2, pt);
+    };
 
     for (let y = 0; y < cwData.rows; y++) {
         for (let x = 0; x < cwData.cols; x++) {
@@ -144,40 +174,31 @@ function _drawGrid(ctx, cwData, ox, oy, cSize, isKey, exCells, exWord) {
             if (!cell) continue;
             const cx = ox + x * cSize, cy = oy + y * cSize;
             const isEx = exCells.has(`${x},${y}`);
-            const fill = isEx ? PALETTE.exampleBg : [255, 255, 255];
-            doc.setFillColor(...fill);
+            doc.setFillColor(...(isEx ? PALETTE.exampleBg : [255, 255, 255]));
             doc.setDrawColor(...PALETTE.ink);
             doc.setLineWidth(0.4);
             doc.rect(cx, cy, cSize, cSize, 'FD');
 
-            // ---- letter first ----
-            const numbered = !!cell.num;
+            const numbered = showNumbers && !!cell.num;
+
+            // ---- letter, on a baseline that clears the number zone ----
             const charPt = numbered ? charPtNumbered : charPtPlain;
-            const midY = cy + cSize * (numbered ? 0.60 : 0.53);
-            if (isKey) {
+            const baseY = cy + cSize * (numbered ? BASE_NUMBERED : BASE_PLAIN);
+            const glyph = isKey ? cell.char : (isEx && exWord ? exWord.word[x - exWord.x] : '');
+            if (glyph) {
                 setFontSafe(doc, pdfFont, 'bold');
                 doc.setFontSize(charPt);
-                doc.setTextColor(...PALETTE.key);
-                doc.text(cell.char, cx + cSize * 0.55, midY, { align: 'center', baseline: 'middle' });
-            } else if (isEx && exWord) {
-                setFontSafe(doc, pdfFont, 'bold');
-                doc.setFontSize(charPt);
-                doc.setTextColor(...PALETTE.example);
-                doc.text(exWord.word[x - exWord.x], cx + cSize * 0.55, midY,
-                    { align: 'center', baseline: 'middle' });
+                doc.setTextColor(...(isKey ? PALETTE.key : PALETTE.example));
+                doc.text(glyph, cx + cSize * 0.5, baseY, { align: 'center' });
             }
 
-            // ---- number last, on a knockout chip ----
+            // ---- number last, inside its own corner ----
             if (numbered) {
                 const label = String(cell.num);
+                doc.setFontSize(numPtFor(label));
                 setFontSafe(doc, pdfFont, 'bold');
-                doc.setFontSize(numPt);
-                const tw = doc.getTextWidth(label);
-                const chipH = numPt * 0.36 + 0.5;
-                doc.setFillColor(...fill);
-                doc.rect(cx + cSize * 0.04, cy + cSize * 0.04, tw + 0.7, chipH, 'F');
                 doc.setTextColor(...(isKey ? PALETTE.muted : PALETTE.ink));
-                doc.text(label, cx + cSize * 0.09, cy + cSize * 0.07, { baseline: 'top' });
+                doc.text(label, cx + cSize * ZONE_X, cy + cSize * ZONE_Y, { baseline: 'top' });
             }
         }
     }
@@ -481,7 +502,7 @@ export function drawCrossword(ctx, cwData, layout, isKey, pScale, separateClues 
  */
 export function drawCrosswordClues(ctx, cwData, startY, pScale) {
     if (!cwData || !cwData.placed.length) return;
-    const { doc, PAGE_HEIGHT, PAGE_WIDTH, MARGIN, pdfFont } = ctx;
+    const { PAGE_HEIGHT, PAGE_WIDTH, MARGIN } = ctx;
     pScale = pScale || ctx.scale;
 
     const ac = cwData.placed.filter(w => w.dir === 'across').sort((a, b) => a.num - b.num);
@@ -497,16 +518,11 @@ export function drawCrosswordClues(ctx, cwData, startY, pScale) {
     const pt = _bestPt(p => Math.max(measure(ac, 'ac', colW, p), measure(dn, 'dn', colW, p)), availH, pScale)
         || PT_CANDIDATES[PT_CANDIDATES.length - 1] * pScale;
 
-    const acEnd = _drawClueSection(ctx, 'ACROSS', ac, MARGIN, startY, colW, pt, pScale, exampleNum);
-    const dnEnd = _drawClueSection(ctx, 'DOWN', dn, MARGIN + colW, startY, colW, pt, pScale, null);
-
-    // A dedicated clue page is capped at 11pt type, so a short list used to
-    // leave the bottom half of the sheet blank. Hand that back to the
-    // student as working space instead.
-    const bottom = Math.max(acEnd, dnEnd);
-    const leftover = (PAGE_HEIGHT - MARGIN) - bottom;
-    if (leftover > 45 * pScale) {
-        drawRuledArea(doc, MARGIN, bottom + 12 * pScale, PAGE_WIDTH - 2 * MARGIN,
-            leftover - 16 * pScale, { pScale, pdfFont, label: 'WORKING OUT', lineGap: 9 });
-    }
+    // No filler below the clues. A vocabulary crossword needs no calculation
+    // space, and ruling the leftover only disguised the real problem, which
+    // was the grid being stranded on the previous sheet. The compiler keeps
+    // grid and clues together now, so this page exists only when a teacher
+    // deliberately asked for it.
+    _drawClueSection(ctx, 'ACROSS', ac, MARGIN, startY, colW, pt, pScale, exampleNum);
+    _drawClueSection(ctx, 'DOWN', dn, MARGIN + colW, startY, colW, pt, pScale, null);
 }

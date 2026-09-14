@@ -19,7 +19,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { jsPDF } from 'jspdf';
 
-import { buildCtx, drawHeader, drawFooter } from '../pdf/pdfHelpers.js';
+import { buildCtx, drawHeader, drawFooter, drawBlankFiller } from '../pdf/pdfHelpers.js';
 import { drawWordSearch } from '../pdf/pdfDrawWordSearch.js';
 import { drawCrosswordPage, drawCrosswordClues } from '../pdf/pdfDrawCrossword.js';
 import { drawScramble } from '../pdf/pdfDrawScramble.js';
@@ -136,6 +136,7 @@ const WORDS = [
 function exportRun({
     matching = false, words = WORDS, showExample = true, showLetterCount = true,
     cwShowBank = false, cwSeparateClues = false, sets = 1, label = 'run',
+    keysAtEnd = true, duplexSafe = true, withKey = true,
 } = {}) {
     const { doc, log } = makeDoc();
     const ctx = buildCtx(doc, 'helvetica', null, 1,
@@ -152,6 +153,9 @@ function exportRun({
     let first = true;
     const footerQueue = [];
     const cpds = [];
+    const keyQueue = [];
+    const pageKind = {};          // page number -> 'student' | 'key' | 'filler'
+    const pageSet = {};           // page number -> set index (-1 for appendix)
     let splitNeeded = false;
 
     for (let si = 0; si < sets; si++) {
@@ -160,10 +164,12 @@ function exportRun({
         cpds.push(cpd);
 
         let pageInSet = 0;
-        const addPage = () => {
+        const addPage = (kind = 'student') => {
             if (!first) doc.addPage();
             first = false;
             pageInSet++;
+            pageKind[doc.internal.getNumberOfPages()] = kind;
+            pageSet[doc.internal.getNumberOfPages()] = si;
             return pageInSet === 1;
         };
         const queueFooter = (right) => footerQueue.push({
@@ -204,10 +210,39 @@ function exportRun({
         drawScramble(ctx, cpd.scr, box(sy), false, false, 1);
         queueFooter('WORD SCRAMBLE');
 
-        addPage();
-        drawMasterKeyPage(ctx, title, sub, cpd, { ws: true, cw: true, scr: true, notes: true }, 1);
-        queueFooter('TEACHER KEY');
+        if (withKey && !keysAtEnd) {
+            addPage('key');
+            drawMasterKeyPage(ctx, title, sub, cpd, { ws: true, cw: true, scr: true, notes: true }, 1);
+            queueFooter('TEACHER KEY');
+        }
+
+        // Pad the packet to an even length so it occupies whole sheets.
+        if (duplexSafe && pageInSet % 2 === 1) {
+            addPage('filler');
+            drawBlankFiller(ctx, 1);
+            queueFooter('');
+        }
+
+        if (withKey && keysAtEnd) keyQueue.push({ cpd, setIdx: si });
     }
+
+    // Answer-key appendix, after every student set.
+    keyQueue.forEach((entry, k) => {
+        if (!first) doc.addPage();
+        first = false;
+        pageKind[doc.internal.getNumberOfPages()] = 'key';
+        pageSet[doc.internal.getNumberOfPages()] = -1;
+        const setLabel = sets > 1 ? `Set ${entry.setIdx + 1}` : '';
+        drawMasterKeyPage(ctx, title, sub, entry.cpd,
+            { ws: true, cw: true, scr: true, notes: true }, 1, setLabel);
+        footerQueue.push({
+            page: doc.internal.getNumberOfPages(), setIdx: -1, pageInSet: 0,
+            right: 'TEACHER KEY', setLabel: '',
+            pageText: sets > 1
+                ? `Answer key ${k + 1} of ${keyQueue.length}  ·  Set ${entry.setIdx + 1}`
+                : 'Answer key',
+        });
+    });
 
     // Footer pass, exactly as pdfExport.js runs it: page counts per set are
     // only known once every set has been laid out.
@@ -217,7 +252,7 @@ function exportRun({
     const footers = footerQueue.map(f => {
         doc.setPage(f.page);
         drawFooter(ctx, 1, {
-            right: f.right, setLabel: f.setLabel,
+            right: f.right, setLabel: f.setLabel, pageText: f.pageText,
             pageInSet: f.pageInSet, pagesInSet: setTotals[f.setIdx],
         });
         return { ...f, pagesInSet: setTotals[f.setIdx] };
@@ -229,7 +264,7 @@ function exportRun({
         fs.writeFileSync(path.join(dir, `${label}.pdf`), Buffer.from(doc.output('arraybuffer')));
     }
     return {
-        cpd: cpds[0], cpds, log, doc, footers,
+        cpd: cpds[0], cpds, log, doc, footers, pageKind, pageSet,
         pages: doc.internal.getNumberOfPages(), splitNeeded,
     };
 }
@@ -297,8 +332,14 @@ labels.forEach(l => {
 });
 check('matching key term never runs into its answer letter', worst > 0.5, `min gap ${worst.toFixed(2)}mm (${worstPair})`);
 
-check('crossword key keeps its clue numbers',
-    keyText.filter(t => /^\d+$/.test(t.text) && t.size < 6).length > 3);
+// A four-up key squeezes the crossword into a quadrant, where a two-digit
+// number cannot share ~4mm with a solution letter. The numbers are dropped
+// there; the student's own full-size grid still carries them.
+check('a cramped answer-key thumbnail drops its clue numbers',
+    keyText.filter(t => /^\d+$/.test(t.text) && t.size < 6).length === 0,
+    `${keyText.filter(t => /^\d+$/.test(t.text) && t.size < 6).length} tiny numbers`);
+check('the student crossword grid still carries its clue numbers',
+    r.log.filter(l => l.kind === 'text' && l.page === 3 && /^\d+$/.test(l.text)).length > 3);
 check('no Times fallback anywhere in the document',
     r.log.filter(l => l.kind === 'text' && /times/i.test(l.font)).length === 0);
 check('word search highlights are vector capsules',
@@ -327,7 +368,10 @@ check('the crossword word bank reaches the PDF', banked.log.some(l => l.text ===
 check('the crossword still fits one page with a word bank', !banked.splitNeeded);
 
 const split = exportRun({ cwSeparateClues: true, label: 'separate-clues' });
-check('an explicitly separate clue page still works', split.pages === 6, `got ${split.pages}`);
+// 5 student pages -> padded to 6 whole sheets -> plus the appendix key.
+check('an explicitly separate clue page still works', split.pages === 7, `got ${split.pages}`);
+check('a separate clue page carries no filler ruling',
+    !split.log.some(l => l.kind === 'text' && l.text === 'WORKING OUT'));
 
 [['six-word', small], ['no-scaffolding', plain], ['scaffolded', scaffolded],
  ['word-bank', banked], ['separate-clues', split]].forEach(([name, run]) => {
@@ -417,19 +461,15 @@ function pillCollisions(log) {
     check('crossword fits one page at 8/12/15/20/25 words', splits === 0, `${splits} split`);
 }
 
-// --- BUG-XWD-02: clue numbers stay legible inside prefilled cells ---
-// A prefilled example letter used to be drawn after the clue number in the
-// same cell, painting over it. The number must now be the last thing drawn
-// in any cell it appears in.
+// --- BUG-XWD-02 / BUG-XWD-06: numbers and letters never share space ---
+// The clue number owns a reserved top-left zone and the letter sits strictly
+// below it. Checked geometrically rather than by draw order: "10" set at the
+// one-digit size used to run into the upright of a prefilled L even though
+// it was drawn on top.
 {
-    let cellsWithBoth = 0, covered = 0;
-    for (let iter = 0; iter < 6; iter++) {
-        const r = exportRun({ label: `vp-cwnum-${iter}` });
-        const page = r.log.filter(l => l.page === 3);
-
-        // Cell size and grid origin, read off the square cell rects.
+    const boxesOf = (page) => {
         const squares = page.filter(l => l.kind === 'rect' && Math.abs(l.w - l.h) < 0.01 && l.w > 3);
-        if (!squares.length) continue;
+        if (!squares.length) return null;
         const tally = {};
         squares.forEach(l => { tally[l.w.toFixed(2)] = (tally[l.w.toFixed(2)] || 0) + 1; });
         const cSize = parseFloat(Object.entries(tally).sort((a, b) => b[1] - a[1])[0][0]);
@@ -438,30 +478,54 @@ function pillCollisions(log) {
         const maxX = Math.max(...cells.map(l => l.x)) + cSize;
         const maxY = Math.max(...cells.map(l => l.y)) + cSize;
 
-        // Group every glyph drawn inside the grid by the cell it lands in.
         const byCell = new Map();
-        page.forEach((l, i) => {
+        page.forEach(l => {
             if (l.kind !== 'text') return;
             const gx = l.align === 'center' ? l.x : l.x + l.w / 2;
-            if (gx < ox || gx > maxX || l.y < oy || l.y > maxY) return;
+            if (gx < ox || gx > maxX || l.y < oy - cSize || l.y > maxY + cSize) return;
             const key = `${Math.floor((gx - ox) / cSize)},${Math.floor((l.y - oy) / cSize)}`;
             if (!byCell.has(key)) byCell.set(key, []);
-            byCell.get(key).push({ ...l, i });
+            // Rough glyph box: jsPDF cap height is ~0.72 of the point size.
+            const capMm = (l.size / 2.83465) * 0.72;
+            const left = l.align === 'center' ? l.x - l.w / 2 : l.x;
+            const isNum = /^\d+$/.test(l.text);
+            byCell.get(key).push({
+                ...l, isNum,
+                left, right: left + l.w,
+                // numbers are drawn baseline:'top', letters on their baseline
+                top: isNum ? l.y : l.y - capMm,
+                bottom: isNum ? l.y + capMm : l.y,
+            });
         });
+        return { byCell, cSize };
+    };
 
-        byCell.forEach(glyphs => {
-            const nums = glyphs.filter(g => /^\d+$/.test(g.text));
-            const letters = glyphs.filter(g => /^[A-Z]$/.test(g.text));
-            if (!nums.length || !letters.length) return;
-            cellsWithBoth++;
-            // The number has to be the LAST glyph in its cell: anything drawn
-            // after it is painted on top of it.
-            const lastNum = nums[nums.length - 1].i;
-            if (letters.some(l => l.i > lastNum)) covered++;
+    const overlap = (a, b) =>
+        a.left < b.right - 0.05 && b.left < a.right - 0.05 &&
+        a.top < b.bottom - 0.05 && b.top < a.bottom - 0.05;
+
+    let pairs = 0, collisions = 0, worstPair = '';
+    for (let iter = 0; iter < 6; iter++) {
+        const r = exportRun({ label: `vp-cwnum-${iter}` });
+        const got = boxesOf(r.log.filter(l => l.page === 3));
+        if (!got) continue;
+        got.byCell.forEach(glyphs => {
+            const nums = glyphs.filter(g => g.isNum);
+            const letters = glyphs.filter(g => !g.isNum && /^[A-Z]$/.test(g.text));
+            nums.forEach(n => letters.forEach(l => {
+                pairs++;
+                if (overlap(n, l)) { collisions++; worstPair = `${n.text}/${l.text}`; }
+            }));
         });
     }
-    check('prefilled example letters never paint over a clue number',
-        cellsWithBoth > 0 && covered === 0, `${covered}/${cellsWithBoth} numbers covered`);
+    check('clue numbers never overlap a prefilled letter on the student grid',
+        pairs > 0 && collisions === 0, `${collisions}/${pairs} collide ${worstPair}`);
+
+    // Two-digit numbers are the case that failed: make sure some were tested.
+    const r2 = exportRun({ label: 'vp-cw2digit' });
+    const twoDigit = r2.log.filter(l => l.kind === 'text' && l.page === 3 && /^\d{2}$/.test(l.text));
+    check('the grid actually exercised two-digit clue numbers', twoDigit.length > 0,
+        `${twoDigit.length} found`);
 }
 
 // --- BUG-XWD-03: distinct crossword topologies across a class set ---
@@ -505,9 +569,11 @@ function pillCollisions(log) {
 {
     const r = exportRun({ sets: 4, label: 'vp-sets' });
     check('four sets produce twenty sheets', r.pages === 20, `got ${r.pages}`);
-    const bad = r.footers.filter(f => f.pageInSet > f.pagesInSet || f.pageInSet < 1);
+    // Appendix pages belong to no packet and name themselves instead.
+    const bad = r.footers.filter(f => !f.pageText &&
+        (f.pageInSet > f.pagesInSet || f.pageInSet < 1));
     check('no footer numbers a page beyond its set', bad.length === 0, `${bad.length} bad`);
-    const firstPages = r.footers.filter(f => f.pageInSet === 1).length;
+    const firstPages = r.footers.filter(f => !f.pageText && f.pageInSet === 1).length;
     check('page numbering restarts with every set', firstPages === 4, `${firstPages} sets start at page 1`);
     // The document-wide counter must not survive anywhere in a footer.
     const footerText = r.log.filter(l => l.kind === 'text' && l.y > FOOTER_BAND).map(l => l.text);
@@ -526,12 +592,15 @@ function pillCollisions(log) {
         ['NAME:', 'DATE:', 'CLASS:'].every(t => labelsOn(1).includes(t)), labelsOn(1).join(','));
     check('later sheets drop to a single slim name line',
         labelsOn(2).length === 1 && labelsOn(2)[0] === 'NAME:', labelsOn(2).join(','));
+    const firstPageOfSet = (si) =>
+        Math.min(...Object.keys(r.pageSet).filter(p => r.pageSet[p] === si).map(Number));
     check('the next set starts its own full name block',
-        ['NAME:', 'DATE:', 'CLASS:'].every(t => labelsOn(6).includes(t)), labelsOn(6).join(','));
+        ['NAME:', 'DATE:', 'CLASS:'].every(t => labelsOn(firstPageOfSet(1)).includes(t)),
+        `p${firstPageOfSet(1)}: ${labelsOn(firstPageOfSet(1)).join(',')}`);
     // Every rule on the metadata block shares a start column, so no two
     // underlines come out visibly different lengths.
     const rules = r.log.filter(l => l.kind === 'line' && l.page === 1
-        && l.x > PAGE.W / 2 && Math.abs(l.x2 - (PAGE.W - PAGE.MARGIN)) < 0.01 && l.y < 40);
+        && l.y < 50 && (l.x2 - l.x) > 10 && (l.x2 - l.x) < PAGE.W * 0.4);
     const lens = rules.map(l => +(l.x2 - l.x).toFixed(2));
     check('name, date and class rules are all the same length',
         lens.length === 3 && new Set(lens).size === 1, lens.join(' / '));
@@ -544,6 +613,148 @@ function pillCollisions(log) {
     const bad = r.log.filter(l => l.kind === 'text' && emoji.test(l.text));
     check('no emoji character reaches the PDF', bad.length === 0, bad.slice(0, 2).map(l => l.text).join(' | '));
     check('no rasterised text image is embedded', r.log.filter(l => l.kind === 'image').length === 0);
+}
+
+
+// =============================================================
+// v2 review — duplex packaging
+// =============================================================
+
+// --- BUG-DUP-01: a teacher key must never back onto a student page ---
+// Duplex printing bonds pages 2k-1 and 2k onto one physical sheet. A six-page
+// packet put the answer key on the reverse of the student's crossword clues,
+// so the teacher could not hand the sheet over without giving away the answers.
+{
+    const sheetOf = (p) => Math.ceil(p / 2);
+    const runs = [
+        ['default packet', exportRun({ sets: 4, label: 'dup-default' })],
+        ['with a separate clue page', exportRun({ sets: 4, cwSeparateClues: true, label: 'dup-split' })],
+        ['single set', exportRun({ sets: 1, label: 'dup-single' })],
+    ];
+    runs.forEach(([name, r]) => {
+        const sheets = {};
+        Object.entries(r.pageKind).forEach(([p, kind]) => {
+            const sh = sheetOf(Number(p));
+            (sheets[sh] = sheets[sh] || []).push({ p: Number(p), kind, set: r.pageSet[p] });
+        });
+        const leaking = Object.values(sheets).filter(sides =>
+            sides.some(s => s.kind === 'key') && sides.some(s => s.kind === 'student'));
+        check(`no sheet backs a teacher key onto a student page (${name})`,
+            leaking.length === 0,
+            leaking.slice(0, 2).map(s => s.map(x => `p${x.p}:${x.kind}`).join('/')).join(' | '));
+
+        const mixed = Object.values(sheets).filter(sides => {
+            const sets = [...new Set(sides.filter(s => s.set >= 0).map(s => s.set))];
+            return sets.length > 1;
+        });
+        check(`no sheet carries two students' work (${name})`, mixed.length === 0,
+            mixed.slice(0, 2).map(s => s.map(x => `p${x.p}:set${x.set}`).join('/')).join(' | '));
+    });
+}
+
+// --- every student packet begins on the front of a fresh sheet ---
+{
+    const r = exportRun({ sets: 4, cwSeparateClues: true, label: 'dup-fronts' });
+    const firsts = [0, 1, 2, 3].map(si =>
+        Math.min(...Object.keys(r.pageSet).filter(p => r.pageSet[p] === si).map(Number)));
+    check('each set starts on the front of a sheet', firsts.every(p => p % 2 === 1),
+        firsts.join(','));
+}
+
+// --- the appendix names which set each key belongs to ---
+{
+    const r = exportRun({ sets: 3, label: 'dup-appendix' });
+    const footerText = r.log.filter(l => l.kind === 'text' && l.y > FOOTER_BAND).map(l => l.text);
+    check('appendix keys are numbered and name their set',
+        footerText.some(t => /Answer key 2 of 3.*Set 2/.test(t)),
+        footerText.filter(t => /Answer key/.test(t)).slice(0, 2).join(' | '));
+    const keyPages = Object.keys(r.pageKind).filter(p => r.pageKind[p] === 'key').map(Number);
+    check('all three keys land after every student set',
+        keyPages.length === 3 && Math.min(...keyPages) >
+            Math.max(...Object.keys(r.pageSet).filter(p => r.pageSet[p] >= 0).map(Number)),
+        keyPages.join(','));
+    // The banner has to say which set, not just the footer.
+    const banners = r.log.filter(l => l.kind === 'text'
+        && /^TEACHER ANSWER KEY — SET \d+$/.test(l.text) && keyPages.includes(l.page));
+    check('each appendix key names its set in the header', banners.length === 3,
+        `${banners.length}/3`);
+}
+
+// --- keysAtEnd off restores the old inline behaviour ---
+{
+    const r = exportRun({ sets: 2, keysAtEnd: false, label: 'dup-inline' });
+    const keyPages = Object.keys(r.pageKind).filter(p => r.pageKind[p] === 'key').map(Number);
+    check('keys can still be placed inline when asked for', keyPages.length === 2, keyPages.join(','));
+}
+
+
+// --- BUG-HDR-01: the header must not jump when a student turns the page ---
+{
+    const r = exportRun({ sets: 2, label: 'hdr-consistency' });
+    const studentPages = Object.keys(r.pageKind)
+        .filter(p => r.pageKind[p] === 'student').map(Number);
+
+    // The SET badge is right-aligned on the title line of every page, rather
+    // than hiding in the top margin on some and inside the NAME row on others.
+    const badges = studentPages.map(p => r.log.find(l =>
+        l.kind === 'text' && l.page === p && /^SET \d+$/.test(l.text)));
+    check('every student page carries the SET badge', badges.every(Boolean),
+        `${badges.filter(Boolean).length}/${studentPages.length}`);
+    const badgeYs = [...new Set(badges.filter(Boolean).map(b => +b.y.toFixed(1)))];
+    const badgeRight = [...new Set(badges.filter(Boolean)
+        .map(b => +(b.align === 'right' ? b.x : b.x + b.w).toFixed(1)))];
+    check('the SET badge keeps one right edge on every page', badgeRight.length === 1,
+        badgeRight.join(','));
+    // Sheet one is taller (it carries the subtitle), so at most two Y positions:
+    // the full header and the slim running header.
+    check('the SET badge sits at no more than two heights', badgeYs.length <= 2,
+        badgeYs.join(','));
+
+    // The name row is always below the divider rule, never beside the title.
+    let checkedRows = 0, aboveDivider = 0;
+    studentPages.forEach(p => {
+        const nameLabel = r.log.find(l => l.kind === 'text' && l.page === p && l.text === 'NAME:');
+        const divider = r.log.filter(l => l.kind === 'line' && l.page === p
+            && Math.abs((l.x2 - l.x) - (PAGE.W - 2 * PAGE.MARGIN)) < 0.5 && l.y < 50)
+            .sort((a, b) => a.y - b.y)[0];
+        if (!nameLabel || !divider) return;
+        checkedRows++;
+        if (nameLabel.y <= divider.y) aboveDivider++;
+    });
+    check('the name row sits below the divider on every page',
+        checkedRows === studentPages.length && aboveDivider === 0,
+        `${aboveDivider} above, ${checkedRows}/${studentPages.length} checked`);
+}
+
+
+// --- BUG-SCR-01: two columns and a word bank on the scramble ---
+{
+    const r = exportRun({ label: 'scr-bank' });
+    const scrPage = r.log.filter(l => l.page === 4);
+
+    check('the scramble page carries a word bank',
+        scrPage.some(l => l.kind === 'text' && l.text === 'WORD BANK'));
+    // Every answer has to be in it, or it is not a bank.
+    const banked = WORDS.filter(w =>
+        scrPage.some(l => l.kind === 'text' && l.text === w.word && l.y > 200));
+    check('the word bank lists every answer', banked.length === WORDS.length,
+        `${banked.length}/${WORDS.length}`);
+
+    // Twenty items down one column left a 12cm rule beside a 3-letter word.
+    const numbers = scrPage.filter(l => l.kind === 'text' && /^\d+\.$/.test(l.text));
+    const columnXs = [...new Set(numbers.map(l => Math.round(l.x)))];
+    check('scramble items run in two columns', columnXs.length === 2, columnXs.join(','));
+
+    // Writing lines are sized for a word, not for the rest of the column.
+    // Answer lines only: skip the full-width header divider and footer rule.
+    const rules = scrPage.filter(l => l.kind === 'line' && l.y > BODY_TOP && l.y < 240
+        && (l.x2 - l.x) > 5 && (l.x2 - l.x) < PAGE.W - 2 * PAGE.MARGIN - 1);
+    const longest = Math.max(...rules.map(l => l.x2 - l.x));
+    check('no answer line is longer than 55mm', longest <= 55, `longest ${longest.toFixed(1)}mm`);
+
+    const off = exportRun({ label: 'scr-nobank', words: WORDS });
+    check('the scramble example still fits beside its pill',
+        pillCollisions(off.log).length === 0, pillCollisions(off.log).slice(0, 2).join(' | '));
 }
 
 console.log(failed ? `\n${failed} failing check(s)` : '\nAll checks passed');

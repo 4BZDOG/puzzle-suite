@@ -91,9 +91,24 @@ The `onChange` listener is registered *before* `init()` is called. When `init()`
 2. Loads custom font (Inter/Roboto/Lora/Comic) via `pdfFonts.js`
 3. Builds a `ctx` context object via `buildCtx()` — carries doc, dimensions, scale, pdfFont, drawWatermark, plus the scaffolding flags (`showExample`, `showLetterCount`, `cwShowBank`)
 4. Loops over sets (bulk export), then page types in `cfg.pageOrder`
-5. Each page: `drawHeader(ctx, title, sub, instruction, isKey, setIndicator, pScale, { label, accent, icon, firstOfSet })` → returns Y where content starts. `firstOfSet: false` draws a **slim running header** (small title, no subtitle, one NAME rule); sheet one of each set gets the full NAME / DATE / CLASS block, whose three rules share a start column so they come out the same length
+5. Each page: `drawHeader(ctx, title, sub, instruction, isKey, setIndicator, pScale, { label, accent, icon, firstOfSet })` → returns Y where content starts. Every page uses the same **two-tier grid** so nothing jumps when a student turns the sheet: title left and the `SET N` badge right on tier one, a divider, then the student input row *below* the rule. `firstOfSet: false` draws a **slim running header** (small title, no subtitle, one full-width NAME rule); sheet one of each set gets NAME / DATE / CLASS in equal cells via `_formRow()`, where every rule starts one label-column in so all three are the same length. The key gets a `TEACHER ANSWER KEY — SET N` banner in the same slot
 6. Passes a layout `{ x, y, w, h }` (`contentBox(sy)`, which reserves `FOOTER_H`) to each `drawXxx()` function
 7. `drawFooter(ctx, pScale, { right, setLabel, pageInSet, pagesInSet })` closes each page with a hairline, the worksheet title and **per-set** pagination (`Set 10 — Page 1 of 4`). Footers are drawn in a **second pass** after every set is laid out, because a set's page count is not known until it is drawn (a crossword that splits costs one sheet more); `pdfExport.js` collects a `footerQueue` and replays it with `doc.setPage()`. Never restore a document-wide `getNumberOfPages()` counter to a student-facing footer
+
+### Duplex packaging (CRITICAL)
+A class set is printed double-sided, so pages `2k-1` and `2k` are physically
+the same sheet. Two settings keep that safe, both default **on**:
+
+| Setting | Effect |
+|---------|--------|
+| `keysAtEnd` | Every teacher key is pulled out of the student packet and drawn in an **appendix after all sets**. Otherwise a 6-page packet prints the answer key on the reverse of the student's own crossword clues. |
+| `duplexSafe` | Each student packet is padded to an **even** page count (`drawBlankFiller`), so no sheet ever carries two students' work, and the appendix always starts on a fresh sheet. |
+
+`pdfExport.js` therefore runs three passes: student pages per set (with
+padding), then the key appendix, then the deferred footer pass. Appendix
+footers carry a `pageText` override (`Answer key 2 of 5 · Set 2`) because they
+belong to no student packet. **Never draw a key inside the student page loop
+when `keysAtEnd` is on**, and never make a packet odd-length.
 
 `PAGE_META` maps each page type to its header chip label and accent colour.
 Usage metering reports `doc.internal.getNumberOfPages()` (actual sheets), not
@@ -109,7 +124,7 @@ not spill onto a second sheet:
 | Notes | Binary-search a single scale `k` (type size + leading together, 0.72–1.7) for the largest that still fits one page. Term-column width is measured **at the chosen size**. Leftover below 40 mm is centred; above that it becomes a ruled `NOTES` writing area (`drawRuledArea`). |
 | Word search | Word-bank height is computed first, then the grid is sized into what remains (cells up to 11 mm) and the slack centred. |
 | Crossword | `drawCrosswordPage()` — see below. |
-| Scramble | Fewest columns that fit (1 → 2 → 3) so answer lines stay long; rows spread across the full height, capped at 22 mm and centred; dotted leaders bridge word → answer line. |
+| Scramble | Two columns by default (one for ≤ 8 items, three for > 24); rows spread across the height left by the word bank, capped at 22 mm and centred; dotted leaders bridge word → answer line; answer lines capped at 52 mm because a writing line only has to fit a word. A `scrShowBank` word bank (default on) frames every answer, alphabetised, at the foot of the page. |
 | Answer key | Quadrants adapt to how many keys are actually present (1 → full page, 2 → halves, 3–4 → quadrants). |
 
 ### Single-page crossword compiler (`pdf/pdfDrawCrossword.js`)
@@ -131,6 +146,18 @@ Score is `min(pt, IDEAL_PT) * 100 + cellSize`: legibility wins until clues reach
 9.5 pt, after which the grid takes the remaining room. Clue heights are memoised
 per (list, column width, point size), so the scan is cheap.
 
+**Cell geometry** (`_drawGrid`): the clue number owns a reserved top-left zone
+(`ZONE_W/ZONE_H`) and its type is sized to *that zone*, not to the cell — set at
+the one-digit size, "10" ran straight into the upright of a prefilled L. Letters
+sit on a low baseline (`BASE_NUMBERED`) that clears the zone, so the two can
+never share space. Below `KEY_NUM_MIN_CELL` (6 mm) a key thumbnail drops its
+clue numbers entirely: a four-up key cannot fit a two-digit number and a
+solution letter in one 4 mm cell.
+
+A dedicated clue page (`drawCrosswordClues`) draws **no filler**. Ruling the
+leftover with a WORKING OUT area only disguised the real problem, which was the
+grid being stranded on the previous sheet.
+
 It returns `{ splitNeeded }`. `true` only when the teacher explicitly asked for
 `cwSeparateClues`, or when the puzzle genuinely cannot fit at minimum size — the
 caller then draws `drawCrosswordClues()` on a following page. **Clues never
@@ -140,7 +167,8 @@ split by accident.**
 - `PALETTE` — one colour language: `example` (blue) for scaffolding, `key` (crimson) for teacher answers
 - `setFontSafe` / `resolveStyle` / `hasFontStyle` — **never** call `doc.setFont(font, style)` directly. Custom fonts are registered in `normal` and `bold` only; asking jsPDF for a style a font lacks makes it silently fall back to **Times**, which is what used to put a Times-italic subtitle under an Inter title.
 - `drawCapsule` — stadium outline along a word path, built as a real polygon so it can be stroked without painting over grid lines or letters. Used for the student's worked example (blue) and every word-search solution on the key (crimson).
-- `drawExamplePill` / `examplePillWidth` — the single EXAMPLE marker used by all four activities. Always reserve `examplePillWidth()` when wrapping the text it will sit beside.
+- `drawExamplePill` / `examplePillWidth` / `placeExamplePill` — the single EXAMPLE marker used by all four activities. Always reserve `examplePillWidth()` when wrapping the text it will sit beside.
+- `drawBlankFiller` — the labelled blank back of a duplex sheet (see Duplex packaging).
 - `drawLeader` — dotted leader (scramble answer lines, matching-key answers)
 - `drawRuledArea` — ruled writing space for leftover page height
 - `drawHeader` auto-fits the title and subtitle to the width left by the NAME/DATE block, so a real unit name no longer runs through the rule.
@@ -366,7 +394,9 @@ Price IDs are read from env vars at module load (`PLAN_PRICE_IDS` is a plain con
 - **The EXAMPLE badge is not row 0 in matching mode**: use `exampleDefIndex(notes)` for the badge and `0` for the prefilled answer box. They are different rows because definitions are shuffled. Pinning the badge to row 0 marks the wrong definition — the P0 defect of the Sept 2026 review.
 - **No `(n)` letter counts on a matching sheet**: the count identifies the answer outright (only one word has three letters). `showLetterCount` is forced off when `isMatching`, and clue text goes through `stripLetterCount()`. Crossword clues keep the count.
 - **Never clamp the EXAMPLE pill back over its text**: use `placeExamplePill()`, which drops the pill onto its own line when it cannot fit after the last line, and add that line's height in the measuring pass too.
-- **Draw grid letters before clue numbers**: `_drawGrid` paints the prefilled/key letter first, then the number over a knockout chip in the cell's own fill colour. Reversing that order buries the number under the example letter.
+- **Grid numbers and letters must not share space**: `_drawGrid` gives the number a reserved top-left zone and sizes its type to that zone, then puts the letter on a baseline below it. Do not size the number off the cell (a two-digit number then collides) and do not paint a knockout chip behind it (the chip clips the letter on a small key thumbnail).
+- **A teacher key must never share a sheet with a student page**: keys go in an appendix and packets are padded to even lengths. See **Duplex packaging**.
+- **Never mark the example with a half-row background**: shading one side of a row breaks the table's alternating bands into a checkerboard. Use the blue outline (`ex-term` / `ex-def` cell borders in CSS, `roundedRect` stroke in the PDF).
 - **Word-search cell geometry is load-bearing**: `.mode-search .cell` states `width`/`height` as `--cell-size + --ws-line-width` (the negative margin collapses the rule into the neighbour). `capsuleOverlay()` measures cell centres from exactly that geometry via its `lineW` option — change one and you must change the other, or highlights drift off the letters.
 - **`clueTermLength` in matching mode**: when writing any code that displays `(N)` after a definition in matching context, use `w.clueTermLength` not `w.term.length`. They diverge because definitions are shuffled across rows.
 - **Editing clues in matching mode**: `updateWord` patches `puzzleData.notes` in-place via `clueOrigIdx`. If you add new code paths that mutate clues, follow this same pattern or call `debouncedGenerate()`.
@@ -497,6 +527,45 @@ Status dots reflect placement in the currently-visible puzzle page.
 
 ---
 
+## Session Fixes (2026-09-14b — Layout Review v2)
+
+Second round on the same 25-set class pack. The v1 fixes held; these are the
+defects the reviewer found in the updated output. `npm run test:pdf` now runs
+74 checks.
+
+### The duplex catastrophe (`BUG-DUP-01`, P0)
+A six-page packet printed double-sided put the **complete teacher answer key on
+the reverse of the student's crossword clues**. The teacher could neither hand
+the sheet over nor withhold it. Keys now go in an appendix after every student
+set (`keysAtEnd`), and each packet is padded to an even page count
+(`duplexSafe`), which also stops one sheet carrying two students' work. Both
+default on; see **Duplex packaging**.
+
+### Crossword
+- **`BUG-XWD-05`**: deleted the artificial `WORKING OUT` ruling from the
+  dedicated clue page. It was filler hiding whitespace, and a vocabulary
+  crossword needs no calculation space.
+- **`BUG-XWD-06`**: the clue number owns a reserved corner zone and is sized to
+  it; the letter sits on a baseline below. Sized off the cell, "10" ran into
+  the upright of a prefilled `L`.
+- **`BUG-KEY-01`**: a key thumbnail below 6 mm per cell drops its clue numbers.
+  In a four-up quadrant a two-digit number and a solution letter cannot share
+  the cell, and the knockout chip added in v1 was clipping the letter.
+
+### Header, scramble, striping
+- **`BUG-HDR-01`**: one two-tier header on every page — title and `SET N` above
+  the rule, student input row below it. The badge no longer moves between the
+  margin and the name row, and the key names its set in the banner, not just
+  the footer.
+- **`BUG-SCR-01`**: the scramble runs in two columns with answer lines capped
+  at 52 mm, and a framed `WORD BANK` (`scrShowBank`, default on) gives Year 8
+  students something to work from on a 12-letter anagram.
+- **`BUG-VOC-05`**: the worked example is marked with a blue outline instead of
+  a half-row background fill, which had broken the zebra striping into a
+  checkerboard.
+
+---
+
 ## Session Fixes (2026-09-10 — Worksheet Layout & Answer Key Review)
 
 Acting on a teacher review of a printed 6-page worksheet.
@@ -545,7 +614,7 @@ Acting on a teacher review of a printed 6-page worksheet.
 
 Acting on a bug & layout review of a printed 25-set class pack (Year 8
 Mathematics: Linear Relationships). All thirteen items closed; the review's
-verification plan is now part of `npm run test:pdf` (46 checks).
+verification plan is now part of `npm run test:pdf`.
 
 ### Vocabulary (P0s)
 - **`BUG-VOC-01` example badge followed the shuffle**: the `[EXAMPLE]` badge was

@@ -7,7 +7,7 @@ import { showToast } from '../ui/toast.js';
 import { licenseManager } from '../license/licenseManager.js';
 import { createPuzzleData } from '../core/puzzleDataBuilder.js';
 import { loadJSPDF, loadFontForPDF, FONT_SELECT_MAP } from './pdfFonts.js';
-import { buildCtx, drawHeader, drawFooter } from './pdfHelpers.js';
+import { buildCtx, drawHeader, drawFooter, drawBlankFiller } from './pdfHelpers.js';
 import { PAGE_ICONS } from './pdfIcons.js';
 import { transposeCrossword } from '../workers/workerBridge.js';
 import { drawWordSearch } from './pdfDrawWordSearch.js';
@@ -172,6 +172,15 @@ export async function exportPDF() {
         // Rebuild ctx with final pdfFont
         ctx = buildCtx(doc, pdfFont, wmImg, scale, { PAGE_WIDTH, PAGE_HEIGHT, MARGIN }, cfg);
 
+        // Teacher keys are pulled out of the student packet and appended after
+        // every set (see the appendix below); `keysAtEnd` off restores the old
+        // inline behaviour for anyone printing single-sided.
+        const keysAtEnd = cfg.keysAtEnd !== false;
+        const duplexSafe = cfg.duplexSafe !== false;
+        const wantKey = selectedPages.includes('key');
+        const studentPages = keysAtEnd ? selectedPages.filter(p => p !== 'key') : selectedPages;
+        const keyQueue = [];
+
         let isFirstPage = true;
         // Footers are drawn after every set is laid out, because a set's page
         // count is not known until it has been drawn (a crossword that has to
@@ -230,7 +239,7 @@ export async function exportPDF() {
                 });
             };
 
-            for (const pType of selectedPages) {
+            for (const pType of studentPages) {
                 // Yield to main thread so progress bar updates and browser does not crash
                 await new Promise(r => setTimeout(r, 0));
 
@@ -297,7 +306,42 @@ export async function exportPDF() {
                     queueFooter(ps, 'TEACHER KEY');
                 }
             }
+
+            // ---- Duplex padding ----
+            // A class set is printed double-sided. An odd-length student
+            // packet puts the last page of one student's work on the same
+            // physical sheet as the first page of the next student's — and,
+            // when keys follow, on the back of an answer key. Pad to an even
+            // count so every set begins on a fresh sheet.
+            if (duplexSafe && pageInSet > 0 && pageInSet % 2 === 1) {
+                const ps = getPScale('notes');
+                addPage();
+                drawBlankFiller(ctx, ps);
+                queueFooter(ps, '');
+            }
+
+            if (wantKey && keysAtEnd) keyQueue.push({ cpd, setIdx: i });
         }
+
+        // ---- Answer-key appendix ----
+        // Keys never sit inside a student packet: on a duplex print the key
+        // would come out on the back of the sheet the student is holding.
+        keyQueue.forEach((entry, k) => {
+            const ps = getPScale('key');
+            if (!isFirstPage) doc.addPage();
+            isFirstPage = false;
+            ctx.drawWatermark();
+            const setLabel = count > 1 ? `Set ${entry.setIdx + 1}` : '';
+            drawMasterKeyPage(ctx, title, sub, entry.cpd, selections, ps, setLabel);
+            footerQueue.push({
+                page: doc.internal.getNumberOfPages(),
+                setIdx: -1, pageInSet: 0, pScale: ps, right: 'TEACHER KEY',
+                setLabel: '',
+                pageText: count > 1
+                    ? `Answer key ${k + 1} of ${keyQueue.length}  ·  Set ${entry.setIdx + 1}`
+                    : 'Answer key',
+            });
+        });
 
         // ---- Footer pass: now every set's true page count is known ----
         const setTotals = footerQueue.reduce((acc, f) => {
@@ -307,7 +351,7 @@ export async function exportPDF() {
         footerQueue.forEach(f => {
             doc.setPage(f.page);
             drawFooter(ctx, f.pScale, {
-                right: f.right, setLabel: f.setLabel,
+                right: f.right, setLabel: f.setLabel, pageText: f.pageText,
                 pageInSet: f.pageInSet, pagesInSet: setTotals[f.setIdx],
             });
         });

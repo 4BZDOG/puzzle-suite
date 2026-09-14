@@ -1178,11 +1178,50 @@ main {
     flex-shrink: 0;
 }
 
+/* The student input row sits BELOW the divider, full width, on every page —
+   it used to sit beside the title, which made the whole header shift when a
+   student turned from sheet one to sheet two of the same packet. */
 .meta-block {
-    text-align: right;
+    display: flex;
+    gap: 18px;
+    width: 100%;
+    margin: 10px 0 2px;
     font-size: calc(0.9rem * var(--global-font-scale) * var(--page-scale));
     font-family: var(--user-font);
-    width: 220px;
+    flex-shrink: 0;
+}
+
+.meta-block .line {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+/* Every rule starts one label-column in, so all three are the same length
+   whatever their labels say. */
+.meta-block .line > span {
+    flex: 0 0 auto;
+    /* Wide enough for the longest label, so every rule starts at the same
+       offset and all three come out the same length. */
+    min-width: 4.4em;
+}
+
+/* The key's counterpart of the student input row: same position under the
+   divider, so the answer key reads as the same document. */
+.key-banner {
+    margin: 10px 0 2px;
+    font-size: calc(0.8rem * var(--global-font-scale) * var(--page-scale));
+    font-weight: 800;
+    color: #dc143c;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-family: var(--user-font);
+    flex-shrink: 0;
+}
+
+.meta-block .line .rule {
+    flex: 1 1 auto;
+    border-bottom: 1px solid #333;
+    align-self: stretch;
 }
 
 /* Sheet one of a set carries Name / Date / Class; the rest of the packet
@@ -1194,15 +1233,14 @@ main {
 }
 
 .line {
-    border-bottom: 1px solid #999;
     height: 24px;
     display: flex;
-    justify-content: space-between;
     align-items: flex-end;
+    gap: 6px;
     margin-top: 8px;
 }
 
-.line span {
+.line > span {
     color: #666;
     font-size: calc(0.75rem * var(--global-font-scale) * var(--page-scale));
     margin-bottom: 2px;
@@ -1247,13 +1285,13 @@ main {
 [data-theme="dark"] .scramble-example,
 [data-theme="dark"] .clue-example,
 [data-theme="dark"] .notes-row-example {
-    background: #1e3a5f;
+    background: none;
 }
-[data-theme="dark"] .notes-row.ex-term:not(.ex-def) .notes-num,
-[data-theme="dark"] .notes-row.ex-term:not(.ex-def) .notes-box,
-[data-theme="dark"] .notes-row.ex-term:not(.ex-def) .notes-word,
-[data-theme="dark"] .notes-row.ex-def:not(.ex-term) .notes-clue {
-    background: #1e3a5f;
+[data-theme="dark"] .notes-row.ex-term .notes-num,
+[data-theme="dark"] .notes-row.ex-term .notes-box,
+[data-theme="dark"] .notes-row.ex-term .notes-word,
+[data-theme="dark"] .notes-row.ex-def .notes-clue {
+    border-color: #60a5fa;
 }
 
 /* ---- Dark mode: word-delete button hover ---- */
@@ -1373,12 +1411,50 @@ table.mode-cw td.cell.empty {
     opacity: 0;
 }
 
+/* Word bank under the scramble — the scaffolding a Year 8 student needs to
+   attack a 10- or 12-letter anagram. Mirrors the framed box in the PDF. */
+.scr-word-bank {
+    flex-shrink: 0;
+    margin-top: 14px;
+    padding: 10px 12px 12px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    background: #f8fafc;
+    font-family: var(--user-font);
+}
+
+.scr-word-bank-title {
+    font-size: calc(0.7rem * var(--global-font-scale) * var(--page-scale));
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 6px;
+}
+
+.scr-word-bank-list {
+    column-gap: 16px;
+    font-size: calc(0.9rem * var(--global-font-scale) * var(--page-scale));
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #0f172a;
+}
+
+.scr-word-bank-list span {
+    display: block;
+    break-inside: avoid;
+    line-height: 1.55;
+}
+
 /* Rows are laid out on a grid so they can be spread down the whole sheet,
    the way the PDF now distributes them, instead of bunching at the top of
    two fixed columns. --scr-cols / --scr-rows are set by the renderer. */
 .scramble-container {
     width: 100%;
-    height: 100%;
+    /* Flexes rather than claiming the full height, so the word bank below it
+       gets its own room instead of being pushed off the sheet. */
+    flex: 1 1 auto;
     min-height: 0;
     display: grid;
     grid-auto-flow: column;
@@ -1568,24 +1644,56 @@ table.mode-cw td.cell.empty {
     border-radius: 4px;
     border-bottom-color: #93c5fd;
 }
+/* The worked example is marked with a blue outline, not a background fill.
+   Shading half of row 1 and half of row 16 broke the table's alternating
+   bands into a checkerboard; an outline points at the example while the row
+   rhythm carries on underneath. In matching mode the example spans two rows
+   — the prefilled answer box on row 1, the EXAMPLE badge on whichever row
+   holds that term's definition — so each half is outlined on its own row.
+   The outline is built from cell borders that join into one box. */
 .notes-row-example {
-    background: #eff6ff;
+    background: none;
+}
+
+.notes-row.ex-term .notes-num,
+.notes-row.ex-term .notes-box,
+.notes-row.ex-term .notes-word,
+.notes-row.ex-def .notes-clue {
+    border-top: 1.5px solid #2563eb;
+    border-bottom: 1.5px solid #2563eb;
+}
+
+.notes-row.ex-term .notes-num {
+    border-left: 1.5px solid #2563eb;
+    border-radius: 4px 0 0 4px;
+}
+
+/* Whichever cell ends the term half owns the right edge. */
+.notes-row.ex-term .notes-word {
+    border-right: 1.5px solid #2563eb;
+    border-radius: 0 4px 4px 0;
+}
+
+.hide-term .notes-row.ex-term .notes-box {
+    border-right: 1.5px solid #2563eb;
+    border-radius: 0 4px 4px 0;
+}
+
+.notes-row.ex-def .notes-clue {
+    border-left: 1.5px solid #2563eb;
+    border-right: 1.5px solid #2563eb;
     border-radius: 4px;
 }
 
-/* In matching mode the worked example spans two rows: the prefilled answer
-   box on row 1, and the EXAMPLE badge on whichever row holds that term's
-   definition. Tint only the half that carries it, so the highlight points
-   at the example rather than washing two whole rows. */
-.notes-row.ex-term:not(.ex-def),
-.notes-row.ex-def:not(.ex-term) {
-    background: none;
+/* Standard mode puts both halves on one row: join them into one outline. */
+.notes-row.ex-term.ex-def .notes-word {
+    border-right: none;
+    border-radius: 0;
 }
-.notes-row.ex-term:not(.ex-def) .notes-num,
-.notes-row.ex-term:not(.ex-def) .notes-box,
-.notes-row.ex-term:not(.ex-def) .notes-word,
-.notes-row.ex-def:not(.ex-term) .notes-clue {
-    background: #eff6ff;
+
+.notes-row.ex-term.ex-def .notes-clue {
+    border-left: none;
+    border-radius: 0 4px 4px 0;
 }
 
 .cw-separate-clues-badge {

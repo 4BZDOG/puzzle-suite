@@ -1,7 +1,7 @@
 // =============================================================
 // pdf/pdfDrawScramble.js
 // =============================================================
-import { PALETTE, drawExamplePill, drawLeader, setFontSafe } from './pdfHelpers.js';
+import { PALETTE, drawExamplePill, examplePillWidth, drawLeader, setFontSafe } from './pdfHelpers.js';
 
 /**
  * Draw a word-scramble puzzle onto the PDF.
@@ -28,10 +28,19 @@ export function drawScramble(ctx, scrData, layout, isKey, showHint, pScale) {
         return;
     }
 
-    // ---- Column count: as few as will fit, so answer lines stay long ----
-    const availH = layout.h - 6 * scale;
+    // ---- Word bank -------------------------------------------------
+    // Unscrambling IUOSBUSNITTT with no hint at all is a memory test, not a
+    // vocabulary exercise. The bank takes the foot of the page; the rows are
+    // then budgeted into what is left.
+    const bank = _bankLayout(ctx, scrData, layout.w, pScale);
+    const bankH = bank ? bank.height : 0;
+
+    // ---- Column count ----------------------------------------------
+    // Two columns by default: twenty items down one column left a 12 cm
+    // answer line beside a three-letter word and wasted half the width.
+    const availH = layout.h - 6 * scale - bankH;
     const MIN_ROW = 9 * pScale, MAX_ROW = 22 * pScale;
-    let numCols = 1;
+    let numCols = scrData.length <= 8 ? 1 : scrData.length <= 24 ? 2 : 3;
     while (numCols < 3 && Math.ceil(scrData.length / numCols) * MIN_ROW > availH) numCols++;
     const itemsPerCol = Math.ceil(scrData.length / numCols);
     const colW = layout.w / numCols;
@@ -72,20 +81,38 @@ export function drawScramble(ctx, scrData, layout, isKey, showHint, pScale) {
 
         const lineStartX = cx + splitX;
         const hintW = showHint && !isEx ? 18 * scale : 0;
-        const lineEndX = cx + colW - 4 * scale - hintW;
+        // A writing line only has to fit the word, not the rest of the column.
+        const MAX_LINE = 52 * scale;
+        const lineEndX = Math.min(cx + colW - 4 * scale - hintW, lineStartX + MAX_LINE);
 
         // Dotted leader bridges the gap to the answer line
         drawLeader(doc, wordEnd + 2, lineStartX - 1.5, cy);
 
         if (isEx) {
+            // The pill owns the right-hand end of the row, and the worked
+            // answer is sized to the width that leaves. Two columns halve the
+            // room a one-column layout had, so a right-aligned pill would
+            // otherwise land on top of a long answer like COORDINATE.
+            const pillRight = cx + colW - 3 * scale;
+            const pillW = examplePillWidth(doc, { pScale, pdfFont });
+            const answerX = lineStartX + 2 * scale;
+            const answerMaxW = Math.max(8, pillRight - pillW - 3 - answerX);
+
             setFontSafe(doc, pdfFont, 'bold');
-            doc.setFontSize(scramFontPt);
+            let answerPt = scramFontPt;
+            doc.setFontSize(answerPt);
+            if (doc.getTextWidth(s.original) > answerMaxW) {
+                answerPt = Math.max(6.5, answerPt * answerMaxW / doc.getTextWidth(s.original));
+                doc.setFontSize(answerPt);
+            }
             doc.setTextColor(...PALETTE.example);
-            doc.text(s.original, lineStartX + 2 * scale, cy);
+            doc.text(s.original, answerX, cy);
+
             doc.setDrawColor(...PALETTE.example);
             doc.setLineWidth(0.4);
-            doc.line(lineStartX, cy + 2 * scale, lineEndX, cy + 2 * scale);
-            drawExamplePill(doc, cx + colW - 3 * scale, cy, { pScale, pdfFont, align: 'right' });
+            doc.line(lineStartX, cy + 2 * scale, Math.min(lineEndX, pillRight - pillW - 3),
+                cy + 2 * scale);
+            drawExamplePill(doc, pillRight, cy, { pScale, pdfFont, align: 'right' });
             doc.setTextColor(...PALETTE.ink);
         } else {
             doc.setDrawColor(180, 180, 180);
@@ -99,6 +126,53 @@ export function drawScramble(ctx, scrData, layout, isKey, showHint, pScale) {
                 doc.text(`(${s.original[0]}...)`, lineEndX + 2 * scale, cy);
             }
         }
+    });
+
+    if (bank) _drawBank(ctx, bank, layout.x, layout.y + layout.h - bankH, layout.w, pScale);
+}
+
+/**
+ * Geometry for the word bank: every answer, alphabetised, in as many
+ * columns as the widest word allows (up to four). Returns null when the
+ * bank is switched off.
+ */
+function _bankLayout(ctx, scrData, availW, pScale) {
+    const { doc, pdfFont, scale } = ctx;
+    if (ctx.scrShowBank === false || !scrData.length) return null;
+    const words = scrData.map(s => s.original).sort();
+    setFontSafe(doc, pdfFont, 'bold');
+    doc.setFontSize(9.5 * pScale);
+    const widest = words.reduce((m, w) => Math.max(m, doc.getTextWidth(w)), 0) + 8 * scale;
+    const cols = Math.max(1, Math.min(4, Math.floor((availW - 8 * scale) / Math.max(widest, 1))));
+    const rows = Math.ceil(words.length / cols);
+    const rowH = 5.2 * pScale;
+    return { words, cols, rows, rowH, colW: (availW - 8 * scale) / cols,
+        height: 10 * pScale + rows * rowH + 6 * scale };
+}
+
+/** Framed WORD BANK box at the foot of the page. */
+function _drawBank(ctx, bank, x, y, w, pScale) {
+    const { doc, pdfFont, scale } = ctx;
+    const { words, cols, rows, rowH, colW } = bank;
+
+    doc.setDrawColor(...PALETTE.rule);
+    doc.setLineWidth(0.4);
+    doc.setFillColor(...PALETTE.band);
+    doc.roundedRect(x, y, w, bank.height - 2 * scale, 2, 2, 'FD');
+
+    setFontSafe(doc, pdfFont, 'bold');
+    doc.setFontSize(8 * pScale);
+    doc.setTextColor(...PALETTE.muted);
+    doc.setCharSpace(0.4);
+    doc.text('WORD BANK', x + 4 * scale, y + 6 * pScale);
+    doc.setCharSpace(0);
+
+    setFontSafe(doc, pdfFont, 'bold');
+    doc.setFontSize(9.5 * pScale);
+    doc.setTextColor(...PALETTE.ink);
+    words.forEach((word, i) => {
+        const c = Math.floor(i / rows), r = i % rows;
+        doc.text(word, x + 4 * scale + c * colW, y + 11 * pScale + r * rowH);
     });
 }
 

@@ -50,6 +50,7 @@ export const state = {
         cwShowBank:     false,
         cwSeparateClues: false,
         scrShowHint:    false,
+        scrShowBank:    true,   // word bank under the scramble (scaffolding)
         showExample:    true,
         showLetterCount: true,
         wmOpacity:      0.15,
@@ -62,6 +63,11 @@ export const state = {
             shuffle:    false,
         },
         opts: { ws: true, cw: true, scr: true, notes: true, key: true },
+        // Duplex printing safety. A class set is almost always printed
+        // double-sided, so a teacher key on the back of a student page hands
+        // out the answers with the worksheet.
+        keysAtEnd:      true,   // all answer keys in an appendix after every set
+        duplexSafe:     true,   // pad each student set to an even page count
         pageOrder:      ['notes','ws','cw','scr','key'],
         sidebarWidth:   '420px',
         aiConfig: {
@@ -146,7 +152,10 @@ export function syncSettingsFromDOM() {
     s.cwLineWidth    = parseFloat(getVal('cwLineWidth', s.cwLineWidth));
     s.cwShowBank     = getChk('cwShowBank', s.cwShowBank);
     s.cwSeparateClues = getChk('cwSeparateClues', s.cwSeparateClues);
+    s.keysAtEnd  = getChk('keysAtEnd',  s.keysAtEnd);
+    s.duplexSafe = getChk('duplexSafe', s.duplexSafe);
     s.scrShowHint    = getChk('scrShowHint', s.scrShowHint);
+    s.scrShowBank    = getChk('scrShowBank', s.scrShowBank);
     s.showExample    = getChk('showExample', s.showExample);
     s.showLetterCount = getChk('showLetterCount', s.showLetterCount);
     s.titleScale     = parseFloat(getVal('titleScale', s.titleScale));
@@ -259,7 +268,10 @@ export function applyStateToDOM(s) {
     setVal('cwLineWidth',    cfg.cwLineWidth);
     setChk('cwShowBank',     cfg.cwShowBank);
     setChk('cwSeparateClues', cfg.cwSeparateClues);
+    setChk('keysAtEnd',  cfg.keysAtEnd !== false);
+    setChk('duplexSafe', cfg.duplexSafe !== false);
     setChk('scrShowHint',    cfg.scrShowHint);
+    setChk('scrShowBank',    cfg.scrShowBank !== false);
     setChk('showExample',    cfg.showExample);
     setChk('showLetterCount', cfg.showLetterCount !== false);
     setVal('titleScale',     cfg.titleScale);
