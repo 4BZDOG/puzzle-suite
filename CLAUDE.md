@@ -104,6 +104,11 @@ the same sheet. Two settings keep that safe, both default **on**:
 | `keysAtEnd` | Every teacher key is pulled out of the student packet and drawn in an **appendix after all sets**. Otherwise a 6-page packet prints the answer key on the reverse of the student's own crossword clues. |
 | `duplexSafe` | Each student packet is padded to an **even** page count (`drawBlankFiller`), so no sheet ever carries two students' work, and the appendix always starts on a fresh sheet. |
 
+With the four default activities the packet is **exactly 4 pages — 2 whole
+sheets** — so the padding never fires. It only triggers if a teacher deselects
+an activity down to an odd count; the blank page is the price of not putting two
+students on one sheet, and `duplexSafe` can be turned off to reclaim it.
+
 `pdfExport.js` therefore runs three passes: student pages per set (with
 padding), then the key appendix, then the deferred footer pass. Appendix
 footers carry a `pageText` override (`Answer key 2 of 5 · Set 2`) because they
@@ -158,10 +163,15 @@ A dedicated clue page (`drawCrosswordClues`) draws **no filler**. Ruling the
 leftover with a WORKING OUT area only disguised the real problem, which was the
 grid being stranded on the previous sheet.
 
-It returns `{ splitNeeded }`. `true` only when the teacher explicitly asked for
-`cwSeparateClues`, or when the puzzle genuinely cannot fit at minimum size — the
-caller then draws `drawCrosswordClues()` on a following page. **Clues never
-split by accident.**
+It returns `{ splitNeeded }`. **There is no longer a teacher-facing option to
+split the crossword** — `cwSeparateClues` was retired, because splitting put the
+grid on the back of one sheet and its clues on the front of the next, so a
+student flipped paper for every clue, and the extra page made the packet
+odd-length. `splitNeeded` is now `true` only when a puzzle genuinely cannot fit
+at the minimum cell size; the caller then draws `drawCrosswordClues()` on a
+following page. `state.js` also forces the field to `false` when merging a saved
+session, so a localStorage entry written while the old toggle was on cannot
+resurrect the split.
 
 ### Shared PDF primitives (`pdf/pdfHelpers.js`)
 - `PALETTE` — one colour language: `example` (blue) for scaffolding, `key` (crimson) for teacher answers
@@ -347,6 +357,11 @@ All `/api/admin/*` routes require `Authorization: Bearer <ADMIN_SECRET>`. The se
 ### Tier limits & features (TUNABLE)
 **`server/tiers.js` is now the single source of truth** for limits, feature flags, and PDF page quotas. `routes/license.js`, `routes/usage.js`, `email.js`, and `routes/checkout.js` all import it — change a number there and it propagates everywhere server-side. The **frontend mirrors** these in the `TIERS` object in `license/licenseManager.js` as an offline fallback; the **server response always wins** when reachable (`licenseManager.getLimit()` / `hasFeature()` prefer `info.limits` / `info.features`), so you can re-price or re-gate without shipping new frontend code.
 
+**Note**: `separateCluePages` is no longer read by the frontend — the feature it
+gated (`cwSeparateClues`) was retired for layout reasons. The flag is left in
+`tiers.js` because re-pricing is a product decision, not a layout one; drop it
+there if it is not coming back.
+
 | Tier | Words | Bulk Sets | PDF Pages/mo | separateCluePages | premiumFonts |
 |------|-------|-----------|--------------|-------------------|--------------|
 | free | 30 | 3 | 30 | ✗ | ✗ |
@@ -396,7 +411,9 @@ Price IDs are read from env vars at module load (`PLAN_PRICE_IDS` is a plain con
 - **Never clamp the EXAMPLE pill back over its text**: use `placeExamplePill()`, which drops the pill onto its own line when it cannot fit after the last line, and add that line's height in the measuring pass too.
 - **Grid numbers and letters must not share space**: `_drawGrid` gives the number a reserved top-left zone and sizes its type to that zone, then puts the letter on a baseline below it. Do not size the number off the cell (a two-digit number then collides) and do not paint a knockout chip behind it (the chip clips the letter on a small key thumbnail).
 - **A teacher key must never share a sheet with a student page**: keys go in an appendix and packets are padded to even lengths. See **Duplex packaging**.
-- **Never mark the example with a half-row background**: shading one side of a row breaks the table's alternating bands into a checkerboard. Use the blue outline (`ex-term` / `ex-def` cell borders in CSS, `roundedRect` stroke in the PDF).
+- **The worked example carries no bounding box at all**: a background fill breaks the table's alternating bands into a checkerboard, and an outline clips the row number it runs through. Both were tried and both were rejected. The example is legible from its own content — a blue row number, the prefilled blue answer letter, and the EXAMPLE badge on the definition that answers it.
+- **The set identifier shows on every export, single or bulk**: header badge, footer, and answer key. It was suppressed for single-set exports from the very first commit, which left a teacher unable to pair a marked sheet with its key.
+- **`roundedRect` needs its own instrumentation in the test harness**: jsPDF draws it through `lines()`, which loses width and height, so a box drawn with it is invisible to any assertion filtering on `kind: 'rect'` unless the harness wraps it explicitly.
 - **Word-search cell geometry is load-bearing**: `.mode-search .cell` states `width`/`height` as `--cell-size + --ws-line-width` (the negative margin collapses the rule into the neighbour). `capsuleOverlay()` measures cell centres from exactly that geometry via its `lineW` option — change one and you must change the other, or highlights drift off the letters.
 - **`clueTermLength` in matching mode**: when writing any code that displays `(N)` after a definition in matching context, use `w.clueTermLength` not `w.term.length`. They diverge because definitions are shuffled across rows.
 - **Editing clues in matching mode**: `updateWord` patches `puzzleData.notes` in-place via `clueOrigIdx`. If you add new code paths that mutate clues, follow this same pattern or call `debouncedGenerate()`.
@@ -527,11 +544,49 @@ Status dots reflect placement in the currently-visible puzzle page.
 
 ---
 
+## Session Fixes (2026-09-14c — Layout Review v3)
+
+Third round on the same class pack. `npm run test:pdf` now runs 92 checks.
+
+### `BUG-REG-01` — the set identifier (P0)
+`SET N` was suppressed whenever only one set was generated. This was **not a v2
+regression**: the `count > 1` guard dates from the initial commit, so a
+single-set export has never carried the label. It is now unconditional — header
+badge, footer (`Set 1 — Page 1 of 4`) and answer key (`TEACHER ANSWER KEY — SET
+1`) — because a teacher holding a marked sheet and a key has no other way to
+pair them.
+
+### `BUG-XWD-07` / `BUG-DOC-04` — the four-page packet (P0)
+The recurring two-page crossword was never a default: `cwSeparateClues`
+defaulted to `false` but **persisted in localStorage**, so a session that once
+had it on kept splitting the crossword no matter what the default said. That is
+why the same complaint survived two rounds of fixes.
+
+The option is retired: the control is gone, `syncSettingsFromDOM()` never reads
+it, and the saved-state merge forces it `false`. The packet is now exactly four
+pages, so the `duplexSafe` blank page never fires in the default configuration.
+`drawCrosswordClues()` survives only as the fallback for a puzzle that genuinely
+cannot fit.
+
+### `BUG-KEY-02`, `BUG-VOC-06`
+- The answer key printed `TEACHER ANSWER KEY` twice — once as the top-right
+  badge and once below the rule. One banner now, carrying the set with it.
+- The blue example outline added in v2 ran through the `1.` row number. Removed
+  entirely rather than padded: a fill checkerboards the striping and an outline
+  clips, so the example is marked by its own content instead.
+
+### Test harness
+`roundedRect` is now instrumented. jsPDF draws it through `lines()`, which loses
+width and height, so the clipping outline was invisible to the assertion meant
+to catch it — the check passed against known-bad output until the harness was
+fixed.
+
+---
+
 ## Session Fixes (2026-09-14b — Layout Review v2)
 
 Second round on the same 25-set class pack. The v1 fixes held; these are the
-defects the reviewer found in the updated output. `npm run test:pdf` now runs
-74 checks.
+defects the reviewer found in the updated output.
 
 ### The duplex catastrophe (`BUG-DUP-01`, P0)
 A six-page packet printed double-sided put the **complete teacher answer key on

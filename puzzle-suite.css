@@ -1287,12 +1287,6 @@ main {
 [data-theme="dark"] .notes-row-example {
     background: none;
 }
-[data-theme="dark"] .notes-row.ex-term .notes-num,
-[data-theme="dark"] .notes-row.ex-term .notes-box,
-[data-theme="dark"] .notes-row.ex-term .notes-word,
-[data-theme="dark"] .notes-row.ex-def .notes-clue {
-    border-color: #60a5fa;
-}
 
 /* ---- Dark mode: word-delete button hover ---- */
 [data-theme="dark"] .wm-btn:hover {
@@ -1644,75 +1638,13 @@ table.mode-cw td.cell.empty {
     border-radius: 4px;
     border-bottom-color: #93c5fd;
 }
-/* The worked example is marked with a blue outline, not a background fill.
-   Shading half of row 1 and half of row 16 broke the table's alternating
-   bands into a checkerboard; an outline points at the example while the row
-   rhythm carries on underneath. In matching mode the example spans two rows
-   — the prefilled answer box on row 1, the EXAMPLE badge on whichever row
-   holds that term's definition — so each half is outlined on its own row.
-   The outline is built from cell borders that join into one box. */
+/* The worked example carries no bounding box. A background fill broke the
+   table's alternating bands into a checkerboard, and an outline clipped the
+   row number it ran through. The example is legible from its own content:
+   a blue row number, the prefilled blue answer letter, and the EXAMPLE badge
+   on the definition that answers it. */
 .notes-row-example {
     background: none;
-}
-
-.notes-row.ex-term .notes-num,
-.notes-row.ex-term .notes-box,
-.notes-row.ex-term .notes-word,
-.notes-row.ex-def .notes-clue {
-    border-top: 1.5px solid #2563eb;
-    border-bottom: 1.5px solid #2563eb;
-}
-
-.notes-row.ex-term .notes-num {
-    border-left: 1.5px solid #2563eb;
-    border-radius: 4px 0 0 4px;
-}
-
-/* Whichever cell ends the term half owns the right edge. */
-.notes-row.ex-term .notes-word {
-    border-right: 1.5px solid #2563eb;
-    border-radius: 0 4px 4px 0;
-}
-
-.hide-term .notes-row.ex-term .notes-box {
-    border-right: 1.5px solid #2563eb;
-    border-radius: 0 4px 4px 0;
-}
-
-.notes-row.ex-def .notes-clue {
-    border-left: 1.5px solid #2563eb;
-    border-right: 1.5px solid #2563eb;
-    border-radius: 4px;
-}
-
-/* Standard mode puts both halves on one row: join them into one outline. */
-.notes-row.ex-term.ex-def .notes-word {
-    border-right: none;
-    border-radius: 0;
-}
-
-.notes-row.ex-term.ex-def .notes-clue {
-    border-left: none;
-    border-radius: 0 4px 4px 0;
-}
-
-.cw-separate-clues-badge {
-    background: #eff6ff;
-    border: 1px solid #bfdbfe;
-    border-radius: 6px;
-    padding: 6px 12px;
-    margin-bottom: 12px;
-    font-size: 0.8rem;
-    color: #2563eb;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-[data-theme="dark"] .cw-separate-clues-badge {
-    background: #1e3a5f;
-    border-color: #1d4ed8;
-    color: #93c5fd;
 }
 
 .clues-two-col {

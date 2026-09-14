@@ -431,7 +431,12 @@ export function drawHeader(ctx, fullTitle, subText, instructions, isKey, setIndi
     // The set badge sits at the far right of the title line on EVERY page,
     // including the key — it used to hide in the top margin on some pages and
     // inside the NAME row on others, so the eye lost it when turning over.
-    const badge = isKey ? 'TEACHER ANSWER KEY' : setIndicator;
+    // One banner only. The key used to print TEACHER ANSWER KEY at the top
+    // right AND again below the rule; the set now rides with it so the
+    // teacher can see at a glance which set a key belongs to.
+    const badge = isKey
+        ? (setIndicator ? `TEACHER ANSWER KEY — ${setIndicator.toUpperCase()}` : 'TEACHER ANSWER KEY')
+        : setIndicator;
     const badgeFs = isKey ? 11 * pScale : 9 * pScale;
     let badgeW = 0;
     if (badge) {
@@ -481,12 +486,9 @@ export function drawHeader(ctx, fullTitle, subText, instructions, isKey, setIndi
     // ---- Tier 2: the student input row, below the rule on every page ----
     const formY = dividerY + 7 * pScale;
     if (isKey) {
-        setFontSafe(doc, pdfFont, 'bold');
-        doc.setFontSize(10 * pScale);
-        doc.setTextColor(...PALETTE.key);
-        doc.text(setIndicator
-            ? `TEACHER ANSWER KEY — ${setIndicator.toUpperCase()}`
-            : 'TEACHER ANSWER KEY', MARGIN, formY);
+        // Nothing here: the key's banner is the badge on the title line, and
+        // the chip below already reads "ANSWER KEY · Solutions for every
+        // activity in this set."
     } else if (slim) {
         _formRow(ctx, ['NAME:'], MARGIN, contentW, formY, pScale);
     } else {
@@ -494,7 +496,7 @@ export function drawHeader(ctx, fullTitle, subText, instructions, isKey, setIndi
     }
 
     // ---- Activity chip + instruction ----
-    const instrY = formY + 9 * pScale;
+    const instrY = formY + (isKey ? 2 : 9) * pScale;
     let textX = MARGIN;
     if (opts.label) {
         const chipFs = Math.max(6.5, 8 * pScale);

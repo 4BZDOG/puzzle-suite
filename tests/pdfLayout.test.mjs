@@ -102,6 +102,13 @@ function makeDoc() {
     };
     const origRect = doc.rect.bind(doc);
     doc.rect = function (x, y, w, h, s) { log.push({ kind: 'rect', page: page(), x, y, w, h }); return origRect(x, y, w, h, s); };
+    // roundedRect draws through lines() internally, which loses its width and
+    // height — an example outline drawn with it was invisible to the log.
+    const origRounded = doc.roundedRect.bind(doc);
+    doc.roundedRect = function (x, y, w, h, rx, ry, st) {
+        log.push({ kind: 'rect', page: page(), x, y, w, h, rounded: true });
+        return origRounded(x, y, w, h, rx, ry, st);
+    };
     const origLine = doc.line.bind(doc);
     doc.line = function (x1, y1, x2, y2, s) { log.push({ kind: 'line', page: page(), x: x1, y: y1, x2, y2 }); return origLine(x1, y1, x2, y2, s); };
     const origLines = doc.lines.bind(doc);
@@ -135,7 +142,7 @@ const WORDS = [
 
 function exportRun({
     matching = false, words = WORDS, showExample = true, showLetterCount = true,
-    cwShowBank = false, cwSeparateClues = false, sets = 1, label = 'run',
+    cwShowBank = false, forceSplitFallback = false, sets = 1, label = 'run',
     keysAtEnd = true, duplexSafe = true, withKey = true,
 } = {}) {
     const { doc, log } = makeDoc();
@@ -174,9 +181,9 @@ function exportRun({
         };
         const queueFooter = (right) => footerQueue.push({
             page: doc.internal.getNumberOfPages(), setIdx: si, pageInSet, right,
-            setLabel: sets > 1 ? `Set ${si + 1}` : '',
+            setLabel: `Set ${si + 1}`,
         });
-        const setIndicator = sets > 1 ? `SET ${si + 1}` : '';
+        const setIndicator = `SET ${si + 1}`;
 
         let fos = addPage();
         let sy = drawHeader(ctx, title, sub, 'Terms and definitions.', false, setIndicator, 1,
@@ -193,7 +200,7 @@ function exportRun({
         fos = addPage();
         sy = drawHeader(ctx, title, sub, 'Fill in the grid.', false, setIndicator, 1,
             { label: 'CROSSWORD', accent: [124, 58, 237], icon: 'crossword', firstOfSet: fos });
-        const res = drawCrosswordPage(ctx, cpd.cw, box(sy), 1, cwSeparateClues);
+        const res = drawCrosswordPage(ctx, cpd.cw, box(sy), 1, forceSplitFallback);
         queueFooter('CROSSWORD');
         if (res.splitNeeded) {
             splitNeeded = true;
@@ -232,15 +239,15 @@ function exportRun({
         first = false;
         pageKind[doc.internal.getNumberOfPages()] = 'key';
         pageSet[doc.internal.getNumberOfPages()] = -1;
-        const setLabel = sets > 1 ? `Set ${entry.setIdx + 1}` : '';
+        const setLabel = `Set ${entry.setIdx + 1}`;
         drawMasterKeyPage(ctx, title, sub, entry.cpd,
             { ws: true, cw: true, scr: true, notes: true }, 1, setLabel);
         footerQueue.push({
             page: doc.internal.getNumberOfPages(), setIdx: -1, pageInSet: 0,
             right: 'TEACHER KEY', setLabel: '',
-            pageText: sets > 1
-                ? `Answer key ${k + 1} of ${keyQueue.length}  ·  Set ${entry.setIdx + 1}`
-                : 'Answer key',
+            pageText: keyQueue.length > 1
+                ? `Set ${entry.setIdx + 1} — Answer key ${k + 1} of ${keyQueue.length}`
+                : `Set ${entry.setIdx + 1} — Answer key`,
         });
     });
 
@@ -367,14 +374,17 @@ const banked = exportRun({ cwShowBank: true, label: 'word-bank' });
 check('the crossword word bank reaches the PDF', banked.log.some(l => l.text === 'WORD BANK'));
 check('the crossword still fits one page with a word bank', !banked.splitNeeded);
 
-const split = exportRun({ cwSeparateClues: true, label: 'separate-clues' });
-// 5 student pages -> padded to 6 whole sheets -> plus the appendix key.
-check('an explicitly separate clue page still works', split.pages === 7, `got ${split.pages}`);
-check('a separate clue page carries no filler ruling',
+// The separate-clue page is no longer a teacher-facing option — it survives
+// only as the fallback for a puzzle that genuinely cannot fit at minimum cell
+// size, so the drawer still has to work. 5 student pages -> padded to 6 whole
+// sheets -> plus the appendix key.
+const split = exportRun({ forceSplitFallback: true, label: 'split-fallback' });
+check('the unfittable-puzzle fallback still draws its clue page', split.pages === 7, `got ${split.pages}`);
+check('the fallback clue page carries no filler ruling',
     !split.log.some(l => l.kind === 'text' && l.text === 'WORKING OUT'));
 
 [['six-word', small], ['no-scaffolding', plain], ['scaffolded', scaffolded],
- ['word-bank', banked], ['separate-clues', split]].forEach(([name, run]) => {
+ ['word-bank', banked], ['split-fallback', split]].forEach(([name, run]) => {
     const c = collisions(run.log);
     check(`nothing overlaps in the ${name} export`, c.length === 0, c.slice(0, 3).join(' | '));
 });
@@ -628,7 +638,7 @@ function pillCollisions(log) {
     const sheetOf = (p) => Math.ceil(p / 2);
     const runs = [
         ['default packet', exportRun({ sets: 4, label: 'dup-default' })],
-        ['with a separate clue page', exportRun({ sets: 4, cwSeparateClues: true, label: 'dup-split' })],
+        ['with the split fallback', exportRun({ sets: 4, forceSplitFallback: true, label: 'dup-split' })],
         ['single set', exportRun({ sets: 1, label: 'dup-single' })],
     ];
     runs.forEach(([name, r]) => {
@@ -654,7 +664,7 @@ function pillCollisions(log) {
 
 // --- every student packet begins on the front of a fresh sheet ---
 {
-    const r = exportRun({ sets: 4, cwSeparateClues: true, label: 'dup-fronts' });
+    const r = exportRun({ sets: 4, forceSplitFallback: true, label: 'dup-fronts' });
     const firsts = [0, 1, 2, 3].map(si =>
         Math.min(...Object.keys(r.pageSet).filter(p => r.pageSet[p] === si).map(Number)));
     check('each set starts on the front of a sheet', firsts.every(p => p % 2 === 1),
@@ -666,7 +676,7 @@ function pillCollisions(log) {
     const r = exportRun({ sets: 3, label: 'dup-appendix' });
     const footerText = r.log.filter(l => l.kind === 'text' && l.y > FOOTER_BAND).map(l => l.text);
     check('appendix keys are numbered and name their set',
-        footerText.some(t => /Answer key 2 of 3.*Set 2/.test(t)),
+        footerText.some(t => /Set 2 — Answer key 2 of 3/.test(t)),
         footerText.filter(t => /Answer key/.test(t)).slice(0, 2).join(' | '));
     const keyPages = Object.keys(r.pageKind).filter(p => r.pageKind[p] === 'key').map(Number);
     check('all three keys land after every student set',
@@ -755,6 +765,96 @@ function pillCollisions(log) {
     const off = exportRun({ label: 'scr-nobank', words: WORDS });
     check('the scramble example still fits beside its pill',
         pillCollisions(off.log).length === 0, pillCollisions(off.log).slice(0, 2).join(' | '));
+}
+
+
+// =============================================================
+// v3 review
+// =============================================================
+
+// --- BUG-REG-01: the set identifier appears on every page, always ---
+// It used to be suppressed whenever only one set was generated, so a teacher
+// with a marked sheet and an answer key had no way to pair them.
+{
+    [['single set', 1], ['four sets', 4]].forEach(([name, sets]) => {
+        const r = exportRun({ sets, label: `reg-set-${sets}` });
+        const studentPages = Object.keys(r.pageKind)
+            .filter(p => r.pageKind[p] === 'student').map(Number);
+        const badged = studentPages.filter(p => r.log.some(l =>
+            l.kind === 'text' && l.page === p && /^SET \d+$/.test(l.text)));
+        check(`every student page shows its SET badge (${name})`,
+            badged.length === studentPages.length,
+            `${badged.length}/${studentPages.length}`);
+
+        const footerText = r.log.filter(l => l.kind === 'text' && l.y > FOOTER_BAND)
+            .map(l => l.text);
+        const setless = footerText.filter(t => /Page \d+ of \d+/.test(t) && !/Set \d+/.test(t));
+        check(`every paginated footer names its set (${name})`, setless.length === 0,
+            setless.slice(0, 2).join(' | '));
+
+        const keyPages = Object.keys(r.pageKind).filter(p => r.pageKind[p] === 'key').map(Number);
+        const keyBanners = keyPages.filter(p => r.log.some(l => l.kind === 'text'
+            && l.page === p && /TEACHER ANSWER KEY — SET \d+/.test(l.text)));
+        check(`every answer key names its set (${name})`,
+            keyBanners.length === keyPages.length, `${keyBanners.length}/${keyPages.length}`);
+        check(`answer-key footers name their set (${name})`,
+            footerText.filter(t => /Answer key/.test(t)).every(t => /Set \d+/.test(t)),
+            footerText.filter(t => /Answer key/.test(t)).slice(0, 2).join(' | '));
+    });
+}
+
+// --- BUG-XWD-07 / BUG-DOC-04: exactly four student pages, no filler ---
+{
+    const r = exportRun({ sets: 4, label: 'v3-budget' });
+    const perSet = [0, 1, 2, 3].map(si =>
+        Object.keys(r.pageSet).filter(p => r.pageSet[p] === si).length);
+    check('each student packet is exactly four pages', perSet.every(n => n === 4),
+        perSet.join(','));
+    check('no packet needs a blank filler page',
+        !Object.values(r.pageKind).includes('filler'),
+        Object.entries(r.pageKind).filter(([, k]) => k === 'filler').map(([p]) => p).join(','));
+    check('no "intentionally blank" page is printed',
+        !r.log.some(l => l.kind === 'text' && /intentionally blank/i.test(l.text)));
+    check('four sets plus four keys is twenty sheets', r.pages === 20, `got ${r.pages}`);
+
+    // Grid and clues have to be on the same sheet, not merely the same packet.
+    const cwPages = [0, 1, 2, 3].map(si => {
+        const pages = Object.keys(r.pageSet).filter(p => r.pageSet[p] === si).map(Number).sort((a, b) => a - b);
+        return pages.find(p => r.log.some(l => l.kind === 'text' && l.page === p && l.text === 'ACROSS'));
+    });
+    const gridOnSamePage = cwPages.every(p => p !== undefined &&
+        r.log.some(l => l.kind === 'rect' && l.page === p && Math.abs(l.w - l.h) < 0.01 && l.w > 3));
+    check('the crossword grid shares its page with ACROSS and DOWN', gridOnSamePage,
+        cwPages.join(','));
+}
+
+// --- BUG-KEY-02: the key names itself once, not twice ---
+{
+    const r = exportRun({ sets: 2, label: 'v3-keyhdr' });
+    const keyPages = Object.keys(r.pageKind).filter(p => r.pageKind[p] === 'key').map(Number);
+    keyPages.forEach(p => {
+        const banners = r.log.filter(l => l.kind === 'text' && l.page === p
+            && /TEACHER ANSWER KEY/.test(l.text));
+        check(`the answer key header says TEACHER ANSWER KEY once (p${p})`,
+            banners.length === 1, banners.map(b => b.text).join(' | '));
+    });
+}
+
+// --- BUG-VOC-06: no bounding box to clip the row number ---
+{
+    const r = exportRun({ matching: true, label: 'v3-outline' });
+    const notesPage = r.log.filter(l => l.page === 1);
+    const num = notesPage.find(l => l.kind === 'text' && l.text === '1.');
+    check('the vocabulary page still numbers its first row', !!num);
+    // Any stroked box starting at or left of the number column would run
+    // through the glyph, which is what clipped "1.".
+    const boxesOverNumber = notesPage.filter(l => l.kind === 'rect'
+        && l.w > 20 && num && l.x <= num.x + 1 && l.y < num.y && l.y + l.h > num.y);
+    check('no outline box runs through the row number', boxesOverNumber.length === 0,
+        `${boxesOverNumber.length} boxes`);
+    // The example is still findable from its own content.
+    check('the example is still marked by its badge',
+        notesPage.some(l => l.kind === 'text' && l.text === 'EXAMPLE'));
 }
 
 console.log(failed ? `\n${failed} failing check(s)` : '\nAll checks passed');
