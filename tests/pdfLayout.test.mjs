@@ -768,6 +768,41 @@ function pillCollisions(log) {
         pillCollisions(off.log).length === 0, pillCollisions(off.log).slice(0, 2).join(' | '));
 }
 
+// --- Scramble prompts never run into their own answer line ---
+// A 12-letter word at 15 pt overshot the prompt-column cap and its last
+// letters sat on the writing line. The type now gives way instead.
+{
+    const r = exportRun({ label: 'scr-long' });
+    const scr = r.log.filter(l => l.page === 4);
+    const prompts = scr.filter(l => l.kind === 'text' && l.font.startsWith('courier'));
+    const rules = scr.filter(l => l.kind === 'line' && l.y > BODY_TOP && l.y < 240
+        && (l.x2 - l.x) > 5 && (l.x2 - l.x) < PAGE.W - 2 * PAGE.MARGIN - 1);
+    let worst = Infinity, worstWord = '';
+    prompts.forEach(t => {
+        const rule = rules.find(l => Math.abs(l.y - (t.y + 2)) < 1.5 && l.x > t.x);
+        if (!rule) return;
+        const gap = rule.x - (t.x + t.w);
+        if (gap < worst) { worst = gap; worstWord = t.text; }
+    });
+    check('every scrambled word clears its answer line by 2mm or more',
+        prompts.length > 0 && worst >= 2, `min gap ${worst.toFixed(2)}mm (${worstWord})`);
+    check('the widest scramble is a 12-letter word', prompts.some(t => t.text.length === 12));
+}
+
+// --- Vocabulary row numbers share a right edge, so 9. and 10. line up ---
+{
+    const r = exportRun({ label: 'num-align' });
+    const nums = r.log.filter(l => l.kind === 'text' && l.page === 1 && /^\d+\.$/.test(l.text));
+    const edges = new Set(nums.map(l => (l.align === 'right' ? l.x : l.x + l.w).toFixed(1)));
+    check('row numbers are right-aligned to one edge', nums.length >= 20 && edges.size === 1,
+        `${nums.length} numbers, ${edges.size} distinct edges`);
+    const terms = r.log.filter(l => l.kind === 'text' && l.page === 1 && l.font.endsWith('bold') && l.y > BODY_TOP);
+    const termX = Math.min(...terms.filter(l => /^[A-Z]{3,}$/.test(l.text)).map(l => l.x));
+    const edge = Number([...edges][0]);
+    check('two-digit numbers keep 1.5mm clear of their term', termX - edge >= 1.5,
+        `gap ${(termX - edge).toFixed(2)}mm`);
+}
+
 
 // =============================================================
 // v3 review

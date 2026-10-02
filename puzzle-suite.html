@@ -539,10 +539,9 @@
                         class="fas fa-key"></i> Keys</button>
             </div>
             <div class="zoom-controls">
-                <button class="zoom-btn" onclick="adjustZoom(-0.1)" aria-label="Zoom Out"><i
-                        class="fas fa-minus"></i></button>
-                <button class="zoom-btn" onclick="adjustZoom(0.1)" aria-label="Zoom In"><i
-                        class="fas fa-plus"></i></button>
+                <button class="zoom-btn" onclick="adjustZoom(-0.1)" title="Zoom out" aria-label="Zoom Out">&minus;</button>
+                <button class="zoom-level" id="zoom-level" onclick="resetZoom()" title="Click to switch between 100% and fit-to-width" aria-label="Zoom level; activate to reset or fit">100%</button>
+                <button class="zoom-btn" onclick="adjustZoom(0.1)" title="Zoom in" aria-label="Zoom In">+</button>
             </div>
         </div>
         <div class="viewport">
@@ -721,7 +720,7 @@
         </div>
     </div>
 
-    <script src="bundle.js?v=277114f348"></script>
+    <script src="bundle.js?v=2f0c77163a"></script>
 </body>
 
 </html>
