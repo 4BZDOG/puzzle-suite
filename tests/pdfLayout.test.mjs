@@ -22,6 +22,7 @@ import { jsPDF } from 'jspdf';
 import { buildCtx, drawHeader, drawFooter, drawBlankFiller } from '../pdf/pdfHelpers.js';
 import { drawWordSearch } from '../pdf/pdfDrawWordSearch.js';
 import { drawCrosswordPage, drawCrosswordClues } from '../pdf/pdfDrawCrossword.js';
+import { drawSeparatorPage } from '../pdf/pdfHelpers.js';
 import { drawScramble } from '../pdf/pdfDrawScramble.js';
 import { drawNotes, drawMasterKeyPage } from '../pdf/pdfDrawNotes.js';
 import { exampleDefIndex } from '../core/notesModel.js';
@@ -144,7 +145,7 @@ const WORDS = [
 function exportRun({
     matching = false, words = WORDS, showExample = true, showLetterCount = true,
     cwShowBank = false, forceSplitFallback = false, sets = 1, label = 'run',
-    keysAtEnd = true, duplexSafe = true, withKey = true,
+    keysAtEnd = true, duplexSafe = true, withKey = true, setSeparator = false,
 } = {}) {
     const { doc, log } = makeDoc();
     const ctx = buildCtx(doc, 'helvetica', null, 1,
@@ -229,6 +230,19 @@ function exportRun({
             addPage('filler');
             drawBlankFiller(ctx, 1);
             queueFooter('');
+        }
+
+        // Separator sheet: whole sheet of its own, no footer, empty reverse.
+        if (setSeparator) {
+            doc.addPage();
+            pageKind[doc.internal.getNumberOfPages()] = 'separator';
+            pageSet[doc.internal.getNumberOfPages()] = si;
+            drawSeparatorPage(ctx, `Set ${si + 1}`, sets, 1);
+            if (duplexSafe) {
+                doc.addPage();
+                pageKind[doc.internal.getNumberOfPages()] = 'separator-back';
+                pageSet[doc.internal.getNumberOfPages()] = si;
+            }
         }
 
         if (withKey && keysAtEnd) keyQueue.push({ cpd, setIdx: si });
@@ -801,6 +815,62 @@ function pillCollisions(log) {
     const edge = Number([...edges][0]);
     check('two-digit numbers keep 1.5mm clear of their term', termX - edge >= 1.5,
         `gap ${(termX - edge).toFixed(2)}mm`);
+}
+
+// --- Set separator: a blank sheet after each set, for back-to-back printing ---
+{
+    const off = exportRun({ sets: 3, label: 'sep-off' });
+    check('separator is off by default', off.pages === 3 * 4 + 3, `got ${off.pages}`);
+
+    const on = exportRun({ sets: 3, setSeparator: true, label: 'sep-on' });
+    check('three sets with separators and keys is 21 pages', on.pages === 3 * 6 + 3, `got ${on.pages}`);
+
+    const fronts = Object.keys(on.pageKind).filter(p => on.pageKind[p] === 'separator').map(Number);
+    const backs = Object.keys(on.pageKind).filter(p => on.pageKind[p] === 'separator-back').map(Number);
+    check('every set is followed by a separator sheet', fronts.length === 3 && backs.length === 3);
+    check('every separator starts on a fresh sheet (odd page number)',
+        fronts.every(p => p % 2 === 1), fronts.join(','));
+    check('each separator back directly follows its front', fronts.every((p, i) => backs[i] === p + 1));
+    check('each separator names the set it closes', fronts.every((p, i) =>
+        on.log.some(l => l.kind === 'text' && l.page === p && l.text.startsWith(`END OF SET ${i + 1}`))));
+    check('the back of a separator is completely empty',
+        !on.log.some(l => backs.includes(l.page)));
+    check('a separator carries nothing but its caption',
+        fronts.every(p => on.log.filter(l => l.page === p).length === 1));
+    check('separators are not counted in the set\'s page total',
+        on.footers.filter(f => f.setIdx >= 0).every(f => f.pagesInSet === 4));
+    check('no teacher key shares a sheet with a separator', (() => {
+        const keyPages = Object.keys(on.pageKind).filter(p => on.pageKind[p] === 'key').map(Number);
+        const sheet = n => Math.ceil(n / 2);
+        const sepSheets = new Set([...fronts, ...backs].map(sheet));
+        return keyPages.every(k => !sepSheets.has(sheet(k)));
+    })());
+
+    // Single-sided printing: one page, no empty reverse.
+    const single = exportRun({ sets: 2, setSeparator: true, duplexSafe: false, label: 'sep-single' });
+    check('without duplex a separator is a single page', single.pages === 2 * 5 + 2, `got ${single.pages}`);
+
+    // Odd packet: padded first, so the separator is still a whole sheet.
+    const odd = exportRun({ sets: 2, setSeparator: true, keysAtEnd: false, label: 'sep-odd' });
+    const oddFronts = Object.keys(odd.pageKind).filter(p => odd.pageKind[p] === 'separator').map(Number);
+    check('an odd packet is padded before its separator', oddFronts.every(p => p % 2 === 1), oddFronts.join(','));
+}
+
+// --- Matching labels: bold letter measured bold, wrapped lines hang under the text ---
+{
+    const r = exportRun({ matching: true, label: 'match-labels' });
+    const p1 = r.log.filter(l => l.kind === 'text' && l.page === 1);
+    const labels = p1.filter(l => /^[A-Z]\. $/.test(l.text));
+    let worst = Infinity;
+    labels.forEach(lab => {
+        const body = p1.find(l => Math.abs(l.y - lab.y) < 0.3 && l.x > lab.x && l.text !== lab.text);
+        if (body) worst = Math.min(worst, body.x - (lab.x + lab.w));
+    });
+    check('every definition clears its letter label by 0.5mm', labels.length >= 20 && worst >= 0.5,
+        `${labels.length} labels, min gap ${worst.toFixed(2)}mm`);
+    const bodyXs = new Set(p1.filter(l => labels.some(lab => Math.abs(l.y - lab.y) < 0.3 && l.x > lab.x))
+        .map(l => l.x.toFixed(1)));
+    check('all first-line definitions start on one x', bodyXs.size === 1, [...bodyXs].join(','));
 }
 
 

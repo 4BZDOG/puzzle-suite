@@ -2892,3 +2892,19 @@ body.sidebar-closed .toggle-sidebar { left: 12px; }
     .viewport { padding: 20px 8px; }
 }
 }
+
+@layer components {
+.packet-summary {
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--primary-light);
+    color: var(--text-main);
+    line-height: 1.45;
+}
+}
+
+@layer components {
+.packaging-toggles { display: flex; flex-direction: column; gap: 4px; margin: 6px 0 8px; }
+.packaging-toggles .toggle-row { padding: 6px 0; min-height: 36px; align-items: center; }
+.export-card .field-hint { margin-bottom: 8px; }
+}

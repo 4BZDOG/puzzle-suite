@@ -542,6 +542,26 @@ export function drawBlankFiller(ctx, pScale) {
 }
 
 /**
+ * Front of a set-separator sheet. It is deliberately almost blank: a teacher
+ * printing a stack back to back needs a sheet that is obviously not student
+ * work, but the page should still cost almost no toner and carry nothing a
+ * student could mistake for an activity. One small caption near the foot says
+ * which set it closes, so a stack can be split without leafing through it.
+ * The reverse side is left completely empty by the caller.
+ */
+export function drawSeparatorPage(ctx, setLabel, ofTotal, pScale) {
+    const { doc, PAGE_WIDTH, PAGE_HEIGHT, MARGIN, pdfFont } = ctx;
+    setFontSafe(doc, pdfFont, 'normal');
+    doc.setFontSize(Math.max(6, 7 * (pScale || 1)));
+    doc.setTextColor(...PALETTE.muted);
+    const txt = ofTotal > 1
+        ? `END OF ${setLabel.toUpperCase()}  \u00B7  ${ofTotal} SETS IN THIS PRINT`
+        : `END OF ${setLabel.toUpperCase()}`;
+    doc.text(txt, PAGE_WIDTH / 2, PAGE_HEIGHT - MARGIN + 6, { align: 'center' });
+    doc.setTextColor(...PALETTE.ink);
+}
+
+/**
  * Thin running footer — lets a teacher collate a printed class set.
  *
  * Pagination is per set, not per document. A teacher printing 25 sets used
