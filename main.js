@@ -24,7 +24,7 @@ import { AI_PROVIDERS, generateWords, loadSavedKeys, saveKey } from './ai/aiGene
 import { openModal, closeModal } from './ui/modal.js';
 import { setupSidebarResize, toggleSidebar, switchTab } from './ui/sidebar.js';
 import { toggleDarkMode } from './ui/darkMode.js';
-import { adjustZoom } from './ui/zoom.js';
+import { adjustZoom, resetZoom, initZoom } from './ui/zoom.js';
 import { setupSortableList } from './ui/pageOrder.js';
 import { setupDragAndDrop } from './ui/dropZone.js';
 
@@ -864,6 +864,7 @@ window._puzzleApp = {
     toggleSidebar,
     switchTab,
     adjustZoom: (d) => adjustZoom(d),
+    resetZoom,
     showPage,
     autoFit,
     updateUI,
@@ -917,6 +918,7 @@ Object.assign(window, {
     toggleSidebar,
     switchTab,
     adjustZoom: (d) => adjustZoom(d),
+    resetZoom,
     showPage,
     autoFit,
     updateUI,
@@ -967,6 +969,8 @@ window.addEventListener('load', async () => {
     try {
         const saved = loadRawState();
         if (saved) applyStateToDOM(saved);
+        // On a phone the sidebar would otherwise open over the whole preview.
+        if (window.innerWidth <= 900) document.body.classList.add('sidebar-closed');
 
         // Restore watermark images in DOM from state (applyStateToDOM set state.watermarkSrc)
         if (state.watermarkSrc) {
@@ -989,6 +993,7 @@ window.addEventListener('load', async () => {
         updateTitleScale();
         updatePaperSize();
         updateUI();
+        initZoom();
 
         await new Promise(r => setTimeout(r, 300));
         if (overlay) overlay.style.opacity = '0';

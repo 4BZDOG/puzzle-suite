@@ -2803,3 +2803,92 @@ table.mode-cw td.cell.empty {
 [data-theme="dark"] .bulk-limit-hint { color: var(--text-muted, #94a3b8); }
 
 } /* end @layer components (license) */
+
+/* ─── UX polish (header, sidebar toggle, preview zoom, small screens) ─────── */
+@layer components {
+
+/* The icon-button rule (36 × 36) used to squash the Upgrade pill and push it
+   under the version tag. The pill sizes to its label; the row wraps rather
+   than overlaps when the sidebar is narrow. */
+.brand { flex-wrap: wrap; row-gap: 10px; }
+.brand h1 { min-width: 0; white-space: nowrap; }
+.brand-actions { flex: 1 1 auto; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+.brand-actions .pro-badge-btn {
+    width: auto;
+    height: 28px;
+    padding: 0 12px;
+    margin-right: auto;
+    border-radius: 14px;
+    color: #fff;
+}
+.brand-actions .pro-badge-btn:hover { color: #fff; }
+.version-tag { margin-left: 2px; }
+
+/* The round sidebar toggle floated over the Regenerate button. It now rides
+   the sidebar's edge, and returns to the corner when the sidebar is closed. */
+.toggle-sidebar {
+    bottom: auto;
+    top: 12px;
+    left: calc(var(--sidebar-width) + 12px);
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
+    transition: left 0.25s ease, transform 0.2s;
+}
+body.sidebar-closed .toggle-sidebar { left: 12px; }
+.toggle-sidebar:focus-visible,
+.zoom-btn:focus-visible,
+.page-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* A page is a sheet of paper: it must never shrink to fit a flex row, and a
+   zoomed sheet wider than the viewport must overflow to the right (scrollable)
+   rather than symmetrically, which hid its left edge. */
+.page { flex-shrink: 0; }
+.viewport { justify-content: safe center; }
+
+.zoom-level {
+    min-width: 52px;
+    height: 36px;
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-panel);
+    color: var(--text-muted);
+    font: 600 0.8rem/1 inherit;
+    font-family: inherit;
+    cursor: pointer;
+    font-variant-numeric: tabular-nums;
+}
+.zoom-level:hover { border-color: var(--text-muted); color: var(--text-main); }
+
+/* Word list: the word keeps a readable column and the clue takes the rest.
+   Both cells could not shrink below their content, so a narrow sidebar
+   clipped the word itself ("GALAX"). */
+.wm-cell-word { flex: 0 0 clamp(92px, 32%, 140px); min-width: 0; }
+.wm-cell-clue { flex: 1 1 0; min-width: 0; }
+.wm-input { text-overflow: ellipsis; }
+
+}
+
+/* Small screens live in the pages layer: the base media query that already
+   styles the toolbar is there, and a later layer would otherwise lose to it. */
+@layer pages {
+@media (max-width: 900px) {
+    .toggle-sidebar { left: calc(min(85%, 400px) + 12px); }
+    body.sidebar-closed .toggle-sidebar { left: 12px; }
+    /* keep the toggle reachable and visible above the dimmed preview */
+    main { padding-left: 0; }
+    .preview-toolbar {
+        justify-content: flex-start;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding-left: 60px;           /* clear the toggle */
+        scrollbar-width: none;
+    }
+    .preview-toolbar::-webkit-scrollbar { display: none; }
+    .page-tabs { flex-shrink: 0; }
+    .zoom-controls { flex-shrink: 0; margin-left: 4px; padding-left: 10px; }
+    .page-btn { white-space: nowrap; }
+    .viewport { padding: 20px 8px; }
+}
+}

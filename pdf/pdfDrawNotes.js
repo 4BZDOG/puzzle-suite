@@ -52,7 +52,7 @@ export function drawNotes(ctx, notesList, startY, pScale) {
     // ---- Column geometry -------------------------------------------
     // Proportional rather than a fixed 20 mm: # gets 5%, the answer box its
     // own 8% column, then the term column and the definition take the rest.
-    const numW    = Math.max(7, availW * 0.05);
+    const numW    = Math.max(9, availW * 0.05);
     const boxColW = isMatching ? Math.max(9, availW * 0.08) : 0;
     const numColW = numW + boxColW;
     const termFrac = (notesConfig?.termWidth || 27) / 100;
@@ -155,7 +155,7 @@ export function drawNotes(ctx, notesList, startY, pScale) {
     setFontSafe(doc, pdfFont, 'bold');
     doc.setFontSize(Math.min(11 * pScale, fontPt));
     doc.setTextColor(...PALETTE.muted);
-    doc.text('#', MARGIN, cy);
+    doc.text('#', MARGIN + numW - 2, cy, { align: 'right' });
     if (showTerm) doc.text('TERM', termX, cy);
     if (showDef) doc.text(isMatching ? 'DEFINITIONS (IN A DIFFERENT ORDER)' : 'DEFINITION', defX, cy);
     doc.setDrawColor(...PALETTE.ink);
@@ -194,7 +194,9 @@ export function drawNotes(ctx, notesList, startY, pScale) {
         doc.setFontSize(fontPt);
         doc.setTextColor(...(isExTerm ? PALETTE.example : PALETTE.muted));
         const numStr = `${i + 1}.`;
-        doc.text(numStr, MARGIN, cy);
+        // Right-aligned so 9. and 10. share a column edge and a two-digit
+        // number keeps the same gap to its term as a one-digit one.
+        doc.text(numStr, MARGIN + numW - 2, cy, { align: 'right' });
 
         if (isMatching) {
             // Centred on the row's whole text block rather than pinned to

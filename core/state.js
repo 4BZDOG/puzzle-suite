@@ -97,7 +97,7 @@ export function setActivePage(n) {
 }
 
 export function setZoom(z) {
-    state.currentZoom = Math.max(0.5, Math.min(2, z));
+    state.currentZoom = Math.max(0.25, Math.min(2, z));
 }
 
 export function setWatermark(src) {
@@ -329,7 +329,7 @@ export function applyStateToDOM(s) {
 
     if (s.zoom !== undefined || cfg.zoom !== undefined) {
         const z = s.zoom ?? cfg.zoom;
-        state.currentZoom = Math.max(0.5, Math.min(2, parseFloat(z) || 1));
+        state.currentZoom = Math.max(0.25, Math.min(2, parseFloat(z) || 1));
         document.querySelectorAll('.page').forEach(p => {
             p.style.transform = `scale(${state.currentZoom})`;
         });

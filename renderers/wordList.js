@@ -53,13 +53,13 @@ export function renderWordList(container, words, puzzleData, activePage, onUpdat
                     <i class="fas fa-chevron-down"></i>
                 </button>
             </div>
-            <div style="flex:1">
+            <div class="wm-cell-word">
                 <input class="wm-input wm-word" value="${escapeHTML(w.word)}"
                     onchange="window._puzzleApp.updateWord(${i},'word',this.value)"
                     placeholder="WORD" aria-label="Word ${i + 1}">
             </div>
-            <div style="flex:2">
-                <input class="wm-input wm-clue" value="${escapeHTML(w.clue)}"
+            <div class="wm-cell-clue">
+                <input class="wm-input wm-clue" value="${escapeHTML(w.clue)}" title="${escapeHTML(w.clue)}"
                     oninput="window._puzzleApp.updateWord(${i},'clue',this.value)"
                     placeholder="Clue" aria-label="Clue for word ${i + 1}">
             </div>

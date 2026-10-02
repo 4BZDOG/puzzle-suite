@@ -49,15 +49,25 @@ export function drawScramble(ctx, scrData, layout, isKey, showHint, pScale) {
     const topPad = Math.max(0, (availH - rowH * itemsPerCol) / 2);
 
     const showExample = ctx.showExample || false;
-    const scramFontPt = Math.min(15 * pScale, Math.max(10 * pScale, rowH * 1.1));
+    let scramFontPt = Math.min(15 * pScale, Math.max(10 * pScale, rowH * 1.1));
 
     doc.setFont('courier', 'bold');
     doc.setFontSize(scramFontPt);
-    const maxScramW = Math.max(...scrData.map(s => doc.getTextWidth(s.scrambled)));
+    let maxScramW = Math.max(...scrData.map(s => doc.getTextWidth(s.scrambled)));
     setFontSafe(doc, pdfFont, 'normal');
     doc.setFontSize(scramFontPt * 0.7);
     const numLabelW = doc.getTextWidth(`${scrData.length}. `) + 1;
-    const splitX = Math.min(numLabelW + maxScramW + 8 * scale, colW * 0.52);
+    // The prompt column may take at most 54% of a column. A 12-letter word at
+    // 15 pt used to overshoot that cap and run into its own answer line, so the
+    // type gives way instead of the gap: shrink until the widest word fits.
+    const promptBudget = colW * 0.54 - numLabelW - 2 * scale - 6 * scale;
+    if (maxScramW > promptBudget) {
+        scramFontPt = Math.max(8, scramFontPt * promptBudget / maxScramW);
+        doc.setFont('courier', 'bold');
+        doc.setFontSize(scramFontPt);
+        maxScramW = Math.max(...scrData.map(s => doc.getTextWidth(s.scrambled)));
+    }
+    const splitX = Math.min(numLabelW + 2 * scale + maxScramW + 6 * scale, colW * 0.6);
 
     scrData.forEach((s, i) => {
         const col = Math.floor(i / itemsPerCol);

@@ -564,6 +564,18 @@ Status dots reflect placement in the currently-visible puzzle page.
 
 ---
 
+## Session Fixes (2026-10-02 — UI/UX & PDF alignment pass)
+
+`npm run test:pdf` now runs 4 more checks. Found by rendering the real app and PDF and looking at them.
+
+- **Scramble overrun (PDF)**: the prompt column was capped at 52 % of the column, so a 12-letter word at 15 pt ran onto its own answer line (-0.45 mm). The type now shrinks to fit the budget instead of the cap clipping the gap.
+- **Row numbers (PDF)**: vocabulary numbers are right-aligned to one edge, so `9.` and `10.` keep the same gap to the term.
+- **Header**: `.brand-actions button` (36 × 36) squashed the Upgrade pill under the version tag. The pill sizes to its label and the row wraps.
+- **Sidebar toggle**: the round FAB sat on top of Regenerate. It now rides the sidebar edge (`left: calc(var(--sidebar-width) + 12px)`) and drops to the corner when closed.
+- **Preview zoom** (`ui/zoom.js`): a CSS transform does not change the layout box, so zoom > 100 % clipped the sheet's left edge and zoom < 100 % left dead scroll. `applyZoom()` adds compensating margins; `.viewport` uses `safe center`; a percentage readout toggles 100 % / fit-to-width. Zoom range is 25–200 %. +/- are text glyphs, not icon-font glyphs.
+- **Small screens**: `.page { flex-shrink: 0 }` (a sheet shrank and reflowed to one word per line), the sidebar starts closed at load, the page tabs scroll horizontally, and the sheet starts fitted to the viewport. Mobile rules live in `@layer pages` because the base media query is there and layer order beats specificity.
+- **Word list**: the word and clue cells have `min-width: 0` (a named cell class each), so a narrow sidebar no longer clips the word ("GALAX"); the clue gets a `title` tooltip for its full text.
+
 ## Session Fixes (2026-09-14d — Layout Review v4)
 
 Fourth round, and the first about the **web preview** rather than the PDF. The
