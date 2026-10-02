@@ -72,6 +72,7 @@ export const state = {
         // out the answers with the worksheet.
         keysAtEnd:      true,   // all answer keys in an appendix after every set
         duplexSafe:     true,   // pad each student set to an even page count
+        setSeparator:   false,  // blank sheet after each set, to split a stack by eye
         pageOrder:      ['notes','ws','cw','scr','key'],
         sidebarWidth:   '420px',
         aiConfig: {
@@ -158,6 +159,7 @@ export function syncSettingsFromDOM() {
     s.cwSeparateClues = false;   // retired; never read from the DOM
     s.keysAtEnd  = getChk('keysAtEnd',  s.keysAtEnd);
     s.duplexSafe = getChk('duplexSafe', s.duplexSafe);
+    s.setSeparator = getChk('setSeparator', s.setSeparator);
     s.scrShowHint    = getChk('scrShowHint', s.scrShowHint);
     s.scrShowBank    = getChk('scrShowBank', s.scrShowBank);
     s.showExample    = getChk('showExample', s.showExample);
@@ -276,6 +278,7 @@ export function applyStateToDOM(s) {
     setChk('cwShowBank',     cfg.cwShowBank);
     setChk('keysAtEnd',  cfg.keysAtEnd !== false);
     setChk('duplexSafe', cfg.duplexSafe !== false);
+    setChk('setSeparator', cfg.setSeparator === true);
     setChk('scrShowHint',    cfg.scrShowHint);
     setChk('scrShowBank',    cfg.scrShowBank !== false);
     setChk('showExample',    cfg.showExample);

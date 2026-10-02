@@ -233,6 +233,7 @@ function updatePageScales() {
 const _PAGE_INDEX = { notes: 1, ws: 2, cw: 3, scr: 4, key: 5 };
 
 function _updatePageChrome() {
+    syncSettingsFromDOM();   // toggles must count immediately, not after the 500 ms debounce
     const cfg = state.settings;
     const isMatching = !!cfg.notesConfig?.shuffle;
     const order = cfg.pageOrder || ['notes', 'ws', 'cw', 'scr', 'key'];
@@ -283,6 +284,28 @@ function _updatePageChrome() {
             footer.querySelector('.page-footer-right').innerText = right;
         }
     });
+
+    _updatePacketSummary(studentPages.length, order.includes('key') && !!opts.key);
+}
+
+// One plain-English line under the packaging toggles: what each set will
+// physically print as. Mirrors the padding and separator rules in pdfExport.js.
+function _updatePacketSummary(studentCount, wantKey) {
+    const el = document.getElementById('packet-summary');
+    if (!el) return;
+    const cfg = state.settings;
+    const duplex = cfg.duplexSafe !== false;
+    const keysAtEnd = cfg.keysAtEnd !== false;
+    let pages = studentCount + (!keysAtEnd && wantKey ? 1 : 0);
+    if (duplex && pages % 2 === 1) pages++;
+    const sheets = duplex ? pages / 2 : pages;
+    const unit = duplex ? 'sheet' : 'page';
+    const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+    let msg = `Each set prints as ${plural(pages, 'page')} (${plural(sheets, unit)}${duplex ? ', double-sided' : ''})`;
+    if (cfg.setSeparator) msg += `, then one separator ${unit}${duplex ? ' (blank on the back)' : ''}`;
+    msg += '.';
+    if (wantKey && keysAtEnd) msg += ' Answer keys follow the last set.';
+    el.textContent = msg;
 }
 
 function showPage(n) {

@@ -7,7 +7,7 @@ import { showToast } from '../ui/toast.js';
 import { licenseManager } from '../license/licenseManager.js';
 import { createPuzzleData } from '../core/puzzleDataBuilder.js';
 import { loadJSPDF, loadFontForPDF, FONT_SELECT_MAP } from './pdfFonts.js';
-import { buildCtx, drawHeader, drawFooter, drawBlankFiller } from './pdfHelpers.js';
+import { buildCtx, drawHeader, drawFooter, drawBlankFiller, drawSeparatorPage } from './pdfHelpers.js';
 import { metaFor, instructionFor } from '../core/pageMeta.js';
 import { transposeCrossword } from '../workers/workerBridge.js';
 import { drawWordSearch } from './pdfDrawWordSearch.js';
@@ -39,8 +39,11 @@ const PREMIUM_FONT_VALUES = ["'Lora', serif", "'Comic Neue', cursive"];
  * A crossword with "clues on separate page" produces 2 pages; everything
  * else is 1 page each. This is the unit we meter for PDF monetisation.
  */
-function pagesPerSet(selectedPages) {
-  return selectedPages.length;
+function pagesPerSet(selectedPages, cfg = {}) {
+  // A separator is one whole sheet when printing double-sided (front + blank
+  // back), a single page otherwise.
+  const sep = cfg.setSeparator ? (cfg.duplexSafe !== false ? 2 : 1) : 0;
+  return selectedPages.length + sep;
 }
 
 export async function exportPDF() {
@@ -91,7 +94,7 @@ export async function exportPDF() {
     }
 
     // --- Page-quota check: monetise PDF generation by page ---
-    const totalPages = pagesPerSet(selectedPages) * (Number.isFinite(count) && count > 0 ? count : 1);
+    const totalPages = pagesPerSet(selectedPages, cfg) * (Number.isFinite(count) && count > 0 ? count : 1);
     const quota = await licenseManager.canExport(totalPages);
     if (!quota.allowed) {
         const u = quota.usage || {};
@@ -303,6 +306,18 @@ export async function exportPDF() {
                 addPage();
                 drawBlankFiller(ctx, ps);
                 queueFooter(ps, '');
+            }
+
+            // ---- Set separator ----
+            // A blank sheet closing each set, so a stack printed back to back
+            // can be split into sets by eye. Added after the padding above,
+            // so it is always a whole sheet of its own and never lands on the
+            // reverse of a student page. It carries no footer and is not
+            // counted in the set's "Page x of y".
+            if (cfg.setSeparator) {
+                doc.addPage();
+                drawSeparatorPage(ctx, `Set ${i + 1}`, count, getPScale('notes'));
+                if (duplexSafe) doc.addPage();   // empty reverse
             }
 
             if (wantKey && keysAtEnd) keyQueue.push({ cpd, setIdx: i });

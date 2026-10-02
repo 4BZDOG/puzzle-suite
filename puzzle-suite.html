@@ -446,7 +446,7 @@
                     <div class="card-content">
                         <div class="toggle-row"><label for="scrShowBank">Show Word Bank</label><label class="switch"><input
                                     type="checkbox" id="scrShowBank" checked onchange="focusPage(4); renderActivePage(); saveState();"><span
-                                    class="slider"></span></label></div>
+                                    class="slider-switch"></span></label></div>
                         <div class="toggle-row"><label for="scrShowHint">Show First Letter Hint</label><label class="switch"><input
                                     type="checkbox" id="scrShowHint" onchange="focusPage(4); renderActivePage(); saveState();"><span
                                     class="slider-switch"></span></label></div>
@@ -480,33 +480,40 @@
                     <div id="page-order-list" class="sortable-list">
                         <div class="sortable-item" draggable="true" data-page="notes">
                             <i class="fas fa-grip-vertical drag-handle"></i><input type="checkbox" id="sel-notes"
-                                checked onchange="saveState()"><span>Notes</span>
+                                checked onchange="saveState(); updateUI()"><span>Notes</span>
                         </div>
                         <div class="sortable-item" draggable="true" data-page="ws">
                             <i class="fas fa-grip-vertical drag-handle"></i><input type="checkbox" id="sel-ws" checked
-                                onchange="saveState()"><span>Word Search</span>
+                                onchange="saveState(); updateUI()"><span>Word Search</span>
                         </div>
                         <div class="sortable-item" draggable="true" data-page="cw">
                             <i class="fas fa-grip-vertical drag-handle"></i><input type="checkbox" id="sel-cw" checked
-                                onchange="saveState()"><span>Crossword</span>
+                                onchange="saveState(); updateUI()"><span>Crossword</span>
                         </div>
                         <div class="sortable-item" draggable="true" data-page="scr">
                             <i class="fas fa-grip-vertical drag-handle"></i><input type="checkbox" id="sel-scr" checked
-                                onchange="saveState()"><span>Scramble</span>
+                                onchange="saveState(); updateUI()"><span>Scramble</span>
                         </div>
                         <div class="sortable-item" draggable="true" data-page="key">
                             <i class="fas fa-grip-vertical drag-handle"></i><input type="checkbox" id="sel-key" checked
-                                onchange="saveState()"><span>Answer Keys</span>
+                                onchange="saveState(); updateUI()"><span>Answer Keys</span>
                         </div>
                     </div>
-                    <div class="toggle-row" style="margin-top:14px;"><label for="keysAtEnd">Answer keys at end of
+                    <label class="field-label" style="margin-top:18px;">Printing &amp; packaging</label>
+                    <div class="packaging-toggles">
+                    <div class="toggle-row"><label for="keysAtEnd">Answer keys at end of
                             document</label><label class="switch"><input type="checkbox" id="keysAtEnd" checked
-                                onchange="saveState()"><span class="slider"></span></label></div>
+                                onchange="saveState(); updateUI()"><span class="slider-switch"></span></label></div>
                     <div class="toggle-row"><label for="duplexSafe">Duplex-safe (each set starts a new
                             sheet)</label><label class="switch"><input type="checkbox" id="duplexSafe" checked
-                                onchange="saveState()"><span class="slider"></span></label></div>
+                                onchange="saveState(); updateUI()"><span class="slider-switch"></span></label></div>
+                    <div class="toggle-row"><label for="setSeparator">Blank separator sheet after each set</label><label
+                            class="switch"><input type="checkbox" id="setSeparator" onchange="saveState(); updateUI()"><span
+                                class="slider-switch"></span></label></div>
+                    </div>
                     <div class="field-hint">Keeps the teacher key off the back of a student page, and stops one sheet
                         carrying two students' work when printing double-sided.</div>
+                    <div class="field-hint packet-summary" id="packet-summary" aria-live="polite"></div>
                     <div class="bulk-export-row">
                         <input type="number" id="bulkCount" value="1" min="1" max="3" class="input-large-center">
                         <span class="text-bold-small">Unique Copies (Bulk)</span>
@@ -720,7 +727,7 @@
         </div>
     </div>
 
-    <script src="bundle.js?v=2f0c77163a"></script>
+    <script src="bundle.js?v=fb2380c870"></script>
 </body>
 
 </html>

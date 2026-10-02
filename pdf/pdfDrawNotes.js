@@ -95,6 +95,14 @@ export function drawNotes(ctx, notesList, startY, pScale) {
         const defX = termX + termColW;
         const defW = availW - numColW - termColW;
         const pillW = examplePillWidth(doc, { pScale, pdfFont });
+        // The letter label is drawn bold, so it is measured bold, and every
+        // definition starts at the widest label's edge. Measured in the body
+        // weight, "F." came out narrower than it drew and ran into its text.
+        setFontSafe(doc, pdfFont, 'bold');
+        doc.setFontSize(fontPt);
+        const prefixCol = isMatching
+            ? notesList.reduce((m, w) => Math.max(m, doc.getTextWidth(`${w.matchLetter}. `)), 0) + 0.8
+            : 0;
         let total = 8 * pScale * k;   // header row
         const rows = notesList.map((w, i) => {
             setFontSafe(doc, pdfFont, 'bold');
@@ -110,7 +118,7 @@ export function drawNotes(ctx, notesList, startY, pScale) {
             setFontSafe(doc, pdfFont, 'normal');
             doc.setFontSize(fontPt);
             const t = rowText(w);
-            const prefixW = t.prefix ? doc.getTextWidth(t.prefix) : 0;
+            const prefixW = t.prefix ? prefixCol : 0;
             const reserve = isExDef ? pillW + 2 + echoW : 0;
             const dLines = showDef
                 ? doc.splitTextToSize(t.body, Math.max(20, defW - prefixW - reserve))
@@ -120,8 +128,7 @@ export function drawNotes(ctx, notesList, startY, pScale) {
             // placed against it (and measured for) identically in both passes.
             let lastLineW = 0;
             if (dLines.length) {
-                lastLineW = doc.getTextWidth(dLines[dLines.length - 1]) +
-                    (dLines.length === 1 ? prefixW : 0);
+                lastLineW = doc.getTextWidth(dLines[dLines.length - 1]) + prefixW;   // hanging indent: every line sits right of the letter
             }
             const pillOwnLine = isExDef && showDef &&
                 (lastLineW + echoW + 2 + pillW > defW);
@@ -241,7 +248,7 @@ export function drawNotes(ctx, notesList, startY, pScale) {
             doc.setFontSize(fontPt);
             doc.setTextColor(...PALETTE.body);
             r.dLines.forEach((line, idx) => {
-                doc.text(line, defX + (idx === 0 ? r.prefixW : 0), cy + idx * lineH);
+                doc.text(line, defX + r.prefixW, cy + idx * lineH);
             });
 
             if (isExDef) {

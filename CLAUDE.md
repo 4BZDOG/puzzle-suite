@@ -564,6 +564,13 @@ Status dots reflect placement in the currently-visible puzzle page.
 
 ---
 
+## Session Fixes (2026-10-02b — Set separator & packaging)
+
+- **`setSeparator`** (default **off**, Export tab → *Printing & packaging*): appends a separator sheet after every set so a stack printed back to back can be split by eye. Logic in `pdfExport.js` runs **after** duplex padding, so it is always a whole sheet of its own: with `duplexSafe` on it is two pages (a nearly blank front via `drawSeparatorPage()` — one small `END OF SET N` caption — and a completely empty reverse); with it off, one page. It queues **no footer** and is not counted in the set's `Page x of y`, and `pagesPerSet()` includes it in the metering estimate. It also stands between the last set and the key appendix. Mirrored in the test harness's `exportRun({ setSeparator })`.
+- **Packet summary**: `#packet-summary` is one plain-English line (`Each set prints as 4 pages (2 sheets, double-sided), then one separator sheet…`) rebuilt by `_updatePacketSummary()` from the same rules as the export. The page-selection and packaging toggles now call `updateUI()` so it stays live, and `_updatePageChrome()` calls `syncSettingsFromDOM()` first.
+- **Invisible switches (bug)**: `keysAtEnd`, `duplexSafe` and the scramble word-bank toggle used `class="slider"`, which has no CSS — the switch rendered 0 px wide, so teachers could not see or flip them. The class is **`slider-switch`**.
+- **Matching labels (PDF)**: the bold `F.` / `P.` label was measured in the regular weight, so wide letters ran into their definition. All labels are measured bold, definitions share one start x, and a wrapped definition hangs under its own text rather than under the letter.
+
 ## Session Fixes (2026-10-02 — UI/UX & PDF alignment pass)
 
 `npm run test:pdf` now runs 4 more checks. Found by rendering the real app and PDF and looking at them.
