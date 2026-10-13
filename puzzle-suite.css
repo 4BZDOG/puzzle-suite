@@ -2165,17 +2165,26 @@ table.mode-cw td.cell.empty {
     background: #fef2f2;
 }
 
+/* One first-line grid for every row. The number, the term and the definition
+   each start with the same top inset (the .notes-editable padding + border,
+   5px) and share one font size and line height, so their first baselines
+   coincide. The answer box is sized off the same line box, so its centre is
+   the first line's centre. */
 .notes-table {
+    --notes-fs: calc(var(--notes-font-size) * var(--global-font-scale) * var(--page-scale));
+    --notes-lh: 1.4;
+    --notes-inset: 5px; /* .notes-editable: padding 4px + border 1px */
     width: 100%;
     display: flex;
     flex-direction: column;
     font-family: var(--user-font);
-    font-size: calc(var(--notes-font-size) * var(--global-font-scale) * var(--page-scale));
+    font-size: var(--notes-fs);
+    line-height: var(--notes-lh);
 }
 
 /* Explicit column widths: # 5%, answer box 8%, term (slider), definition.
-   `stretch` lets the answer-box cell centre its box against the whole row
-   rather than pinning it to the first line of a wrapped definition. */
+   `stretch` lets each cell start at the top of the row, so every first line
+   sits on the same grid. */
 .notes-row {
     display: flex;
     border-bottom: 1px solid #cbd5e1;
@@ -2187,13 +2196,25 @@ table.mode-cw td.cell.empty {
     border-bottom: 2px solid #000;
 }
 
+/* Right-aligned, so "9." and "10." share an edge and keep the same gap to
+   the next column (the PDF does the same). The header "#" uses this rule too. */
 .notes-num {
     width: 5%;
     min-width: 26px;
+    flex-shrink: 0;
+    padding: var(--notes-inset) 8px 0 0;
+    text-align: right;
     font-weight: 700;
     color: #666;
-    flex-shrink: 0;
-    padding-top: 2px;
+}
+
+.notes-header .notes-num {
+    padding-top: 0;
+}
+
+/* The worked example's term row number is blue, as in the PDF. */
+.notes-row.ex-term .notes-num {
+    color: #2563eb;
 }
 
 .notes-box {
@@ -2201,22 +2222,33 @@ table.mode-cw td.cell.empty {
     min-width: 30px;
     flex-shrink: 0;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: flex-start;
 }
 
+/* The box is as tall as the first line box (1.4em) and its top sits at the
+   line's top inset, so its centre is the first line's centre. The letter is
+   centred by flexbox rather than by a line height worked out from the border:
+   Chromium rounds a 1.5px border to whole device pixels at 1x, so an inner
+   height of (box - 3px) was off by about a pixel. Sizes come from the table's
+   font so the box stays proportional to the type. */
 .match-answer-box {
-    display: inline-block;
-    width: 20px;
-    height: 18px;
+    --box-h: calc(var(--notes-fs, 14px) * var(--notes-lh, 1.4));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: calc(var(--notes-fs, 14px) * 2.4);
+    height: var(--box-h);
     flex-shrink: 0;
     border: 1.5px solid #94a3b8;
     border-radius: 3px;
-    text-align: center;
-    line-height: 18px;
+    line-height: 1;
     font-weight: 700;
-    font-size: 0.85em;
-    vertical-align: middle;
+    font-size: calc(var(--notes-fs, 14px) * 0.9);
+    vertical-align: top;
+    /* top = inset + (first line box height / 2) - (box height / 2) */
+    margin-top: calc(var(--notes-inset, 5px) + var(--notes-fs, 14px) * var(--notes-lh, 1.4) / 2 - var(--box-h) / 2);
     margin-left: 2px;
     background: #fff;
 }
@@ -2236,22 +2268,54 @@ table.mode-cw td.cell.empty {
     word-break: break-word;
 }
 
-/* The badge is a flex sibling of the text, never an overlay: it keeps its
-   own width (flex-shrink:0) and wraps onto its own line when the definition
-   runs the full width, instead of being painted over the words. */
+/* The definition, its letter count and its EXAMPLE pill are one run of inline
+   content, as in the PDF: the count follows the last word of a wrapped
+   definition, and the pill follows the count, dropping to a new line only if
+   it cannot fit. The block carries the inset the editable used to carry on
+   all four sides (padding 4px + border 1px), so first baselines are unchanged
+   and the wrap width is the same. */
 .notes-clue {
     flex: 1;
     min-width: 0;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 4px 8px;
+    display: block;
+    padding: var(--notes-inset);
 }
 
+/* Inline rather than block: a block editable pushed the count onto its own
+   line below the whole definition. Padding and border are removed here
+   because they add no line height to an inline box; the inset above replaces
+   them. The text inside stays the clue alone, so innerText saved on blur
+   carries no count or pill. */
 .notes-clue .notes-editable {
-    flex: 1;
-    min-width: 0;
+    display: inline;
+    padding: 0;
+    border: 0;
+    border-radius: 3px;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+}
+
+/* A word added without a clue has an empty definition. An empty inline box
+   collapses to nothing and cannot be clicked, so give it a writing slot. */
+.notes-clue .notes-editable:empty {
+    display: inline-block;
+    min-width: 8em;
+    min-height: 1.4em;
+    vertical-align: top;
+}
+
+/* Scoped to the notes definition: the count is shared with the crossword and
+   word-search renderers, which must not change. The space before it in the
+   markup is the break opportunity, so the count wraps as a word would; the
+   margin adds the rest of the gap. */
+.notes-clue .notes-clue-length {
+    margin-left: 2px;
+    padding-top: 0;
+}
+
+.notes-clue .example-pill {
+    vertical-align: baseline;
+    margin-left: 2px;
 }
 
 .notes-editable {
@@ -2313,14 +2377,18 @@ table.mode-cw td.cell.empty {
     flex-shrink: 0;
 }
 
+/* Left inset matches the text below (.notes-editable padding + border), so
+   TERM and DEFINITION start on the same x as the words they label. */
 .notes-word-header {
     width: var(--notes-term-width);
     flex-shrink: 0;
+    padding-left: var(--notes-inset);
     padding-right: 16px;
 }
 
 .notes-clue-header {
     flex: 1;
+    padding-left: var(--notes-inset);
 }
 
 .slider-val {
