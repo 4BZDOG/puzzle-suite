@@ -27,6 +27,11 @@ function fitLabel(doc, label, maxW) {
  * page: a six-word list no longer leaves a third of the sheet blank,
  * and a fifty-word list tightens instead of spilling onto page two.
  *
+ * Geometry: rules and zebra bands run margin to margin, but every letter
+ * and answer box sits `padX` inside them, and each row's text block is
+ * centred vertically in its band. The column widths depend on the type
+ * size, so they are solved inside `measure(k)` with the rest of the fit.
+ *
  * @param {Object} ctx       - buildCtx() result
  * @param {Array}  notesList - puzzleData.notes
  * @param {number} startY    - Y after the header
@@ -38,7 +43,14 @@ export function drawNotes(ctx, notesList, startY, pScale) {
     if (!notesList || !notesList.length) return;
 
     const availW = PAGE_WIDTH - MARGIN * 2;
-    const availH = PAGE_HEIGHT - MARGIN - startY;
+    // The table stops FOOT_CLEAR short of the bottom margin so the last rule
+    // never crowds the running footer hairline beneath it.
+    const FOOT_CLEAR = 6;
+    const bottomY = PAGE_HEIGHT - MARGIN - FOOT_CLEAR;
+    const availH = bottomY - startY;
+    // Inset for every letter and answer box, from both the band edges and the
+    // page rules, so no text ever touches the edge of its row.
+    const padX = 2.5 * pScale;
 
     const isMatching = isMatchingNotes(notesList);
     const showTerm = notesConfig ? notesConfig.showTerm !== false : true;
@@ -49,14 +61,7 @@ export function drawNotes(ctx, notesList, startY, pScale) {
     const showLetterCount = !isMatching && ctx.showLetterCount !== false;
     const showExample = ctx.showExample || false;
 
-    // ---- Column geometry -------------------------------------------
-    // Proportional rather than a fixed 20 mm: # gets 5%, the answer box its
-    // own 8% column, then the term column and the definition take the rest.
-    const numW    = Math.max(9, availW * 0.05);
-    const boxColW = isMatching ? Math.max(9, availW * 0.08) : 0;
-    const numColW = numW + boxColW;
     const termFrac = (notesConfig?.termWidth || 27) / 100;
-    const termX = MARGIN + numColW;
 
     // The term side of the worked example is always row 1. The definition
     // beside it belongs to a DIFFERENT term once the definitions are
@@ -67,14 +72,16 @@ export function drawNotes(ctx, notesList, startY, pScale) {
 
     // The term column has to be measured at the size the row will actually
     // be drawn at — the vertical fit below can grow the type, and a column
-    // sized for 10pt would then wrap "COORDINATE" onto two lines.
-    const termColWFor = (fontPt) => {
+    // sized for 10pt would then wrap "COORDINATE" onto two lines. The pool
+    // runs to the right inset, so the definition column ends at padX too.
+    const termColWFor = (fontPt, numColW) => {
         setFontSafe(doc, pdfFont, 'bold');
         doc.setFontSize(fontPt);
         const widest = notesList.reduce((m, w) => Math.max(m, doc.getTextWidth(w.term)), 0);
+        const pool = availW - numColW - padX;
         return Math.min(
-            Math.max((availW - numColW) * termFrac, 28, widest + 5),
-            (availW - numColW) * 0.70);
+            Math.max(pool * termFrac, 28, widest + 5),
+            pool * 0.70);
     };
 
     // Row text, per candidate scale k
@@ -89,11 +96,27 @@ export function drawNotes(ctx, notesList, startY, pScale) {
 
     const measure = (k) => {
         const fontPt = 10 * pScale * k;
+        const sz     = fontPt * 0.3528;   // type size in mm
+        const capH   = 0.72 * sz;         // cap height in mm
         const lineH  = 4.5 * pScale * k;
-        const pad    = 3.5 * pScale * k;
-        const termColW = termColWFor(fontPt);
-        const defX = termX + termColW;
-        const defW = availW - numColW - termColW;
+        const pad    = 4.5 * pScale * k;
+
+        // ---- Columns, solved at this type size ---------------------------
+        // The row number is right-aligned 3 mm short of the term column (or
+        // the answer box). In matching mode the box follows the number and
+        // the term sits after the box.
+        const numW     = Math.max(11, availW * 0.06);
+        const boxH     = isMatching ? Math.min(1.45 * sz, 6.5) : 0;
+        const boxW     = isMatching ? Math.min(boxH * 1.7, 11) : 0;
+        const boxColW  = isMatching ? boxW + 4 : 0;
+        const numColW  = padX + numW + boxColW;
+        const numRight = MARGIN + padX + numW - 3;
+        const boxX     = MARGIN + padX + numW;
+        const termX    = MARGIN + numColW;
+        const termColW = termColWFor(fontPt, numColW);
+        const defX     = termX + termColW;
+        const defW     = (PAGE_WIDTH - MARGIN - padX) - defX;
+
         const pillW = examplePillWidth(doc, { pScale, pdfFont });
         // The letter label is drawn bold, so it is measured bold, and every
         // definition starts at the widest label's edge. Measured in the body
@@ -101,9 +124,11 @@ export function drawNotes(ctx, notesList, startY, pScale) {
         setFontSafe(doc, pdfFont, 'bold');
         doc.setFontSize(fontPt);
         const prefixCol = isMatching
-            ? notesList.reduce((m, w) => Math.max(m, doc.getTextWidth(`${w.matchLetter}. `)), 0) + 0.8
+            ? notesList.reduce((m, w) => Math.max(m, doc.getTextWidth(`${w.matchLetter}. `)), 0) + 1.4
             : 0;
-        let total = 8 * pScale * k;   // header row
+
+        // Header: baseline to heavy rule, then the rows.
+        let total = 2 * pScale;
         const rows = notesList.map((w, i) => {
             setFontSafe(doc, pdfFont, 'bold');
             doc.setFontSize(fontPt);
@@ -133,12 +158,20 @@ export function drawNotes(ctx, notesList, startY, pScale) {
             const pillOwnLine = isExDef && showDef &&
                 (lastLineW + echoW + 2 + pillW > defW);
 
+            // The row is one line taller when the pill drops to its own line.
             const maxLines = Math.max(tLines.length, dLines.length, 1);
-            const h = maxLines * lineH + pad + (pillOwnLine ? lineH : 0);
+            const extra    = pillOwnLine ? 1 : 0;
+            const h        = (maxLines + extra) * lineH + pad;
+            // Cap-top of the first line to the last baseline: the block that
+            // is centred in the band.
+            const blockH   = capH + (maxLines - 1 + extra) * lineH;
             total += h;
-            return { tLines, dLines, maxLines, h, prefixW, lastLineW, echoW, pillOwnLine, ...t };
+            return { tLines, dLines, maxLines, h, blockH, prefixW, lastLineW, echoW, pillOwnLine, ...t };
         });
-        return { rows, total, fontPt, lineH, pad, k, termColW, defX, defW };
+
+        const geom = { padX, numW, numRight, numColW, boxX, boxW, boxH, boxColW,
+            termX, termColW, defX, defW, prefixCol };
+        return { rows, total, fontPt, lineH, capH, k, geom };
     };
 
     // Largest k (leading + type size together) that still fits one page.
@@ -153,8 +186,8 @@ export function drawNotes(ctx, notesList, startY, pScale) {
             if (m.total <= availH) { best = m; lo = mid; } else { hi = mid; }
         }
     }
-    const { rows, fontPt, lineH, pad, k, defX, defW } = best;
-    const ruleGap = 1.5 * pScale * k;   // text baseline -> hairline rule
+    const { rows, fontPt, lineH, capH } = best;
+    const { numRight, boxX, boxW, boxH, termX, defX, defW, prefixCol } = best.geom;
     // Any leftover goes half above the table, so it reads as margin.
     let cy = startY + Math.max(0, Math.min(14 * pScale, (availH - best.total) / 2));
 
@@ -162,13 +195,24 @@ export function drawNotes(ctx, notesList, startY, pScale) {
     setFontSafe(doc, pdfFont, 'bold');
     doc.setFontSize(Math.min(11 * pScale, fontPt));
     doc.setTextColor(...PALETTE.muted);
-    doc.text('#', MARGIN + numW - 2, cy, { align: 'right' });
+    doc.text('#', numRight, cy, { align: 'right' });
     if (showTerm) doc.text('TERM', termX, cy);
     if (showDef) doc.text(isMatching ? 'DEFINITIONS (IN A DIFFERENT ORDER)' : 'DEFINITION', defX, cy);
     doc.setDrawColor(...PALETTE.ink);
     doc.setLineWidth(0.4);
     doc.line(MARGIN, cy + 2 * pScale, PAGE_WIDTH - MARGIN, cy + 2 * pScale);
-    cy += 8 * pScale;
+    // The top edge of the first band is the heavy rule.
+    let rowTop = cy + 2 * pScale;
+
+    // Hairline rules are drawn after each page's bands and text, so a
+    // banded row cannot paint over the rule above it.
+    let pendingRules = [];
+    const flushRules = () => {
+        doc.setDrawColor(...PALETTE.rule);
+        doc.setLineWidth(0.2);
+        pendingRules.forEach(y => doc.line(MARGIN, y, PAGE_WIDTH - MARGIN, y));
+        pendingRules = [];
+    };
 
     // ---- Rows ----
     notesList.forEach((w, i) => {
@@ -176,20 +220,26 @@ export function drawNotes(ctx, notesList, startY, pScale) {
         const isExTerm = i === exTermIdx;
         const isExDef  = i === exDefIdx;
 
-        if (cy + r.h > PAGE_HEIGHT - MARGIN) {
+        if (rowTop + r.h > bottomY) {
+            flushRules();
             doc.addPage();
             drawWatermark();
-            cy = MARGIN + 10 * pScale;
+            rowTop = MARGIN + 10 * pScale;
         }
+
+        // Vertical centring: the block from the top of the capitals to the
+        // last baseline sits in the middle of the band, so the space above
+        // the first line equals the space below the last one.
+        const base    = rowTop + (r.h - r.blockH) / 2 + capH;
+        const centreY = base - capH / 2;
 
         // Zebra striping stays uniform across the whole table. Tinting only
         // the left half of row 1 and only the right half of row 16 broke the
         // alternating bands into a checkerboard, which read as a rendering
         // fault rather than as emphasis.
-        const bandY = cy - pad + 1;
         if (i % 2 === 1) {
             doc.setFillColor(...PALETTE.band);
-            doc.rect(MARGIN, bandY, availW, r.h, 'F');
+            doc.rect(MARGIN, rowTop, availW, r.h, 'F');
         }
         // No bounding box around the example. A fill broke the zebra bands
         // into a checkerboard and an outline clipped the row number it ran
@@ -200,20 +250,15 @@ export function drawNotes(ctx, notesList, startY, pScale) {
         setFontSafe(doc, pdfFont, 'bold');
         doc.setFontSize(fontPt);
         doc.setTextColor(...(isExTerm ? PALETTE.example : PALETTE.muted));
-        const numStr = `${i + 1}.`;
         // Right-aligned so 9. and 10. share a column edge and a two-digit
         // number keeps the same gap to its term as a one-digit one.
-        doc.text(numStr, MARGIN + numW - 2, cy, { align: 'right' });
+        doc.text(`${i + 1}.`, numRight, base, { align: 'right' });
 
         if (isMatching) {
-            // Centred on the row's whole text block rather than pinned to
-            // the first baseline, so a two-line definition does not leave
-            // its answer box floating up beside the first line.
-            const boxH = 4.5 * pScale, boxW = Math.min(8, boxColW - 2);
-            const blockTop = cy - lineH * 0.72;
-            const blockH = (r.maxLines - 1) * lineH + lineH * 0.94;
-            const boxY = blockTop + (blockH - boxH) / 2;
-            const boxX = MARGIN + numW;
+            // The box is centred on the FIRST line, never on the whole block,
+            // so a two-line definition leaves its answer box level with the
+            // number and term beside it.
+            const boxY = centreY - boxH / 2;
             if (isExTerm) {
                 doc.setFillColor(...PALETTE.exampleBg);
                 doc.setDrawColor(...PALETTE.example);
@@ -222,7 +267,7 @@ export function drawNotes(ctx, notesList, startY, pScale) {
                 setFontSafe(doc, pdfFont, 'bold');
                 doc.setFontSize(fontPt);
                 doc.setTextColor(...PALETTE.example);
-                doc.text(w.correctLetter, boxX + boxW / 2, boxY + boxH * 0.78, { align: 'center' });
+                doc.text(w.correctLetter, boxX + boxW / 2, centreY + capH / 2, { align: 'center' });
             } else {
                 doc.setDrawColor(...PALETTE.muted);
                 doc.setLineWidth(0.3);
@@ -234,25 +279,29 @@ export function drawNotes(ctx, notesList, startY, pScale) {
             setFontSafe(doc, pdfFont, 'bold');
             doc.setFontSize(fontPt);
             doc.setTextColor(...PALETTE.ink);
-            doc.text(r.tLines, termX, cy);
+            // Each line is placed on the shared leading, so a wrapped term
+            // stays inside the block that is centred in the band.
+            r.tLines.forEach((line, idx) => doc.text(line, termX, base + idx * lineH));
         }
 
         if (showDef) {
             if (r.prefix) {
+                // Labels are right-aligned to one edge, so "I." and "M." both
+                // leave the same gap before the definition.
                 setFontSafe(doc, pdfFont, 'bold');
                 doc.setFontSize(fontPt);
                 doc.setTextColor(99, 102, 241);
-                doc.text(r.prefix, defX, cy);
+                doc.text(r.prefix.trimEnd(), defX + prefixCol - 1.0, base, { align: 'right' });
             }
             setFontSafe(doc, pdfFont, 'normal');
             doc.setFontSize(fontPt);
             doc.setTextColor(...PALETTE.body);
             r.dLines.forEach((line, idx) => {
-                doc.text(line, defX + r.prefixW, cy + idx * lineH);
+                doc.text(line, defX + r.prefixW, base + idx * lineH);
             });
 
             if (isExDef) {
-                const lastY = cy + Math.max(0, r.dLines.length - 1) * lineH;
+                const lastY = base + Math.max(0, r.dLines.length - 1) * lineH;
                 let endX = defX + r.lastLineW;
                 // Only spell out the answer when the term column is hidden —
                 // otherwise the term is already sitting on the same row.
@@ -271,18 +320,16 @@ export function drawNotes(ctx, notesList, startY, pScale) {
             }
         }
 
-        cy += r.maxLines * lineH + (r.pillOwnLine ? lineH : 0) + ruleGap;
-        doc.setDrawColor(...PALETTE.rule);
-        doc.setLineWidth(0.2);
-        doc.line(MARGIN, cy - 1 * pScale, PAGE_WIDTH - MARGIN, cy - 1 * pScale);
-        cy += pad - ruleGap;
+        rowTop += r.h;
+        pendingRules.push(rowTop);
     });
+    flushRules();
 
     // Adaptive flow: a short list cannot fill an A4 sheet without absurd
     // type, so hand the leftover to the student as ruled working space.
-    const leftover = (startY + availH) - cy;
+    const leftover = (startY + availH) - rowTop;
     if (leftover > 40 * pScale && doc.internal.getNumberOfPages() >= 1) {
-        drawRuledArea(doc, MARGIN, cy + 10 * pScale, availW, leftover - 14 * pScale,
+        drawRuledArea(doc, MARGIN, rowTop + 10 * pScale, availW, leftover - 14 * pScale,
             { pScale, pdfFont, label: 'NOTES', lineGap: 9 });
     }
 }

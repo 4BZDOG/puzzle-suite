@@ -19,7 +19,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { jsPDF } from 'jspdf';
 
-import { buildCtx, drawHeader, drawFooter, drawBlankFiller } from '../pdf/pdfHelpers.js';
+import { buildCtx, drawHeader, drawFooter, drawBlankFiller, PALETTE } from '../pdf/pdfHelpers.js';
 import { drawWordSearch } from '../pdf/pdfDrawWordSearch.js';
 import { drawCrosswordPage, drawCrosswordClues } from '../pdf/pdfDrawCrossword.js';
 import { drawSeparatorPage } from '../pdf/pdfHelpers.js';
@@ -102,13 +102,21 @@ function makeDoc() {
         log.push({ kind: 'image', page: page(), x: args[2], y: args[3] });
         return origImage(...args);
     };
+    // Fill colour is tracked so a zebra band can be told from an answer box:
+    // both are rects, only the band is 'F' in PALETTE.band.
+    let fillNow = '';
+    const origSetFill = doc.setFillColor.bind(doc);
+    doc.setFillColor = function (...args) { fillNow = args.join(','); return origSetFill(...args); };
     const origRect = doc.rect.bind(doc);
-    doc.rect = function (x, y, w, h, s) { log.push({ kind: 'rect', page: page(), x, y, w, h }); return origRect(x, y, w, h, s); };
+    doc.rect = function (x, y, w, h, s) {
+        log.push({ kind: 'rect', page: page(), x, y, w, h, style: s || 'S', fill: fillNow });
+        return origRect(x, y, w, h, s);
+    };
     // roundedRect draws through lines() internally, which loses its width and
     // height — an example outline drawn with it was invisible to the log.
     const origRounded = doc.roundedRect.bind(doc);
     doc.roundedRect = function (x, y, w, h, rx, ry, st) {
-        log.push({ kind: 'rect', page: page(), x, y, w, h, rounded: true });
+        log.push({ kind: 'rect', page: page(), x, y, w, h, rounded: true, style: st || 'S', fill: fillNow });
         return origRounded(x, y, w, h, rx, ry, st);
     };
     const origLine = doc.line.bind(doc);
@@ -322,6 +330,16 @@ function collisions(log) {
     });
     return bad;
 }
+
+/** Where a logged text run's ink starts and ends, given its alignment. */
+function leftEdgeOf(t) {
+    return t.align === 'right' ? t.x - t.w : t.align === 'center' ? t.x - t.w / 2 : t.x;
+}
+function rightEdgeOf(t) {
+    return t.align === 'right' ? t.x : t.align === 'center' ? t.x + t.w / 2 : t.x + t.w;
+}
+/** Cap height of a logged run, in mm (0.72 of the em, as jsPDF Helvetica does). */
+const capOf = (t) => 0.72 * t.size * 0.3528;
 
 // ---- assertions ----
 let failed = 0;
@@ -860,17 +878,32 @@ function pillCollisions(log) {
 {
     const r = exportRun({ matching: true, label: 'match-labels' });
     const p1 = r.log.filter(l => l.kind === 'text' && l.page === 1);
-    const labels = p1.filter(l => /^[A-Z]\. $/.test(l.text));
+    // Labels are right-aligned ("A.", no trailing space), so the right edge is
+    // what the gap is measured from, whatever the recorded alignment.
+    const labels = p1.filter(l => /^[A-Z]\.$/.test(l.text));
+    // The first-line definition on the label's baseline: the nearest ink to
+    // its right. The EXAMPLE pill can share that baseline, but it sits further
+    // right than the words it annotates, so the nearest run is the definition.
+    const firstLineBody = (lab) => p1
+        .filter(l => Math.abs(l.y - lab.y) < 0.3 && l.text !== lab.text && l.text.trim()
+            && leftEdgeOf(l) >= rightEdgeOf(lab) - 0.01)
+        .sort((a, b) => leftEdgeOf(a) - leftEdgeOf(b))[0];
     let worst = Infinity;
     labels.forEach(lab => {
-        const body = p1.find(l => Math.abs(l.y - lab.y) < 0.3 && l.x > lab.x && l.text !== lab.text);
-        if (body) worst = Math.min(worst, body.x - (lab.x + lab.w));
+        const body = firstLineBody(lab);
+        if (body) worst = Math.min(worst, leftEdgeOf(body) - rightEdgeOf(lab));
     });
     check('every definition clears its letter label by 0.5mm', labels.length >= 20 && worst >= 0.5,
         `${labels.length} labels, min gap ${worst.toFixed(2)}mm`);
-    const bodyXs = new Set(p1.filter(l => labels.some(lab => Math.abs(l.y - lab.y) < 0.3 && l.x > lab.x))
-        .map(l => l.x.toFixed(1)));
-    check('all first-line definitions start on one x', bodyXs.size === 1, [...bodyXs].join(','));
+    const labelEdges = labels.map(rightEdgeOf);
+    const edgeSpread = Math.max(...labelEdges) - Math.min(...labelEdges);
+    check('all letter labels share one right edge', labels.length >= 20 && edgeSpread <= 0.05,
+        `${labels.length} labels, spread ${edgeSpread.toFixed(3)}mm`);
+    const bodyXs = new Set(labels.map(lab => {
+        const body = firstLineBody(lab);
+        return body ? leftEdgeOf(body).toFixed(1) : 'none';
+    }));
+    check('all first-line definitions start on one x', bodyXs.size === 1 && !bodyXs.has('none'), [...bodyXs].join(','));
 }
 
 
@@ -1008,6 +1041,238 @@ function pillCollisions(log) {
         metaFor('notes', true).label === 'MATCHING' &&
         metaFor('notes', false).label === 'VOCABULARY' &&
         toHex(metaFor('notes', false).accent) === '#6366f1');
+}
+
+// =============================================================
+// v5 review — notes page geometry
+// =============================================================
+// Read back from the draw log, so the assertions describe what lands on the
+// sheet rather than what the drawer intended. Every check runs over all seven
+// fixtures below; a failure names the fixture that broke.
+
+// Thirty words for the stress case: the table is tallest here.
+const WORDS30 = WORDS.concat([
+    ['FUNCTION', 'A rule pairing each input with exactly one output'],
+    ['DOMAIN', 'The set of allowed input values'],
+    ['RANGE', 'The set of resulting output values'],
+    ['PARALLEL', 'Lines with the same gradient that never meet'],
+    ['MIDPOINT', 'The point halfway between two others'],
+    ['RECIPROCAL', 'One divided by a number, its multiplicative inverse'],
+    ['INTERCEPTS', 'The coordinates where a graph meets the axes'],
+    ['DIAGONAL', 'A line joining two non-adjacent vertices'],
+    ['INEQUALITY', 'A statement that one expression is greater or less than another'],
+    ['COEFFICIENT', 'The number multiplying a variable in an expression'],
+].map(([word, clue]) => ({ word, clue })));
+
+// The twenty-word list with one long definition, so a matching row wraps.
+const WRAP = WORDS.map(w => w.word !== 'ORIGIN' ? w : {
+    word: w.word,
+    clue: 'The point where both axes meet, (0,0), the reference from which every other coordinate on the plane is measured',
+});
+
+/** One notes sheet on its own: header, table and footer, drawn as the export draws them. */
+function notesSheet(words, matching) {
+    const { doc, log } = makeDoc();
+    const ctx = buildCtx(doc, 'helvetica', null, 1,
+        { PAGE_WIDTH: PAGE.W, PAGE_HEIGHT: PAGE.H, MARGIN: PAGE.MARGIN },
+        {
+            notesConfig: { showTerm: true, showDef: true, shuffle: matching, termWidth: 27 },
+            showExample: true, showLetterCount: true, cwShowBank: false, wsInternalGrid: false, titleScale: 1,
+            title: 'Linear Relationships & Coordinate Geometry',
+        });
+    const notes = buildNotes(words, matching);
+    const sy = drawHeader(ctx, 'Linear Relationships', 'Year 8 Mathematics — Unit 4',
+        instructionFor('notes', matching), false, 'SET 1', 1,
+        { ...metaFor('notes', matching), firstOfSet: true });
+    drawNotes(ctx, notes, sy, 1);
+    drawFooter(ctx, 1, { right: matching ? 'MATCHING' : 'VOCABULARY', setLabel: 'Set 1', pageInSet: 1, pagesInSet: 1 });
+    return { n: notes.length, log, pages: doc.internal.getNumberOfPages() };
+}
+
+/** Rows, rules and boxes of a notes sheet, read back from the log. */
+function notesGeometry(sheet) {
+    const p = sheet.log.filter(l => l.page === 1);
+    const n = sheet.n;
+    const head = p.find(l => l.kind === 'text' && l.text === '#');
+    const footerRule = p.find(l => l.kind === 'line' && l.y > FOOTER_BAND && (l.x2 - l.x) > 100);
+    // Full-width rules between the header row and the footer: the heavy rule,
+    // then one hairline under each row. Taking n + 1 leaves out any ruled
+    // NOTES area drawn beneath the table.
+    const rules = p.filter(l => l.kind === 'line' && head && l.y > head.y && l.y < FOOTER_BAND
+        && Math.abs(l.x - PAGE.MARGIN) < 0.01 && Math.abs(l.x2 - (PAGE.W - PAGE.MARGIN)) < 0.01)
+        .map(l => l.y).sort((a, b) => a - b).slice(0, n + 1);
+    const texts = p.filter(l => l.kind === 'text' && l.text.trim());
+    const rects = p.filter(l => l.kind === 'rect' && !l.rounded);
+    const bands = rects.filter(r => r.style === 'F' && r.fill === PALETTE.band.join(','));
+    const boxes = rects.filter(r => r.style !== 'F' && r.w < 12);
+    const termHead = texts.find(t => t.text === 'TERM');
+    const rows = [];
+    for (let i = 0; i < n && i + 1 < rules.length; i++) {
+        const top = rules[i], bot = rules[i + 1];
+        const inRow = texts.filter(t => t.y > top && t.y < bot);
+        rows.push({
+            i, top, bot, texts: inRow,
+            band: bands.find(b => Math.abs(b.y - top) < 0.01) || null,
+            box: boxes.find(b => b.y > top && b.y < bot) || null,
+            number: inRow.find(t => /^\d+\.$/.test(t.text)) || null,
+            term: termHead
+                ? inRow.filter(t => Math.abs(t.x - termHead.x) < 0.01).sort((a, b) => a.y - b.y)[0] || null
+                : null,
+        });
+    }
+    const headTexts = head ? texts.filter(t => Math.abs(t.y - head.y) < 0.01) : [];
+    return { rows, rules, n, footerY: footerRule ? footerRule.y : null, headTexts };
+}
+
+/** NaN compares false in every direction, so a broken measurement must be made to lose outright:
+ *  a "higher is better" value falls to -Infinity, an "error" value rises to +Infinity. */
+const finite = (v) => (Number.isFinite(v) ? v : -Infinity);
+const finiteErr = (v) => (Number.isFinite(v) ? v : Infinity);
+
+/** Vertical centring error for a row: top gap versus bottom gap, in mm. */
+function centreError(texts, top, bot) {
+    if (!texts.length) return Infinity;
+    const capTop = Math.min(...texts.map(t => t.y - capOf(t)));
+    const lastBase = Math.max(...texts.map(t => t.y));
+    return Math.abs((capTop - top) - (bot - lastBase));
+}
+
+const LAYOUT = [
+    ['standard, 6 words', WORDS.slice(0, 6), false],
+    ['standard, 20 words', WORDS, false],
+    ['standard, 30 words', WORDS30, false],
+    ['matching, 6 words', WORDS.slice(0, 6), true],
+    ['matching, 20 words', WORDS, true],
+    ['matching, 30 words', WORDS30, true],
+    ['matching, wrapped clue', WRAP, true],
+].map(([name, words, matching]) => {
+    const sheet = notesSheet(words, matching);
+    return { name, matching, sheet, geo: notesGeometry(sheet) };
+});
+const TOTAL_ROWS = LAYOUT.reduce((s, c) => s + c.sheet.n, 0);
+const allRows = () => LAYOUT.flatMap(c => c.geo.rows.map(r => ({ c, r })));
+
+// Precondition: the wrapped fixture really does wrap a definition.
+{
+    const wrapped = LAYOUT.find(c => c.name === 'matching, wrapped clue').geo.rows
+        .filter(r => r.texts.filter(t => t.font.endsWith('-normal') && t.align === 'left').length >= 2);
+    check('the wrapped fixture really wraps a definition onto two lines', wrapped.length >= 1,
+        `${wrapped.length} row(s) wrap`);
+}
+
+// 1. Zebra bands: the text block sits in the middle of its band.
+{
+    const errs = [];
+    LAYOUT.forEach(c => c.geo.rows.filter(r => r.band).forEach(r => {
+        const onRules = Math.abs(r.band.y - r.top) < 0.01 && Math.abs(r.band.h - (r.bot - r.top)) < 0.01;
+        errs.push({ name: c.name, onRules, err: finiteErr(centreError(r.texts, r.band.y, r.band.y + r.band.h)) });
+    }));
+    const worst = errs.reduce((m, e) => (e.err > m.err ? e : m), { err: -1, name: '' });
+    check('zebra bands: text block is vertically centred (±0.6mm)',
+        errs.length > 0 && errs.every(e => e.onRules) && worst.err <= 0.6,
+        `${errs.length} bands, worst ${worst.err.toFixed(2)}mm (${worst.name})`);
+}
+
+// 1b. Every row, banded or not, is centred in its own space between rules.
+// Row 1 (the worked example) is unbanded, so the band check alone misses it.
+{
+    const errs = allRows().map(({ c, r }) => ({ name: c.name, row: r.i + 1, err: finiteErr(centreError(r.texts, r.top, r.bot)) }));
+    const worst = errs.reduce((m, e) => (e.err > m.err ? e : m), { err: -1, name: '', row: 0 });
+    check('every row, banded or not, is vertically centred (±0.6mm)',
+        errs.length === TOTAL_ROWS && worst.err <= 0.6,
+        `${errs.length}/${TOTAL_ROWS} rows, worst ${worst.err.toFixed(2)}mm (${worst.name}, row ${worst.row})`);
+}
+
+// 2. Inset from the band edges.
+{
+    const gaps = allRows().filter(({ r }) => r.number)
+        .map(({ c, r }) => ({ name: c.name, v: leftEdgeOf(r.number) - PAGE.MARGIN }));
+    const worst = gaps.reduce((m, g) => (g.v < m.v ? g : m), { v: Infinity, name: '' });
+    check('row numbers clear the band\'s left edge by at least 1.5mm',
+        gaps.length === TOTAL_ROWS && worst.v >= 1.5,
+        `worst ${worst.v.toFixed(2)}mm (${worst.name})`);
+
+    const ends = [];
+    LAYOUT.forEach(c => {
+        c.geo.rows.forEach(r => r.texts.forEach(t => ends.push({ name: c.name, v: (PAGE.W - PAGE.MARGIN) - rightEdgeOf(t), s: t.text })));
+        c.geo.headTexts.forEach(t => ends.push({ name: c.name, v: (PAGE.W - PAGE.MARGIN) - rightEdgeOf(t), s: t.text }));
+    });
+    const tight = ends.reduce((m, g) => (g.v < m.v ? g : m), { v: Infinity, name: '', s: '' });
+    check('no table text ends within 1.5mm of the right band edge',
+        ends.length > 0 && tight.v >= 1.5,
+        `closest ${tight.v.toFixed(2)}mm ("${tight.s}", ${tight.name})`);
+}
+
+// 3. Number to term (or answer box) and box to term clearances.
+{
+    const gaps = [];
+    allRows().forEach(({ c, r }) => {
+        if (!r.number || !r.term || (c.matching && !r.box)) {
+            gaps.push({ name: c.name, row: r.i + 1, numTerm: -Infinity, boxTerm: -Infinity, missing: true });
+            return;
+        }
+        if (c.matching) {
+            gaps.push({
+                name: c.name, row: r.i + 1,
+                numTerm: r.box.x - rightEdgeOf(r.number),
+                boxTerm: leftEdgeOf(r.term) - (r.box.x + r.box.w),
+            });
+        } else {
+            gaps.push({ name: c.name, row: r.i + 1, numTerm: leftEdgeOf(r.term) - rightEdgeOf(r.number), boxTerm: Infinity });
+        }
+    });
+    const nt = gaps.reduce((m, g) => (g.numTerm < m.numTerm ? g : m), { numTerm: Infinity, name: '' });
+    const bt = gaps.filter(g => isFinite(g.boxTerm))
+        .reduce((m, g) => (g.boxTerm < m.boxTerm ? g : m), { boxTerm: Infinity, name: '' });
+    check('row numbers clear their term or answer box by 2.5mm, and boxes clear their term by 3mm',
+        gaps.length === TOTAL_ROWS && !gaps.some(g => g.missing) && nt.numTerm >= 2.5 && bt.boxTerm >= 3,
+        `number gap ${nt.numTerm.toFixed(2)}mm (${nt.name}), box-to-term ${bt.boxTerm === Infinity ? 'n/a' : bt.boxTerm.toFixed(2) + 'mm'}`);
+}
+
+// 4. Answer boxes level with their row numbers, wrapped rows included.
+{
+    const matchingRows = LAYOUT.filter(c => c.matching).flatMap(c => c.geo.rows.map(r => ({ c, r })));
+    const measured = matchingRows.filter(({ r }) => r.box && r.number);
+    const worst = measured.reduce((m, { c, r }) => {
+        const err = finiteErr(Math.abs((r.box.y + r.box.h / 2) - (r.number.y - capOf(r.number) / 2)));
+        return err > m.err ? { err, where: `${c.name}, row ${r.i + 1}` } : m;
+    }, { err: -1, where: '' });
+    check('answer boxes sit level with their row numbers, wrapped row included (±0.5mm)',
+        measured.length === matchingRows.length && worst.err <= 0.5,
+        `${measured.length}/${matchingRows.length} boxes, worst ${worst.err.toFixed(2)}mm (${worst.where})`);
+}
+
+// 5. The worked example's letter is centred in its box on both axes.
+{
+    const out = LAYOUT.filter(c => c.matching).map(c => {
+        const row = c.geo.rows[0];
+        const letter = row.texts.find(t => t.align === 'center');
+        if (!row.box || row.box.style !== 'FD' || !letter) return { name: c.name, h: Infinity, v: Infinity };
+        return {
+            name: c.name,
+            h: Math.abs(letter.x - (row.box.x + row.box.w / 2)),
+            v: Math.abs((letter.y - capOf(letter) / 2) - (row.box.y + row.box.h / 2)),
+        };
+    });
+    const worstH = Math.max(...out.map(o => o.h)), worstV = Math.max(...out.map(o => o.v));
+    check('the worked example letter is centred in its box on both axes (±0.4mm)',
+        out.length > 0 && worstH <= 0.4 && worstV <= 0.4,
+        `horizontal ${worstH.toFixed(2)}mm, vertical ${worstV.toFixed(2)}mm`);
+}
+
+// 6. Footer clearance, and every table stays on one sheet.
+{
+    const clear = LAYOUT.map(c => ({ name: c.name, v: finite(c.geo.footerY - c.geo.rules[c.geo.n]) }));
+    const worst = clear.reduce((m, g) => (g.v < m.v ? g : m), { v: Infinity, name: '' });
+    check('the last table rule clears the footer hairline by 4mm',
+        worst.v >= 4, `closest ${worst.v.toFixed(2)}mm (${worst.name})`);
+
+    const sheets = LAYOUT.map(c => ({
+        name: c.name, pages: c.sheet.pages, rows: c.geo.rows.length, rules: c.geo.rules.length, n: c.geo.n,
+    }));
+    const bad = sheets.filter(s => s.pages !== 1 || s.rows !== s.n || s.rules !== s.n + 1);
+    check('every notes table stays on one sheet with every row drawn',
+        bad.length === 0, bad.map(s => `${s.name}: ${s.pages} page(s), ${s.rows}/${s.n} rows`).join(' | '));
 }
 
 console.log(failed ? `\n${failed} failing check(s)` : '\nAll checks passed');

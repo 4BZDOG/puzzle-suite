@@ -49,7 +49,9 @@ export function renderNotes(container, puzzleData, words, settings, onUpdateWord
     // A letter count next to a shuffled definition leaks the answer, so it
     // is a crossword-only hint. Mirrors drawNotes() in the PDF.
     const showLetterCount = !isMatching && settings.showLetterCount !== false;
-    const lenHint = (n) => showLetterCount ? `<span class="notes-clue-length">(${n})</span>` : '';
+    // The leading space is outside the editable, so it is not saved with the
+    // clue; it gives the count a break opportunity after the last word.
+    const lenHint = (n) => showLetterCount ? ` <span class="notes-clue-length">(${n})</span>` : '';
 
     // Term side of the example is row 1; the definition side follows the
     // shuffle to whichever row actually describes term 1.
@@ -73,7 +75,7 @@ export function renderNotes(container, puzzleData, words, settings, onUpdateWord
 
         if (isMatching) {
             htmlStr += `<div class="notes-editable">${escapeHTML(w.matchLetter)}. ${escapeHTML(stripLetterCount(w.clue))}</div>`;
-            if (isExDef) htmlStr += '<span class="example-pill">EXAMPLE</span>';
+            if (isExDef) htmlStr += ' <span class="example-pill">EXAMPLE</span>';
         } else {
             htmlStr += `<div class="notes-editable" contenteditable="true" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}" onblur="window._puzzleApp.updateWord(${i}, 'clue', this.innerText)">${escapeHTML(w.clue)}</div>`;
             htmlStr += lenHint(w.term.length);
@@ -83,7 +85,7 @@ export function renderNotes(container, puzzleData, words, settings, onUpdateWord
                 if (!settings.notesConfig.showTerm) {
                     htmlStr += ` <b style="color:#2563eb">${escapeHTML(w.term)}</b>`;
                 }
-                htmlStr += '<span class="example-pill">EXAMPLE</span>';
+                htmlStr += ' <span class="example-pill">EXAMPLE</span>';
             }
         }
 
